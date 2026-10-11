@@ -82,6 +82,11 @@ const KNEEL = { pitch: 0.35, headPitch: 0.55, drop: 0.3, front: 1.2, knee: -1.6,
 const OFFER = { pitch: -0.8, headPitch: 0.6, drop: -0.1, front: -1.2, knee: 1.2, hind: -0.2, legs: 1, tailPitch: 0.3, w: 1 };
 /** 立誓：前腳收在身下跪著、頭垂下去，後半身還撐著（主角在國王面前跪下）。 */
 const VOW = { pitch: 0.2, headPitch: 0.5, drop: 0.18, front: 1.1, knee: -1.5, hind: 0, legs: 1, tailPitch: -0.4, w: 1 };
+/** 突進（moves.js 的 LUNGE_POSE）：身體拉長、前腳往前伸、後腳往後蹬，整隻撲出去。 */
+const LUNGE = {
+  pitch: -0.22, headPitch: -0.10, headTilt: -0.25, lean: -0.08,
+  tailPitch: -0.50, front: -1.25, hind: 0.85, knee: 0.30, legs: 0.9, w: 1,
+};
 /** 喘氣：身體往前沉、頭垂一點，尾巴放低。 */
 const PANT = { pitch: 0.12, headPitch: 0.12, drop: 0.05, tailPitch: -0.35, w: 1 };
 
@@ -791,6 +796,67 @@ export const SHOTS = [
     cast: [{ who: 'ghostKing', at: [0, 0], y: 0.4, yaw: 0.25, air: 0, blade: 'king', move: { headPitch: 0.1, w: 1 }, face: 'glare', eyes: { lift: 0.4, spread: 0.15 }, shadow: false }],
     cam: { focus: 'ghostKing', yaw: 0.3, pitch: 0.0, dist: 1.25, fov: 34, frame: [0, 0.08] },
     light: [2, 6, 6],
+  },
+
+  /* ── 第 14 頁　王座廳・戰後 ──────────────────────────────────── */
+  {
+    // 打倒國王：最後一擊的那一刻。主角（右）咬著刀撲過去，國王的亡魂（左）被砍得往後仰、飛起來，
+    // 叉叉眼，劍從嘴裡飛出去、盾散開、霧從身上噴出去；速度線順著撲過去的方向。主角往畫面左邊撲，
+    // 左臉朝鏡頭：刀從右頰伸出去，在臉的另一側，才不會橫在眼睛前面。
+    id: 'p14-1', size: [860, 720], ink: 3.5,
+    speedLines: { angle: 0.25, rows: 12, band: [0.15, 0.85], len: [0.4, 0.7], seed: 3 },
+    cast: [
+      { who: 'hero', at: [1.6, 0], y: 0.35, yaw: -Math.PI / 2 + 0.55, air: 1, move: LUNGE, face: 'proud', blade: 'knife', shadow: false },
+      { who: 'ghostKing', at: [0.45, -0.3], y: 0.15, yaw: Math.PI / 2 - 0.9, air: 3, alpha: 0.45, shields: 3, spin: 1.0,
+        tip: -0.45, move: { pitch: -0.15, headPitch: 0.05, tailPitch: -0.5, front: -0.8, legs: 0.7, w: 1 }, face: 'ko', eyes: { lift: 0.4 }, shadow: false },
+    ],
+    props: [{ blade: 'king', at: [-0.3, -0.6], y: 1.9, yaw: -0.9, size: 1.4 }],
+    puffs: [
+      { x: 0.12, y: 0.32, r: 0.07, alpha: 0.6, seed: 3 },
+      { x: 0.08, y: 0.62, r: 0.06, alpha: 0.55, seed: 5 },
+      { x: 0.5, y: 0.22, r: 0.05, alpha: 0.5, seed: 9 },
+    ],
+    cam: { pos: [0.95, 0.95, 3.4], look: [0.95, 0.9, 0], fov: 40 },
+    light: [-2, 7, 6],
+  },
+  {
+    // 一路收集的靈魂：正面近景。主角微微抬頭、盼的眼神，一路收集的四顆靈魂（殭屍王、騎士、兩隻幽靈騎士的）
+    // 繞在頭的四周，背後放出淡藍的光；兩側是王座廳的柱子剪影。咬著刀，所以臉正對鏡頭（刀才不會橫在眼睛前面），
+    // 眼睛用 lift 抬到吻部上面。
+    id: 'p14-2', size: [1200, 720], ink: 4,
+    rays: { at: [0.55, 0.5], n: 24, inner: 0.16, width: 0.4, color: '#d7ecf8', alpha: 0.75 },
+    bg: [
+      { piece: 'column', r: 0.5, h: 6.4, x: 0.06, y: 1.0, size: 1.2 },
+      { piece: 'column', r: 0.5, h: 6.4, x: 0.94, y: 1.0, size: 1.2 },
+    ],
+    cast: [{ who: 'hero', at: [0, 0], yaw: 0.15, move: { headPitch: -0.25, headTilt: 0.12, tailPitch: 0.3, w: 1 }, face: 'hope', eyes: { lift: 0.9, spread: 0.35 }, blade: 'knife' }],
+    souls: [
+      { at: [-0.85, 1.0, 0.35], yaw: 2.2, scale: 0.4, seed: 3, trail: 15 },
+      { at: [0.0, 1.65, -0.3], yaw: -1.6, scale: 0.4, seed: 5, trail: 15 },
+      { at: [0.8, 1.35, -0.2], yaw: -0.4, scale: 0.4, seed: 7, trail: 15 },
+      { at: [0.95, 0.65, 0.45], yaw: 0.9, scale: 0.4, seed: 9, trail: 15 },
+    ],
+    cam: { focus: 'hero', yaw: 0.25, pitch: 0.0, dist: 2.3, fov: 40, frame: [0, 0.22] },
+    light: [2, 7, 6],
+  },
+  {
+    // 國王需要這些力量：過肩。主角（右下，背對我們、低頭）看著台座前倒下的國王的亡魂：跟第 15 頁第 1 格
+    // 同一個樣子——伏在階前、閉著眼、半透明，盾不見了、劍掉在地上；兩顆靈魂還繞在主角身邊（右上，
+    // 讓開上面正中的心聲）。
+    id: 'p14-3', size: [1200, 720], ink: 3.5,
+    horizon: 0.6,
+    bg: [{ piece: 'dais', x: 0.42, y: 0.62, size: 0.42 }],
+    props: [{ blade: 'king', at: [-0.9, 1.0], yaw: 0.4, size: 1.4 }],
+    cast: [
+      { who: 'ghostKing', at: [0, 0], yaw: 0.6, alpha: 0.35, move: { ...KNEEL, headPitch: 0.05 }, face: 'rest', eyes: { lift: 0.3 }, shadow: false },
+      { who: 'hero', at: [2.15, 2.0], yaw: -Math.PI / 2 - 0.6, move: { headPitch: 0.35, tailPitch: -0.2, w: 1 }, face: 'proud', blade: 'knife' },
+    ],
+    souls: [
+      { at: [2.75, 1.1, 1.9], yaw: -1.0, scale: 0.4, seed: 11, trail: 15 },
+      { at: [2.55, 1.42, 2.3], yaw: 2.0, scale: 0.4, seed: 13, trail: 15 },
+    ],
+    cam: { pos: [2.6, 1.1, 4.4], look: [0.6, 0.6, 0.2], fov: 42 },
+    light: [4, 7, 6],
   },
 
   /* ── 第 15 頁　王座廳・結局 ──────────────────────────────────── */

@@ -97,9 +97,9 @@ export const PAGES = [
     { note: '國王睜開眼', src: 'comic/p13-5.png', focus: '50% 50%' },
   ] },
   { title: '王座廳', panels: [
-    { note: '主角打倒國王：最後一擊，國王的亡魂倒下去' },
-    { note: '主角看向身邊環繞的狗頭靈魂' },
-    { note: '主角看向倒地的靈魂國王', say: '國王需要這些力量。' },
+    { note: '主角打倒國王：最後一擊，國王的亡魂倒下去', src: 'comic/p14-1.png', focus: '50% 45%' },
+    { note: '主角看向身邊環繞的狗頭靈魂', src: 'comic/p14-2.png', focus: '50% 60%' },
+    { note: '主角看向倒地的靈魂國王', say: '國王需要這些力量。', src: 'comic/p14-3.png', focus: '55% 50%' },
   ] },
   { title: '王座廳', big: 5, panels: [
     { note: '國王跪倒在台座前，失控的亡魂安靜下來', src: 'comic/p15-1.png', focus: '45% 50%' },
