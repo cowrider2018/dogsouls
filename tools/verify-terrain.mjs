@@ -2185,13 +2185,20 @@ head('手把');
      不會爆」驗得到，而那是這種每幀跑的繪圖碼最常見的故障。 */
   const calls = new Map();
   const grad = { addColorStop() {} };
-  const ctx = new Proxy({}, {
+  const fakeCtx = (log) => new Proxy({}, {
     get(_, k) {
       if (k === 'createRadialGradient' || k === 'createLinearGradient') return () => grad;
-      return (...a) => { calls.set(k, (calls.get(k) || 0) + 1); void a; };
+      return (...a) => { if (log) log.set(k, (log.get(k) || 0) + 1); void a; };
     },
     set() { return true; },
   });
+  const ctx = fakeCtx(calls);
+  /* 鍵上的圖案先畫進一張離屏的小畫布（pad.js 的 _glyph）：給它一張假的，記在另一本帳上，
+     「每一幀清一次」數的才只是操作層那一張。 */
+  const glyphCalls = new Map();
+  globalThis.document = {
+    createElement: () => ({ width: 0, height: 0, getContext: () => fakeCtx(glyphCalls) }),
+  };
   globalThis.Path2D = class {
     moveTo() {} lineTo() {} closePath() {} quadraticCurveTo() {} arc() {}
   };
@@ -2214,6 +2221,8 @@ head('手把');
     `${calls.get('clearRect') || 0} 次`);
   ok((calls.get('stroke') || 0) > 0 && (calls.get('fill') || 0) > 0, '真的有畫東西',
     `stroke ${calls.get('stroke') || 0} 次、fill ${calls.get('fill') || 0} 次`);
+  ok((calls.get('drawImage') || 0) >= 4 && (glyphCalls.get('stroke') || 0) > 0, '鍵上的圖案畫進小畫布、再貼上來',
+    `貼 ${calls.get('drawImage') || 0} 次、小畫布 stroke ${glyphCalls.get('stroke') || 0} 次`);
 }
 
 head('生物那張表的 RWD');
