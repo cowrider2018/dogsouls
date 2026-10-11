@@ -1334,18 +1334,22 @@ export function pavilion(B, o) {
 /**
  * 武器架：兩根柱、上下兩道橫木，一排靠著上橫木的長槍，前面靠著兩面圓盾。
  * 架子沿 local x、正面朝 local +z（世界的 (sin yaw, cos yaw)）。
+ * rack: false 不砌架子、spears: false 不放長槍、shields: false 不放盾（漫畫拿來分開畫：架子是
+ * 剪影、兵器只剩虛線），預設都有；碰撞箱照舊。
  */
 export function weaponRack(B, o) {
   const yaw = o.yaw || 0, y = o.y || 0, at = frame(o.x, y, o.z, yaw);
-  for (const sx of [-1, 1]) {
-    B.add(B.kit.brick(0.12, 1.7, 0.12, 0.02), { p: at(sx * 1.1, 0.85, 0), r: [0, yaw, 0], color: C.woodDark });
-    B.add(B.kit.brick(0.12, 0.08, 0.72, 0.015), { p: at(sx * 1.1, 0.04, 0), r: [0, yaw, 0], color: C.woodDark });
+  if (o.rack !== false) {
+    for (const sx of [-1, 1]) {
+      B.add(B.kit.brick(0.12, 1.7, 0.12, 0.02), { p: at(sx * 1.1, 0.85, 0), r: [0, yaw, 0], color: C.woodDark });
+      B.add(B.kit.brick(0.12, 0.08, 0.72, 0.015), { p: at(sx * 1.1, 0.04, 0), r: [0, yaw, 0], color: C.woodDark });
+    }
+    B.add(B.kit.brick(2.44, 0.1, 0.12, 0.02), { p: at(0, 1.6, 0), r: [0, yaw, 0], color: C.wood });
+    B.add(B.kit.brick(2.44, 0.08, 0.1, 0.02), { p: at(0, 0.45, 0), r: [0, yaw, 0], color: C.wood });
   }
-  B.add(B.kit.brick(2.44, 0.1, 0.12, 0.02), { p: at(0, 1.6, 0), r: [0, yaw, 0], color: C.wood });
-  B.add(B.kit.brick(2.44, 0.08, 0.1, 0.02), { p: at(0, 0.45, 0), r: [0, yaw, 0], color: C.wood });
   /* 長槍：槍尾在前面的地上，槍身靠在上橫木的**前緣**上（在 1.6 的高度離架心
      8.6 公分，橫木前緣在 6 公分），槍頭過了橫木半公尺多。 */
-  for (let i = 0; i < 6; i++) {
+  if (o.spears !== false) for (let i = 0; i < 6; i++) {
     const lx = -0.9 + i * 0.36;
     const a = at(lx, 0, 0.3), b = at(lx, 2.24, 0);
     rod(B, a, b, 0.045, C.wood);
@@ -1358,7 +1362,7 @@ export function weaponRack(B, o) {
   // 兩面圓盾，面朝前、往後靠 15°，下緣著地。
   const lean = 0.27, sc = Math.cos(yaw), ss = Math.sin(yaw);
   const nrm = [ss * Math.cos(lean), Math.sin(lean), sc * Math.cos(lean)];
-  for (const [lx, color] of [[-0.55, C.banner], [0.6, C.bannerAlt]]) {
+  if (o.shields !== false) for (const [lx, color] of [[-0.55, C.banner], [0.6, C.bannerAlt]]) {
     const c = at(lx, 0.36 * Math.cos(lean) + 0.03, 0.44);
     B.add(B.kit.drum(0.36, 0.36, 0.05, 12), { p: c, r: tilt(...nrm), color });
     B.add(B.kit.blob(0.07), { p: [c[0] + nrm[0] * 0.04, c[1] + nrm[1] * 0.04, c[2] + nrm[2] * 0.04], color: C.ironLit, ink: false });

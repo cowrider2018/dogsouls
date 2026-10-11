@@ -247,7 +247,7 @@ const KIT = new Pieces.Kit();
 const silMat = new THREE.MeshBasicMaterial({ color: SIL });
 
 /** 砌一件零件，回傳它的剪影 mesh（原點在零件的原點）。 */
-function silhouette({ piece, at, yaw, scale, view, tilt, x, y, size, flip, ...o }) {
+function silhouette({ piece, at, yaw, scale, view, tilt, x, y, size, flip, vanish, dash, ...o }) {
   const make = PIECES[piece];
   if (!make) throw new Error(`沒有這種零件：${piece}`);
   const B = new Build(KIT);
@@ -320,20 +320,28 @@ function placeSouls(list) {
    轉幾弳再拍——要拍側面就給 π/2；tilt 往前傾幾弳，看得到一點頂），底邊正中間放在畫面的
    (x, y)（寬高的比例，y 往下），高 size（畫面高的比例），flip 左右翻。vanish: [vx, vy] 是消失點
    （畫面的比例）：剪影變成梯形——直的邊還是直的，每一條直線照它離消失點多遠縮放、對著 vy 那條
-   水平線收，所以底邊與頂邊都往消失點收（離它越近越矮）。底邊正中間那一條不變。超出畫面的照裁。 */
+   水平線收，所以底邊與頂邊都往消失點收（離它越近越矮）。底邊正中間那一條不變。超出畫面的照裁。
+
+   虛線（dash）：原本在那裡、現在不見了的東西，只剩一圈粗虛線的輪廓——沒有填色、沒有實體，裡面
+   透出紙（或後面的剪影）。dash: true 是這一件整個只畫輪廓；dash: { ...參數 } 是這一件照常畫剪影，
+   再把同一件零件換上這些參數重砌一次、只畫輪廓，疊在剪影上——同一個位置、同一個比例（框是全部
+   合起來的大小）。給陣列就是好幾層，後面的先畫，前面那一層蓋住的地方，後面那幾層的虛線擦掉（盾
+   擋在長槍前面，槍桿的虛線停在盾的輪廓外）。例如兵器架：{ piece: 'weaponRack', spears: false,
+   shields: false, dash: [{ rack: false, spears: true }, { rack: false, shields: true }] } 是空的
+   架子，加上原本靠著的長槍、擋在前面的盾的虛線。輪廓是從拍好的剪影描出來的（marching squares）。
+   不支援 vanish。 */
 const cutFat = document.createElement('canvas');
 const cutScene = new THREE.Scene();
 const cutCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
 const cutCanvas = document.createElement('canvas');
-function drawCutout(g, spec, W, H) {
-  const m = silhouette(spec);
-  m.rotation.set(spec.tilt || 0, spec.view || 0, 0, 'YXZ');
+const dashCanvas = document.createElement('canvas');
+/** 虛線：線寬是畫面高的 w 倍；一段 on、一個空隙 off（線寬的倍數，看得到的長度，圓頭算在裡面）。 */
+const DASH = { w: 1 / 120, on: 2.6, off: 1.7, color: `#${INK.toString(16).padStart(6, '0')}` };
+
+/** 把一件轉好的零件用框 box 平拍成 pw × ph，拍在 cutCanvas 上。 */
+function snapCutout(m, box, pw, ph) {
   cutScene.add(m);
   m.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(m);
-  const bw = box.max.x - box.min.x, bh = box.max.y - box.min.y;
-  const ph = Math.max(2, Math.round(spec.size * H));
-  const pw = Math.max(2, Math.round(ph * bw / bh));
   Object.assign(cutCam, { left: box.min.x, right: box.max.x, top: box.max.y, bottom: box.min.y, far: box.max.z - box.min.z + 2 });
   cutCam.position.set(0, 0, box.max.z + 1);              // 沒轉過的正交鏡頭本來就朝 −Z 看
   cutCam.updateProjectionMatrix();
@@ -348,31 +356,215 @@ function drawCutout(g, spec, W, H) {
   cutCanvas.width = pw;
   cutCanvas.height = ph;
   cutCanvas.getContext('2d').drawImage(canvas, 0, 0, pw, ph, 0, 0, pw, ph);
-  // 零件是一塊一塊砌的，磚縫、鼓與鼓之間的縫拍出來會透光；剪影要是實心的，所以往外補 r 像素
-  // （同一個顏色錯開疊幾次），縫就合起來了。
-  const r = Math.max(1, Math.round(H / 300));
-  const fat = (c, ox, oy) => {
-    for (let k = 0; k < 9; k++) {
-      const a = (k / 8) * Math.PI * 2, d = k === 8 ? 0 : r;
-      c.drawImage(cutCanvas, ox + Math.cos(a) * d, oy + Math.sin(a) * d);
+}
+
+/** 零件是一塊一塊砌的，磚縫、鼓與鼓之間的縫拍出來會透光；剪影要是實心的，所以把 cutCanvas 往外補
+    r 像素（同一個顏色錯開疊幾次）畫到 c 的 (ox, oy)，縫就合起來了。 */
+function fat(c, ox, oy, r) {
+  for (let k = 0; k < 9; k++) {
+    const a = (k / 8) * Math.PI * 2, d = k === 8 ? 0 : r;
+    c.drawImage(cutCanvas, ox + Math.cos(a) * d, oy + Math.sin(a) * d);
+  }
+}
+
+/** 剪影（畫布的不透明度）的輪廓：marching squares，回傳一圈一圈封閉的折線（畫布的像素座標）。 */
+function contours(c) {
+  const w = c.width, h = c.height;
+  const px = c.getContext('2d').getImageData(0, 0, w, h).data;
+  // 四周墊一圈 0，每一圈輪廓都是封閉的。v(i, j) 是像素 (i−1, j−1) 的中心。
+  const v = (i, j) => (i < 1 || j < 1 || i > w || j > h ? 0 : px[((j - 1) * w + (i - 1)) * 4 + 3] / 255);
+  const T = 0.5;
+  const pt = new Map(), nb = new Map();
+  // 邊的編號：橫的 (i, j)—(i+1, j) 是 2k，直的 (i, j)—(i, j+1) 是 2k+1，k = j·(w+2)+i。
+  const edge = (i, j, vert) => {
+    const id = 2 * (j * (w + 2) + i) + (vert ? 1 : 0);
+    if (!pt.has(id)) {
+      const a = v(i, j), b = vert ? v(i, j + 1) : v(i + 1, j), t = (T - a) / (b - a);
+      pt.set(id, vert ? [i - 1 + 0.5, j - 1 + 0.5 + t] : [i - 1 + 0.5 + t, j - 1 + 0.5]);
     }
+    return id;
   };
+  const link = (a, b) => {
+    if (!nb.has(a)) nb.set(a, []);
+    if (!nb.has(b)) nb.set(b, []);
+    nb.get(a).push(b);
+    nb.get(b).push(a);
+  };
+  for (let j = 0; j <= h; j++) {
+    for (let i = 0; i <= w; i++) {
+      const k = (v(i, j) > T ? 1 : 0) | (v(i + 1, j) > T ? 2 : 0) | (v(i + 1, j + 1) > T ? 4 : 0) | (v(i, j + 1) > T ? 8 : 0);
+      if (k === 0 || k === 15) continue;
+      const top = () => edge(i, j, false), bot = () => edge(i, j + 1, false);
+      const lef = () => edge(i, j, true), rig = () => edge(i + 1, j, true);
+      switch (k) {
+        case 1: case 14: link(lef(), top()); break;
+        case 2: case 13: link(top(), rig()); break;
+        case 4: case 11: link(rig(), bot()); break;
+        case 8: case 7: link(bot(), lef()); break;
+        case 3: case 12: link(lef(), rig()); break;
+        case 6: case 9: link(top(), bot()); break;
+        case 5: link(lef(), top()); link(rig(), bot()); break;   // 對角的兩塊：當成分開的
+        case 10: link(top(), rig()); link(bot(), lef()); break;
+      }
+    }
+  }
+  const loops = [], seen = new Set();
+  for (const start of nb.keys()) {
+    if (seen.has(start)) continue;
+    const loop = [];
+    let prev = -1, cur = start;
+    while (cur !== undefined && !seen.has(cur)) {
+      seen.add(cur);
+      loop.push(pt.get(cur));
+      const next = nb.get(cur).find((n) => n !== prev && !seen.has(n));
+      prev = cur;
+      cur = next;
+    }
+    loops.push(loop);
+  }
+  return loops;
+}
+
+/**
+ * 一圈一圈輪廓畫成粗虛線，圓頭。先抹掉像素的鋸齒、重新取成每 1 像素一點。
+ * 尖角（槍尖、兩塊交會的凹角）一定落在一段的正中間，形狀才讀得出來：輪廓在尖角切成幾截，
+ * 每一截各自取整數段、把間隔攤勻；沒有尖角的一圈（盾）整圈取整數段。段長都一樣，間隔只差一點點。
+ */
+const dashWidth = (H) => Math.max(2, DASH.w * H);
+function strokeDashed(g, loops, H) {
+  const lw = dashWidth(H), on = DASH.on * lw, P = (DASH.on + DASH.off) * lw;
+  // 圓頭往兩頭各長出半個線寬：畫的那一截短一個線寬，看起來才是 on。
+  const half = Math.max(0.01, on - lw) / 2;
+  const k = Math.max(2, Math.round(lw * 1.5)), CORNER = (45 * Math.PI) / 180;
+  g.save();
+  g.strokeStyle = DASH.color;
+  g.lineWidth = lw;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  for (let loop of loops) {
+    for (let pass = 0; pass < 3; pass++) {
+      const q = loop;
+      loop = q.map((p, i) => {
+        const a = q[(i + q.length - 1) % q.length], b = q[(i + 1) % q.length];
+        return [(a[0] + 2 * p[0] + b[0]) / 4, (a[1] + 2 * p[1] + b[1]) / 4];
+      });
+    }
+    // 每 1 像素取一點：索引就是弧長。
+    const pts = [];
+    let arc = 0, next = 0;
+    for (let i = 0; i < loop.length; i++) {
+      const a = loop[i], b = loop[(i + 1) % loop.length], d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (!d) continue;
+      for (; next < arc + d; next += 1) {
+        const t = (next - arc) / d;
+        pts.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      }
+      arc += d;
+    }
+    const N = pts.length;
+    if (N < P * 1.5) continue;                            // 剪影裡零星的小洞、小碎塊
+    const at = (i) => pts[((Math.floor(i) % N) + N) % N];
+    const turn = pts.map((p, i) => {
+      const a = at(i - k), b = at(i + k);
+      const t = Math.atan2(b[1] - p[1], b[0] - p[0]) - Math.atan2(p[1] - a[1], p[0] - a[0]);
+      return Math.abs(Math.atan2(Math.sin(t), Math.cos(t)));
+    });
+    const corners = [];
+    for (let i = 0; i < N; i++) {
+      if (turn[i] < CORNER) continue;
+      let top = true;
+      for (let j = -k; j <= k && top; j++) {
+        const o = turn[(i + j + N) % N];
+        if (o > turn[i] || (o === turn[i] && j < 0)) top = false;
+      }
+      if (top) corners.push(i);
+    }
+    // 每一截（尖角到下一個尖角）取整數段，段的中心排在 c、c + u、c + 2u……
+    const centres = [];
+    if (!corners.length) {
+      const n = Math.max(1, Math.round(N / P));
+      for (let j = 0; j < n; j++) centres.push((j * N) / n);
+    } else {
+      corners.forEach((c, i) => {
+        const S = (i + 1 < corners.length ? corners[i + 1] : corners[0] + N) - c;
+        const n = Math.max(1, Math.round(S / P));
+        for (let j = 0; j < n; j++) centres.push(c + (j * S) / n);
+      });
+    }
+    g.beginPath();
+    for (const c of centres) {
+      const from = Math.round(c - half), to = Math.round(c + half);
+      g.moveTo(...at(from));
+      for (let i = from + 1; i <= to; i++) g.lineTo(...at(i));
+      if (to === from) g.lineTo(at(from)[0] + 0.01, at(from)[1]);
+    }
+    g.stroke();
+  }
+  g.restore();
+}
+
+function drawCutout(g, spec, W, H) {
+  if (spec.dash && spec.vanish) throw new Error('虛線（dash）不支援 vanish');
+  const solid = spec.dash === true ? null : silhouette(spec);
+  // 虛線的那幾層，後面的先、前面的後。
+  const layers = !spec.dash ? [] : spec.dash === true ? [{}] : [spec.dash].flat();
+  const ghosts = layers.map((d) => silhouette({ ...spec, ...d }));
+  const box = new THREE.Box3();
+  for (const m of [solid, ...ghosts]) {
+    if (!m) continue;
+    m.rotation.set(spec.tilt || 0, spec.view || 0, 0, 'YXZ');
+    m.updateMatrixWorld(true);
+    box.union(new THREE.Box3().setFromObject(m));
+  }
+  const bw = box.max.x - box.min.x, bh = box.max.y - box.min.y;
+  const ph = Math.max(2, Math.round(spec.size * H));
+  const pw = Math.max(2, Math.round(ph * bw / bh));
+  const r = Math.max(1, Math.round(H / 300));
   if (!spec.vanish) {
+    // 底邊正中間在 (x, y)。
     g.save();
     g.translate(spec.x * W, spec.y * H);
     if (spec.flip) g.scale(-1, 1);
-    fat(g, -pw / 2, -ph);
+    if (solid) {
+      snapCutout(solid, box, pw, ph);
+      fat(g, -pw / 2, -ph, r);
+    }
+    if (ghosts.length) {
+      // 補好縫畫在 cutFat 再描：多補半個線寬，虛線整條落在原本的形狀外面，裡面空出來的就是原本的
+      // 寬——細長的東西（槍桿）才不會被兩邊的虛線吃掉。一層一層畫在 dashCanvas 上：前面那一層先把
+      // 它蓋住的地方（再寬一個線寬）擦掉，後面那幾層的虛線就停在它的輪廓外面。座標是 cutFat 的，
+      // 往回挪 e 對齊剪影。
+      const lw = dashWidth(H), e = r + Math.round(lw / 2), cover = e + Math.ceil(lw) + 1;
+      dashCanvas.width = cutFat.width = pw + 2 * cover;
+      dashCanvas.height = cutFat.height = ph + 2 * cover;
+      const dg = dashCanvas.getContext('2d'), fg = cutFat.getContext('2d');
+      ghosts.forEach((m, i) => {
+        snapCutout(m, box, pw, ph);
+        if (i) {
+          fg.clearRect(0, 0, cutFat.width, cutFat.height);
+          fat(fg, cover, cover, cover);
+          dg.globalCompositeOperation = 'destination-out';
+          dg.drawImage(cutFat, 0, 0);
+          dg.globalCompositeOperation = 'source-over';
+        }
+        fg.clearRect(0, 0, cutFat.width, cutFat.height);
+        fat(fg, cover, cover, e);
+        strokeDashed(dg, contours(cutFat), H);
+      });
+      g.drawImage(dashCanvas, -pw / 2 - cover, -ph - cover);
+    }
     g.restore();
     return;
   }
   // 梯形：先補好、翻好畫在 cutFat（左上角在 (x0, y0)），再一條一條直線畫，第 i 條照它離消失點
   // 多遠（跟底邊正中間比）縮，對著 vy 那條線。
+  snapCutout(solid, box, pw, ph);
   const fw = pw + 2 * r, fh = ph + 2 * r;
   cutFat.width = fw;
   cutFat.height = fh;
   const fg = cutFat.getContext('2d');
   if (spec.flip) { fg.translate(fw, 0); fg.scale(-1, 1); }
-  fat(fg, r, r);
+  fat(fg, r, r, r);
   const x0 = spec.x * W - fw / 2, y0 = spec.y * H - ph - r;
   const vx = spec.vanish[0] * W, vy = spec.vanish[1] * H, cx = spec.x * W;
   for (let i = 0; i < fw; i++) {
