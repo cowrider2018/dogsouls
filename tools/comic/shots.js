@@ -187,7 +187,7 @@ export const SHOTS = [
     // 殭屍趴平在地上、下巴貼地、叉叉眼，頭朝各個方向。鏡頭從高一點的地方往下看，看得到牠們躺著；
     // 主角仰著頭喘，帽簷才不會擋住眼睛。
     cast: [
-      { who: 'zombie', at: [-1.9, -1.2], yaw: 0.9, move: { ...FLOP, headTilt: 0.4 }, face: 'ko', eyes: { lift: 0.3 } },
+      { who: 'zombie', at: [-1.9, -1.2], yaw: 0.9, move: { ...FLOP, headTilt: 0.4 }, face: 'ko', eyes: { lift: 0.3 }, shadow: false },
       { who: 'zombie', at: [1.3, -1.1], yaw: -0.3, move: { ...FLOP, headTilt: -0.3 }, face: 'ko', eyes: { lift: 0.3 } },
       { who: 'zombie', at: [-2.4, 0.7], yaw: 1.2, move: { ...FLOP, headTilt: 0.5 }, face: 'ko', eyes: { lift: 0.3 } },
       { who: 'hero', at: [0, 0], yaw: 0.35, move: { ...PANT, headPitch: -0.3 }, face: 'pant', blade: 'knife' },
