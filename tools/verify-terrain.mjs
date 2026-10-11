@@ -2181,28 +2181,40 @@ head('手把');
   ok(jp.drops.length > 0, '按下噴出水花', `${jp.drops.length} 滴`);
   jp.up(9);
 
-  /* 交靈魂的圖案：掌心那一條線是水平的；手從右下伸進來，在離圓心 0.9 r 的那一圈切掉，切口剛好在
-     拇指根部的外緣；手釘在原本那一版（托著狗頭）挑出來的位置，換了靈魂也不動。靈魂浮在手上面 0.08 r、
-     身體的正中對在鍵的直中線上，放到最大、整顆剛好還在那一圈裡。 */
+  /* 交靈魂的圖案：掌心那一條線是水平的；手從右下伸進來，在離圓心 0.9 r 的那一圈切掉。先 fit、再 shift：
+     fit——手釘在原本那一版（托著狗頭）挑出來的位置、切口剛好在拇指根部的外緣；靈魂浮在手上面 0.08 r、
+     身體（body 那一條線上的那一段）的正中對在鍵的直中線上，放到最大、整顆剛好還在那一圈裡。
+     shift——k 與兩個之間的相對位置不動，靈魂與手一起左右平移同一段，靈魂平的底邊的正中落在 x = 0。 */
   {
-    const { hand, soul } = GIVE;
+    const { hand, soul, fit, shift } = GIVE;
     ok(hand.tilt === 0 && hand.clip === 0.9 && Math.abs(GIVE.rootR - 0.9) < 1e-9 && hand.x > 0 && hand.y > 0,
-      '交靈魂的手：掌心水平、從右下伸進來，在 0.9 r 那一圈切在拇指的根部（鍵的邊緣留 0.1 r）',
-      `手擺在 (${hand.x.toFixed(2)}, ${hand.y.toFixed(2)})、根部離圓心 ${GIVE.rootR.toFixed(3)} r`);
-    ok(Math.abs(hand.x - 0.3078217753689113) < 1e-12 && Math.abs(hand.y - 0.42386165518237606) < 1e-12,
-      '交靈魂的手還在原本那個位置（托著狗頭那一版挑出來的），靈魂怎麼換都不動它',
-      `手擺在 (${hand.x}, ${hand.y})`);
-    // 身體那一條水平線只碰到外框兩次（左緣、右緣：只有身體），尾巴整條在它上面。
+      '交靈魂的手：掌心水平、從右下伸進來；fit 的時候在 0.9 r 那一圈切在拇指的根部（鍵的邊緣留 0.1 r）',
+      `手擺在 (${hand.x.toFixed(2)}, ${hand.y.toFixed(2)})、fit 時根部離圓心 ${GIVE.rootR.toFixed(3)} r`);
+    ok(Math.abs(fit.hand.x - 0.3078217753689113) < 1e-12 && Math.abs(fit.hand.y - 0.42386165518237606) < 1e-12
+      && Math.abs(hand.x - (fit.hand.x + shift)) < 1e-12 && hand.y === fit.hand.y,
+      '交靈魂的手：fit 時在原本那個位置（托著狗頭那一版挑出來的），之後跟著靈魂一起平移',
+      `原本 (${fit.hand.x}, ${fit.hand.y})、平移 ${shift.toFixed(4)} r → (${hand.x.toFixed(4)}, ${hand.y.toFixed(4)})`);
+    // 身體那一條水平線只碰到外框兩次（左右各一刀），尾巴尖整個在它上面。
     const [bl, br] = bodySpan(), O = SOUL_OUTLINE, oy = O.filter((_, i) => i % 2 === 1);
     const by = SOUL_SHAPE.body;
     let cuts = 0;
     for (let i = 0, j = O.length - 2; i < O.length; j = i, i += 2) if ((O[i + 1] > by) !== (O[j + 1] > by)) cuts++;
-    ok(Math.abs(soul.body[0] + soul.body[1]) < 1e-9 && cuts === 2 && bl < 0 && br > 0 && Math.min(...oy) < by - 1.5,
-      '靈魂的身體（上面的尾巴不算）左右正中對在鍵的直中線上',
-      `身體 ${soul.body[0].toFixed(3)}～${soul.body[1].toFixed(3)} r、靈魂擺在 x ${soul.x.toFixed(3)} r、放大 ${soul.k.toFixed(3)} 倍`);
-    ok(Math.abs(GIVE.clear - 0.08) < 1e-9 && GIVE.soulReach <= 0.9 + 1e-9 && GIVE.soulReach > 0.9 - 1e-6 && GIVE.bottom <= 0.9 + 1e-9,
-      '靈魂浮在手上面 0.08 r（都含線寬），放到最大、剛好整顆在 0.9 r 那一圈裡，露出來的手也在',
-      `靈魂擺在 (${soul.x.toFixed(2)}, ${soul.y.toFixed(2)})、空 ${GIVE.clear.toFixed(3)} r、靈魂離圓心最遠 ${GIVE.soulReach.toFixed(3)} r`);
+    ok(Math.abs(fit.soul.body[0] + fit.soul.body[1]) < 1e-9 && cuts === 2 && bl < 0 && br > 0 && Math.min(...oy) < by - 0.5,
+      'fit：靈魂的身體（body 那一條線上的那一段，尾巴尖不算）左右正中對在鍵的直中線上',
+      `身體 ${fit.soul.body[0].toFixed(3)}～${fit.soul.body[1].toFixed(3)} r、靈魂擺在 x ${fit.soul.x.toFixed(3)} r、放大 ${soul.k.toFixed(6)} 倍`);
+    ok(Math.abs(fit.reach - 0.9) < 1e-6 && fit.reach <= 0.9 + 1e-9 && Math.abs(soul.k - 0.642317) < 1e-6,
+      'fit：靈魂放到最大，身體置中的時候整顆剛好在 0.9 r 那一圈裡',
+      `放大 ${soul.k} 倍、離圓心最遠 ${fit.reach.toFixed(6)} r`);
+    // 底邊那一段（base 的兩點）的正中，平移之後落在鍵的直中線上；靈魂與手平移的是同一段。
+    const P = SOUL_SHAPE.path, [ia, ib] = SOUL_SHAPE.base;
+    const mid = soul.x + ((P[ia][0] + P[ib][0]) / 2) * soul.k;
+    ok(P[ia][1] === P[ib][1] && Math.abs(mid) < 1e-9 && Math.abs(soul.base - mid) < 1e-12
+      && Math.abs(soul.x - (fit.soul.x + shift)) < 1e-12 && soul.y === fit.soul.y,
+      'shift：靈魂平的底邊的正中落在鍵的直中線上，手平移同一段（相對位置不變）',
+      `底邊正中 x ${mid.toExponential(2)} r、平移 ${shift.toFixed(4)} r、靈魂擺在 (${soul.x.toFixed(4)}, ${soul.y.toFixed(4)})`);
+    ok(Math.abs(GIVE.clear - 0.08) < 1e-9 && GIVE.soulReach <= 0.9 + 1e-9 && GIVE.bottom <= 0.9 + 1e-9,
+      '平移之後靈魂還是浮在手上面 0.08 r（都含線寬），整顆也還在 0.9 r 那一圈裡，露出來的手也在',
+      `空 ${GIVE.clear.toFixed(3)} r、靈魂離圓心最遠 ${GIVE.soulReach.toFixed(4)} r、露出來的手 x ${hand.seen[0].toFixed(3)}～${hand.seen[2].toFixed(3)}、y ${hand.seen[1].toFixed(3)}～${hand.seen[3].toFixed(3)} r`);
   }
 
   /* 圖案一換，那顆水就晃一下，晃法跟長按一模一樣：一個換圖案（stir），一個真的按住 STIR 秒再放開，

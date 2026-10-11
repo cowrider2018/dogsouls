@@ -2990,8 +2990,9 @@ console.log('34. 獻靈魂');
 
   /* 托著的那一顆是靈魂：實心、一條尾巴，直直立著，直邊加圓角轉折。外框是一圈（頭尾同一點），中間每一個
      轉折都倒圓角，而且相鄰兩個圓角不搶同一段直邊（切點離頂點 rad / tan(夾角/2)，兩頭加起來不超過那一段）；
-     只有一個轉折是尖的（夾角不到 45°）——那一條尾巴的尖：整圈最高的那一點，高過身體一大截，左右落在
-     身體那一段裡（尾巴往上衝，不往旁邊拖）。 */
+     只有一個尖——那一條尾巴的尖：整圈最高的那一點，就是夾角最窄（約 50°）、圓角最小的那一個轉折，比其他
+     轉折都尖，高過身體那一條線，左右落在身體那一段裡（尾巴往上衝，不往旁邊拖）。底下是一段平的底邊
+     （base 那兩點同高、是整圈最低的頂點，左右對稱在 x = 0 兩邊）。 */
   {
     const P = SOUL_SHAPE.path, mid = P.slice(1, -1);
     const turn = (i) => {
@@ -3005,14 +3006,18 @@ console.log('34. 獻靈魂');
     for (let i = 0; i < P.length - 1; i++) {
       if (reach(i) + reach(i + 1) > Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]) + 1e-9) fits = false;
     }
-    const sharp = angles.filter((a) => a < Math.PI / 4).length;
-    const tip = mid[angles.indexOf(Math.min(...angles))];
-    const [bl, br] = bodySpan();
+    // 最高的那一個頂點：夾角比其他每一個都窄、圓角比其他每一個都小（只有它一個是最小）。
+    const top = mid.reduce((m, p) => (p[1] < m[1] ? p : m)), it = mid.indexOf(top);
+    const sharpest = angles.every((a, k) => k === it || a > angles[it]);
+    const smallest = mid.every((p, k) => k === it || p[2] > top[2]);
+    const [bl, br] = bodySpan(), [ia, ib] = SOUL_SHAPE.base, A = P[ia], B = P[ib];
+    const flat = A[1] === B[1] && A[0] < B[0] && Math.abs(A[0] + B[0]) < 1e-12 && ib === ia + 1
+      && P.every((p) => p[1] <= A[1]);
     ok(P[0][0] === P[P.length - 1][0] && P[0][1] === P[P.length - 1][1] && mid.every((p) => p[2] > 0) && fits
-      && sharp === 1 && tip[1] === Math.min(...mid.map((p) => p[1])) && tip[1] < SOUL_SHAPE.body - 1.5
-      && tip[0] > bl && tip[0] < br,
-      '交靈魂的圖案上那顆是靈魂：一圈直邊、每個轉折都倒圓角，只有一個尖（一條尾巴，在最上面、往上衝）',
-      `${mid.length} 個轉折、尾巴尖在 (${tip[0]}, ${tip[1]})、身體 ${bl.toFixed(2)}～${br.toFixed(2)}`);
+      && sharpest && smallest && top[1] < SOUL_SHAPE.body && top[0] > bl && top[0] < br && flat,
+      '交靈魂的圖案上那顆是靈魂：一圈直邊、每個轉折都倒圓角，只有一個尖（一條尾巴，在最上面、往上衝），底邊是平的',
+      `${mid.length} 個轉折、尾巴尖在 (${top[0]}, ${top[1]})、夾角 ${((angles[it] * 180) / Math.PI).toFixed(1)}°、`
+      + `身體 ${bl.toFixed(2)}～${br.toFixed(2)}、底邊 ${A[0]}～${B[0]} @ y ${A[1]}`);
   }
 }
 

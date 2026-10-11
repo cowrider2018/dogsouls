@@ -139,31 +139,35 @@ function fillLiquid(ctx, p, cx, cy, r, tn, glow, col = SOUL) {
 }
 
 /**
- * 靈魂的剪影：實心、一條尾巴，直直立著（照使用者畫的那一張描的）。底下是一大塊胖胖的身體——底邊
- * 是兩段微微斜的直線、在偏左的地方往下尖一點；左邊往上收、腰上凹一下；右邊往上到一個肩。身體的頂
- * 從肩往左上斜進去，冒出一條尾巴：先往右上斜、折一下再往左上衝，收在最上面一個圓圓的尖；尾巴的左緣
- * 也跟著折一下（往右下凹進去、再往左下斜出到身體）——像一撮火、一縷魂。比原圖再壓矮、放寬一點（稍胖），
- * 手上面那一塊才擺得下、又不會小。全是直邊，每一個轉折都倒圓角（roundPath 的 [x, y, 圓角半徑]），
- * 沒有一段是畫出來的圓弧；尾巴尖也只是一個圓角。path 是一圈：從底邊左段的正中出發、繞回同一點
- * （頭尾兩點不用半徑）。y 朝下；身體在 y ≈ 0 那一帶左右大約 ±0.7。body 是量身體左右到哪的那一條
- * 水平線：在腰與肩的下面、尾巴的根更上面，碰到的只有身體。
+ * 靈魂的剪影：實心、一條尾巴，直直立著（使用者在調整工具裡一點一點調出來的那一版，數字照抄）。底下
+ * 是一大塊胖胖的身體——底邊是一段平的直線（底邊左、底邊右兩點同高，y 0.85，左右對稱在 x = 0 兩邊），
+ * 兩頭斜斜往上接到左下、右下；左邊往上收、腰上凹一下；右邊往上到一個肩。身體的頂從肩往左上斜進去，
+ * 冒出一條尾巴：先往右上斜、折一下再往左上衝，收在最上面一個尖（圓角最小、整圈最尖的那一個轉折）；
+ * 尾巴的左緣也跟著折一下（往右下凹進去、再往左下斜出到身體）——像一撮火、一縷魂。全是直邊，每一個
+ * 轉折都倒圓角（roundPath 的 [x, y, 圓角半徑]），沒有一段是畫出來的圓弧；尾巴尖也只是一個圓角。
+ * path 是一圈：從左下往底邊左斜下去的那一段上出發、繞回同一點（頭尾兩點不用半徑）。y 朝下。
+ *   base  底邊那一段的兩頭是 path 的第幾點（底邊左、底邊右）：整個圖案最後照它的正中左右置中。
+ *   body  擺的時候量「身體」左右到哪的那一條水平線（使用者挑的 −0.5：左邊切在尾巴左緣斜出來的那一段、
+ *         右邊切在肩到尾巴根那一段，各一刀）。只在算放大倍數（fit）的時候用，見 GIVE。
  */
 export const SOUL_SHAPE = {
   path: [
-    [-0.5, 0.58],
-    [-0.15, 0.73, 0.14],                // 底邊往下尖的那一點（偏左）
-    [0.84, 0.29, 0.14],                 // 右下
-    [0.47, -0.57, 0.14],                // 肩
-    [0, -0.84, 0.1],                    // 尾巴的根（右邊，往裡凹）
-    [0.25, -1.13, 0.1],                 // 尾巴右緣的那一折
-    [-0.26, -1.74, 0.1],                // 尾巴尖（最上面，圓的）
-    [-0.23, -1.29, 0.06],               // 尾巴左緣的那一折（往裡凹）
-    [-0.74, -0.76, 0.12],               // 尾巴左緣斜出來接身體
-    [-0.51, -0.32, 0.12],               // 腰（左邊，往裡凹）
-    [-0.85, 0.42, 0.14],                // 左下
-    [-0.5, 0.58],
+    [-0.55, 0.625],
+    [-0.35, 0.85, 0.25],                // 底邊左
+    [0.35, 0.85, 0.25],                 // 底邊右
+    [0.75, 0.35, 0.15],                 // 右下
+    [0.5, -0.2, 0.1],                   // 肩
+    [0.1, -0.55, 0.1],                  // 尾巴根（往裡凹）
+    [0.25, -0.75, 0.1],                 // 尾巴右折
+    [-0.05, -1.1, 0.05],                // 尾巴尖
+    [-0.1, -0.8, 0.1],                  // 尾巴左折（往裡凹）
+    [-0.5, -0.4, 0.1],                  // 尾巴左斜出來接身體
+    [-0.4, -0.08, 0.1],                 // 腰（往裡凹）
+    [-0.75, 0.4, 0.15],                 // 左下
+    [-0.55, 0.625],
   ],
-  body: 0,
+  base: [1, 2],
+  body: -0.5,
 };
 
 /**
@@ -186,13 +190,19 @@ function roundPath(g, u, pts) {
           空白，切口照著那一圈的弧走。沿著手的方向（水平）滑到那一圈剛好切在右邊那根指頭（立著的
           拇指）的根部外緣：圈裡只剩手掌、手指與那根指頭。x 由這一條算（placeHand）。y 是定死的：
           原本那一版（托著狗頭的時候）挑出來的那一個——當時挑「狗頭對在露出來的手正中、整顆留在 clip
-          那一圈裡」的最高那一個，二分出來是 0.42386165518237606。手從此釘在那裡，換靈魂也不動。
-   SOUL_ICON 靈魂：SOUL_SHAPE 放大 k 倍。y 擺到靈魂最低的那一點（含線寬）比手最高的那一點（拇指的
-          尖，含線寬）再高 gap，看起來是浮在手上面。x 擺到身體的左右正中對在鍵的直中線（x = 0）上：
-          身體是剪影在 SOUL_SHAPE.body 那一條水平線上的那一段，上面的尾巴不算。k 挑擺得下的最大那一個：
-          這樣擺，整顆（含線寬）剛好還在 clip 那一圈裡——k 越大，底邊釘在手上面、頭頂越往上衝出鍵外。
-          手先擺好、靈魂才照手擺，靈魂怎麼改都不會動到手。
-   GIVE   算好的擺法與量出來的幾個數（模組載入時算一次）。 */
+          那一圈裡」的最高那一個，二分出來是 0.42386165518237606。fit 的時候手釘在那裡（換靈魂也不動）；
+          fit 完，整個圖案置中的時候手才跟著靈魂一起左右平移 dx（見下面 SOUL_ICON 的第 2 步）。
+   SOUL_ICON 靈魂：SOUL_SHAPE 放大 k 倍。分兩步，先 fit、再 shift：
+          1. fit（定 k）：手在上面那個位置不動。靈魂的 y 擺到最低的那一點（含線寬）比手最高的那一點（拇指
+             的尖，含線寬）再高 gap，看起來是浮在手上面；x 擺到身體（剪影在 SOUL_SHAPE.body 那一條水平線
+             上的那一段）的左右正中對在鍵的直中線（x = 0）上。k 挑這樣擺得下的最大那一個：整顆（含線寬）
+             剛好還在 clip 那一圈裡——k 越大，底邊釘在手上面、頭頂越往上衝出鍵外。body 那一條線只在這一步用。
+          2. shift（置中）：k 與靈魂、手兩個之間的相對位置都照 fit 的不動，整個圖案（靈魂與手一起）左右平移
+             同一段 dx，讓靈魂平的底邊（SOUL_SHAPE.base 那兩點）的正中落在鍵的直中線（x = 0）上。clip 那一圈
+             是鍵的邊緣、不跟著動，所以手切在哪裡跟著變（不再剛好切在拇指的根部）；靈魂平移之後離圓心最遠
+             的那一筆也可能不再剛好是 clip——不再縮放，照實記在 GIVE.soulReach。
+   GIVE   算好的擺法與量出來的幾個數（模組載入時算一次）：hand、soul 是平移之後（畫出來的）的位置，
+          fit 是平移之前的，shift 是那一段 dx。 */
 const HAND = {
   tilt: 0, unit: 0.92, lw: 0.07, clip: 0.9, root: 1, y: 0.42386165518237606,
   path: [
@@ -214,7 +224,7 @@ export const SOUL_OUTLINE = filletPoints(SOUL_SHAPE.path).slice(0, -1).flat();
 
 /**
  * 身體左右到哪（SOUL_SHAPE 的單位）：外框跟 body 那一條水平線交在哪幾點，取最左與最右。
- * 那一條在尾巴的根下面，所以這一段只有身體。
+ * 那一條只碰到外框兩次（左右各一刀），尾巴尖整個在它上面。只在 fit 用。
  */
 export function bodySpan() {
   const o = SOUL_OUTLINE, y = SOUL_SHAPE.body, xs = [];
@@ -281,43 +291,59 @@ function placeHand(y) {
 function soulAt(k, top) {
   const o = SOUL_OUTLINE, oy = o.filter((_, i) => i % 2 === 1), [bl, br] = bodySpan();
   const x = -((bl + br) / 2) * k, y = top - SOUL_ICON.gap - (Math.max(...oy) * k + SOUL_ICON.lw / 2);
-  let far = 0;
-  for (let i = 0; i < o.length; i += 2) far = Math.max(far, Math.hypot(x + o[i] * k, y + o[i + 1] * k));
   return {
-    x, y, reach: far + SOUL_ICON.lw / 2,
+    x, y, reach: soulReach(x, y, k),
     top: y + Math.min(...oy) * k - SOUL_ICON.lw / 2, low: y + Math.max(...oy) * k + SOUL_ICON.lw / 2,
   };
 }
 
+/** 靈魂擺在 (x, y)、放大 k 倍的時候，離圓心最遠的那一筆（含線寬）。 */
+function soulReach(x, y, k) {
+  const o = SOUL_OUTLINE;
+  let far = 0;
+  for (let i = 0; i < o.length; i += 2) far = Math.max(far, Math.hypot(x + o[i] * k, y + o[i + 1] * k));
+  return far + SOUL_ICON.lw / 2;
+}
+
 export const GIVE = (() => {
-  // 手：y 定死（見 HAND），x 照切口算。露出來的手最低到哪、拇指的尖最高到哪（都含線寬）。
-  HAND.x = placeHand(HAND.y);
-  const pts = handPoints(HAND.x, HAND.y), pad = HAND.lw / 2;
-  const seen = pts.filter(([px, py]) => Math.hypot(px, py + pad) <= HAND.clip);
-  const bottom = Math.max(...seen.map(([, py]) => py + pad));
-  const thumb = Math.min(...pts.map(([, py]) => py)) - pad;
-  // 靈魂擺得下的最大那一個 k：整顆剛好在 clip 那一圈裡。二分（k 越大，頭頂越往鍵外衝）。
+  // ── 1. fit ── 手：y 定死（見 HAND），x 照切口算；拇指的尖最高到哪（含線寬）。
+  const fitX = placeHand(HAND.y), pad = HAND.lw / 2;
+  const thumb = Math.min(...handPoints(fitX, HAND.y).map(([, py]) => py)) - pad;
+  // 靈魂擺得下的最大那一個 k：身體置中的時候整顆剛好在 clip 那一圈裡。二分（k 越大，頭頂越往鍵外衝）。
   let lo = 0, hi = 2;
   for (let i = 0; i < 60; i++) {
     const m = (lo + hi) / 2;
     if (soulAt(m, thumb).reach > HAND.clip) hi = m; else lo = m;
   }
-  SOUL_ICON.k = lo;
-  const S = soulAt(lo, thumb), [bl, br] = bodySpan();
-  SOUL_ICON.x = S.x; SOUL_ICON.y = S.y;                           // 身體的正中對在 x = 0
-  // rootR：拇指根部的外緣離圓心多遠（就是切口那一圈）。
+  const k = lo, S = soulAt(k, thumb), [bl, br] = bodySpan();
+  // rootR：fit 的時候拇指根部的外緣離圓心多遠（就是切口那一圈）。
   const [rx, ry] = HAND.path[HAND.root];
-  const rootR = Math.hypot(HAND.x + rx * HAND.unit + HAND.lw / 2, HAND.y + ry * HAND.unit);
+  const rootR = Math.hypot(fitX + rx * HAND.unit + HAND.lw / 2, HAND.y + ry * HAND.unit);
+
+  // ── 2. shift ── 靈魂與手一起左右平移 dx：底邊（base 那兩點）的正中落在 x = 0。k、y、兩個之間的相對位置不動。
+  const [ia, ib] = SOUL_SHAPE.base, P = SOUL_SHAPE.path;
+  const dx = -(S.x + ((P[ia][0] + P[ib][0]) / 2) * k);
+  HAND.x = fitX + dx;
+  SOUL_ICON.k = k; SOUL_ICON.x = S.x + dx; SOUL_ICON.y = S.y;
+  // 平移之後露出來的手（clip 那一圈裡、含線寬）左右上下到哪；靈魂離圓心最遠的那一筆。
+  const seen = handPoints(HAND.x, HAND.y).filter(([px, py]) => Math.hypot(px, py + pad) <= HAND.clip);
+  const sx = seen.map(([px]) => px), sy = seen.map(([, py]) => py);
   return {
-    hand: { x: HAND.x, y: HAND.y, tilt: HAND.tilt, clip: HAND.clip },
-    soul: { x: S.x, y: S.y, k: lo, body: [S.x + bl * lo, S.x + br * lo] },
-    // soulReach：靈魂離圓心最遠的那一筆（含線寬）；不超過 clip 的話鍵的邊緣也留著 0.1 的空白。
-    // clear：靈魂最低的那一點與手最高的那一點之間空多少（都含線寬）。
-    soulReach: S.reach, clear: thumb - S.low, rootR, top: S.top, bottom,
+    hand: { x: HAND.x, y: HAND.y, tilt: HAND.tilt, clip: HAND.clip,
+      seen: [Math.min(...sx) - pad, Math.min(...sy) - pad, Math.max(...sx) + pad, Math.max(...sy) + pad] },
+    soul: { x: SOUL_ICON.x, y: S.y, k, base: SOUL_ICON.x + ((P[ia][0] + P[ib][0]) / 2) * k },
+    shift: dx,
+    // fit：平移之前。body 是身體那一段（剛好左右對稱在 x = 0），reach 剛好是 clip。
+    fit: { hand: { x: fitX, y: HAND.y }, soul: { x: S.x, y: S.y, body: [S.x + bl * k, S.x + br * k] }, reach: S.reach },
+    // soulReach：平移之後靈魂離圓心最遠的那一筆（含線寬）；不超過 clip 的話鍵的邊緣也留著 0.1 的空白。
+    // clear：靈魂最低的那一點與手最高的那一點之間空多少（都含線寬；一起平移，不變）。
+    // top：靈魂最高到哪；bottom：露出來的手最低到哪（都含線寬）。
+    soulReach: soulReach(SOUL_ICON.x, S.y, k), clear: thumb - S.low, rootR, top: S.top,
+    bottom: Math.max(...sy) + pad,
   };
 })();
 
-/** 圖案的小畫布半邊多寬（r）：至少是鍵的半徑，交靈魂的靈魂伸出去的話照它再留一點。 */
+/** 圖案的小畫布半邊多寬（r）：至少是鍵的半徑，交靈魂的靈魂伸出去的話照它（平移之後的）再留一點。 */
 const GLYPH_HALF = Math.max(1, GIVE.soulReach) + 0.02;
 
 /* ── 跳躍鍵上的圖案 ─────────────────────────────────────────────
