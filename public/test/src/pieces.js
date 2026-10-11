@@ -1337,6 +1337,7 @@ export function pavilion(B, o) {
  * rack: false 不砌架子、spears: false 不放長槍、shields: false 不放盾（漫畫拿來分開畫：架子是
  * 剪影、兵器只剩虛線），預設都有；碰撞箱照舊。spears、shields 給數字就是幾支、幾面（漫畫裡少放
  * 幾件、每件才看得清楚）：長槍平均排在同一段（預設 6 支，間隔 0.36），一面盾放正中間，兩面照舊。
+ * spearScale 把槍桿與槍頭加粗幾倍（長度不變；漫畫的虛線才分得出槍桿兩邊），預設 1。
  */
 export function weaponRack(B, o) {
   const yaw = o.yaw || 0, y = o.y || 0, at = frame(o.x, y, o.z, yaw);
@@ -1353,11 +1354,11 @@ export function weaponRack(B, o) {
   const nSpears = typeof o.spears === 'number' ? o.spears : o.spears === false ? 0 : 6;
   for (let i = 0; i < nSpears; i++) {
     const lx = nSpears > 1 ? -0.9 + i * (1.8 / (nSpears - 1)) : 0;
-    const a = at(lx, 0, 0.3), b = at(lx, 2.24, 0);
-    rod(B, a, b, 0.045, C.wood);
+    const a = at(lx, 0, 0.3), b = at(lx, 2.24, 0), k = o.spearScale ?? 1;
+    rod(B, a, b, 0.045 * k, C.wood);
     const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L = Math.hypot(...d);
-    B.add(B.kit.cone(0.05, 0.24, 4), {
-      p: [b[0] + d[0] / L * 0.11, b[1] + d[1] / L * 0.11, b[2] + d[2] / L * 0.11],
+    B.add(B.kit.cone(0.05 * k, 0.24 * k, 4), {
+      p: [b[0] + d[0] / L * 0.11 * k, b[1] + d[1] / L * 0.11 * k, b[2] + d[2] / L * 0.11 * k],
       r: tilt(...d), color: C.ironLit, ink: false,
     });
   }
