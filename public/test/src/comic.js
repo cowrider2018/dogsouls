@@ -67,7 +67,7 @@ export const PAGES = [
     { note: '主角走向打開的鐵閘', say: '那裡有路……', src: 'comic/p8-3.png', capAt: 'bottom', focus: '40% 50%' },
   ] },
   { title: '地下墓室', panels: [
-    { note: '鐵閘升起，主角走進去', src: 'comic/p9-1.png', focus: '50% 60%' },
+    { note: '主角從打開的鐵閘下走進去', src: 'comic/p9-1.png', focus: '50% 60%' },
     { note: '拱肋下一排排石棺，壁龕裡燭火', say: '……墓室？', src: 'comic/p9-2.png', focus: '50% 60%' },
     { note: '石棺縫裡冒出幽靈', src: 'comic/p9-3.png', focus: '58% 40%' },
   ] },
