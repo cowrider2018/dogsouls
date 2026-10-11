@@ -77,7 +77,7 @@ import { stone } from '../public/test/src/geom.js';
 import { CAM, makeCam, updateCam } from '../public/test/src/camera.js';
 import { readFileSync } from 'node:fs';
 import { loadZoo, TURN_RATE } from '../public/test/src/critter.js';
-import { Pad, STIR } from '../public/test/src/pad.js';
+import { Pad, STIR, GIVE } from '../public/test/src/pad.js';
 import { railTier } from '../public/test/src/hud.js';
 import { roomOf, signposts } from '../public/test/src/route.js';
 
@@ -2180,6 +2180,14 @@ head('手把');
   ok(jp.takeJump() === false, '同一次按下不會跳兩次');
   ok(jp.drops.length > 0, '按下噴出水花', `${jp.drops.length} 滴`);
   jp.up(9);
+
+  /* 交靈魂的圖案：手與頭合起來的外框（含線寬）置中在鍵的圓心上。 */
+  {
+    const { lo, hi } = GIVE.box;
+    ok(Math.abs(lo[0] + hi[0]) < 1e-9 && Math.abs(lo[1] + hi[1]) < 1e-9 && hi[0] > 0.3 && hi[1] > 0.3,
+      '交靈魂的圖案（手＋頭）整個置中在跳躍鍵上',
+      `外框 x ${lo[0].toFixed(2)}～${hi[0].toFixed(2)}、y ${lo[1].toFixed(2)}～${hi[1].toFixed(2)}（r）`);
+  }
 
   /* 圖案一換，那顆水就晃一下，晃法跟長按一模一樣：一個換圖案（stir），一個真的按住 STIR 秒再放開，
      兩顆的液化與按壓每一幀都一樣。只動外觀：不跳、不回報、不算按著。 */

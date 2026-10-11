@@ -167,8 +167,83 @@ function roundPath(g, u, pts) {
   g.lineTo(lx * u, ly * u);
 }
 
-/** 交靈魂那隻手擺在哪裡（以 r·0.92 為單位）、斜多少（弧度，正的是指尖往上翹）：從右下往左上伸。 */
-const HAND = { x: 0.16, y: -0.08, tilt: 0.22 };
+/* ── 交靈魂的圖案的擺法（都以 r：鍵的半徑為單位）──────────────────────────
+   HAND   那隻手擺在哪裡、斜多少（弧度，正的是指尖往上翹）：從右下往左上伸。點是以 0.92·r 為單位、
+          [x, y, 圓角半徑]，c 是指尖的圓角；線寬 HAND.lw·r。
+   SOUL_HEAD 狗頭：SOUL_SIDE 放大 k 倍（剪影長的那一邊半長 = k·r）、外框中心擺在 (x, y)。x 是原本那個
+          位置（0.06）再往左挪 0.85 個頭寬（頭寬 = 2k）。
+   GIVE   手與頭合起來的外框（含線寬）的中心挪到鍵的圓心：shift 是整個圖案要挪多少，box 是挪完之後
+          的外框——模組載入時算一次（giveBox）。 */
+const HAND = {
+  x: 0.16 * 0.92, y: -0.08 * 0.92, tilt: 0.22, unit: 0.92, lw: 0.07, c: 0.035,
+  path: [
+    [0.46, 0.33],                       // 手臂上緣（從右下伸進來）
+    [0.31, 0.24, 0.07],                 // 手腕接拇指
+    [0.31, 0.06, 0.035],                // 拇指的尖：圓角矩形
+    [0.15, 0.06, 0.035],
+    [0.15, 0.21, 0.05],                 // 拇指接掌心
+    [-0.43, 0.21, 0.035],               // 掌心、手指平平地往左伸出去，指尖是圓角矩形
+    [-0.43, 0.40, 0.035],
+    [0.08, 0.46, 0.12],                 // 掌根接手臂
+    [0.46, 0.61],                       // 手臂下緣
+  ],
+};
+const SOUL_K = 0.34 * 1.3 * 1.3;
+const SOUL_HEAD = { k: SOUL_K, x: 0.06 - 0.85 * 2 * SOUL_K, y: -0.40, lw: 0.05 };
+
+/**
+ * roundPath 畫出來的那條線上的點（倒圓角的弧取樣），單位跟 pts 一樣。arcTo 的幾何：頂點 P 兩邊的
+ * 方向夾角 2θ，切點離 P 是 rad / tan θ，圓心在角平分線上離 P rad / sin θ。
+ */
+function filletPoints(pts, steps = 12) {
+  const out = [pts[0].slice(0, 2)];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py, rad] = pts[i];
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i + 1];
+    const l1 = Math.hypot(ax - px, ay - py), l2 = Math.hypot(bx - px, by - py);
+    const d1 = [(ax - px) / l1, (ay - py) / l1], d2 = [(bx - px) / l2, (by - py) / l2];
+    const th = Math.acos(Math.max(-1, Math.min(1, d1[0] * d2[0] + d1[1] * d2[1]))) / 2;
+    const t = rad / Math.tan(th), h = rad / Math.sin(th);
+    const m = [d1[0] + d2[0], d1[1] + d2[1]], ml = Math.hypot(...m);
+    const cx = px + (m[0] / ml) * h, cy = py + (m[1] / ml) * h;
+    const a0 = Math.atan2(py + d1[1] * t - cy, px + d1[0] * t - cx);
+    let a1 = Math.atan2(py + d2[1] * t - cy, px + d2[0] * t - cx);
+    while (a1 - a0 > Math.PI) a1 -= TAU;
+    while (a1 - a0 < -Math.PI) a1 += TAU;
+    for (let k = 0; k <= steps; k++) {
+      const a = a0 + ((a1 - a0) * k) / steps;
+      out.push([cx + Math.cos(a) * rad, cy + Math.sin(a) * rad]);
+    }
+  }
+  out.push(pts[pts.length - 1].slice(0, 2));
+  return out;
+}
+
+/** 交靈魂的圖案還沒挪之前，手與頭合起來的外框（含線寬的一半），單位 r。 */
+function giveBox() {
+  const lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
+  const add = (x, y, pad) => {
+    lo[0] = Math.min(lo[0], x - pad); lo[1] = Math.min(lo[1], y - pad);
+    hi[0] = Math.max(hi[0], x + pad); hi[1] = Math.max(hi[1], y + pad);
+  };
+  const cs = Math.cos(HAND.tilt), sn = Math.sin(HAND.tilt);
+  for (const [px, py] of filletPoints(HAND.path)) {
+    const x = px * HAND.unit, y = py * HAND.unit;
+    add(HAND.x + x * cs - y * sn, HAND.y + x * sn + y * cs, HAND.lw / 2);
+  }
+  const o = SOUL_SIDE.outline;
+  for (let i = 0; i < o.length; i += 2) add(SOUL_HEAD.x + o[i] * SOUL_HEAD.k, SOUL_HEAD.y + o[i + 1] * SOUL_HEAD.k, SOUL_HEAD.lw / 2);
+  return { lo, hi };
+}
+
+export const GIVE = (() => {
+  const { lo, hi } = giveBox();
+  const shift = [-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2];
+  return { shift, box: { lo: [lo[0] + shift[0], lo[1] + shift[1]], hi: [hi[0] + shift[0], hi[1] + shift[1]] } };
+})();
+
+/** 圖案的小畫布半邊多寬（r）：至少是鍵的半徑，交靈魂的圖案比它寬就照它的外框再留一點。 */
+const GLYPH_HALF = Math.max(1, ...GIVE.box.hi, ...GIVE.box.lo.map(Math.abs)) + 0.02;
 
 /* ── 跳躍鍵上的圖案 ─────────────────────────────────────────────
    每一個都以鍵的圓心為 (0, 0)、用 r（鍵的半徑）量，畫在 _glyph 給的那張小畫布上（筆的顏色、
@@ -220,39 +295,29 @@ const GLYPHS = {
   },
 
   /**
-   * 交靈魂：一隻從右下往左上伸進來（HAND）、掌心朝上托著的手，上面隔一點空浮著一顆狗頭靈魂的側面剪影（SOUL_SIDE，
+   * 交靈魂：一隻從右下往左上伸進來（HAND）、掌心朝上托著的手，左上浮著一顆狗頭靈魂的側面剪影（SOUL_SIDE、SOUL_HEAD，
    * 臉朝左）、叉叉眼挖空。手跟箭頭、刀一樣是線，畫得粗胖：兩隻指頭——靠手腕立著的拇指、往左平平
    * 伸出去的手指——拇指與掌心是一個托；兩個指尖都是圓角矩形（平的頭、圓的角），手腕接拇指、拇指接
    * 掌心、手指接掌根、掌根接手臂，每一個轉折都倒圓角（roundPath），沒有一個尖角。頭是實心的剪影，
    * 一眼看得出是「那一顆」，不是另一條線。
    */
   give(g, r) {
-    const u = r * 0.92, c = 0.035;      // c：指尖的圓角
-    g.lineWidth = Math.max(2.2, r * 0.10);
+    g.translate(GIVE.shift[0] * r, GIVE.shift[1] * r);              // 手與頭合起來置中
+    g.lineWidth = r * HAND.lw;
     g.save();
-    g.translate(HAND.x * u, HAND.y * u);
+    g.translate(HAND.x * r, HAND.y * r);
     g.rotate(HAND.tilt);
     g.beginPath();
-    roundPath(g, u, [
-      [0.46, 0.33],                     // 手臂上緣（從右下伸進來）
-      [0.31, 0.24, 0.07],               // 手腕接拇指
-      [0.31, 0.06, c],                  // 拇指的尖：圓角矩形
-      [0.15, 0.06, c],
-      [0.15, 0.21, 0.05],               // 拇指接掌心
-      [-0.43, 0.21, c],                 // 掌心、手指平平地往左伸出去，指尖是圓角矩形
-      [-0.43, 0.40, c],
-      [0.08, 0.46, 0.12],               // 掌根接手臂
-      [0.46, 0.61],                     // 手臂下緣
-    ]);
+    roundPath(g, r * HAND.unit, HAND.path);
     g.stroke();
     g.restore();
 
-    const k = 0.34 * r, { outline: o, eye } = SOUL_SIDE;
+    const k = SOUL_HEAD.k * r, { outline: o, eye } = SOUL_SIDE;
     g.save();
-    g.translate(0.06 * r, -0.40 * r);
+    g.translate(SOUL_HEAD.x * r, SOUL_HEAD.y * r);
     g.scale(k, k);
     g.fillStyle = g.strokeStyle;
-    g.lineWidth = Math.max(1.6, r * 0.05) / k;                              // 描一圈，剪影的角圓一點
+    g.lineWidth = (r * SOUL_HEAD.lw) / k;                                        // 描一圈，剪影的角圓一點
     g.beginPath();
     for (let i = 0; i < o.length; i += 2) g.lineTo(o[i], o[i + 1]);
     g.closePath();
@@ -704,12 +769,12 @@ export class Pad {
 
   /**
    * 畫一個圖案：在離屏的小畫布上以 (0, 0) 為圓心、用不透明的 color 畫 draw(g)，再整張以
-   * alpha 貼到 (cx, cy)。重疊的筆畫因此是同一個透明度。小畫布是跳躍鍵那麼大（2r 見方，
-   * 照 dpr 放大），不夠大才重新配。
+   * alpha 貼到 (cx, cy)。重疊的筆畫因此是同一個透明度。小畫布至少跳躍鍵那麼大（2r 見方），
+   * 交靈魂的圖案比鍵寬的話照它的外框（GIVE.box）放大，不切到筆畫；照 dpr 放大，不夠大才重新配。
    */
   _glyph(ctx, cx, cy, r, color, alpha, draw) {
     if (alpha <= 0.002) return;
-    const dpr = this.dpr, half = Math.ceil(r);
+    const dpr = this.dpr, half = Math.ceil(r * GLYPH_HALF);
     const px = Math.ceil(half * 2 * dpr);
     if (!this._glyphCv) this._glyphCv = document.createElement('canvas');
     const cv = this._glyphCv;
