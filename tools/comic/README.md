@@ -94,6 +94,7 @@
   rays: { at: [fx, fy], n, from, to, inner, width, color, alpha },   // 光芒（可以是陣列）
   speedLines: { angle, rows, band, len, width, seed },              // 速度線
   puffs: [{ x, y, r, color, alpha, n, seed }],                      // 霧與塵
+  marks: { at: [fx, fy], angle, spread, n, inner, len, width, color },   // 強調記號（三條黃色短線，可以是陣列）
   souls: [{ at: [x, y, z], yaw, scale, seed, trail }],              // 靈魂（發光的狗頭），3D；trail 是小球冒幾幀（預設 90）
   cast: [{
     who: 'hero',           // 見下面「角色」
@@ -143,6 +144,7 @@
   - `rays` 光芒：從 `at`（畫面的比例）往外放、等角度等寬的光，`from`／`to` 是角度範圍。中心放在畫面外很遠、`inner` 給大，光就從一條弧開始、幾乎平行（地上一整條裂縫透上來的光）。光從縫裡透上來、從誰身上擴散出去、門後的冷光。畫在角色底下、背景剪影後面（門後的光被門擋住）；`front: true` 畫在剪影前面。
   - `speedLines` 速度線：沿 `angle` 一列一列等間隔的長線，跑過去、掉下去。畫在角色底下。
   - `puffs` 霧與塵：幾團大圓聯成的形狀，沒有墨線、半透明。幽靈散掉的霧、砸起來的塵。畫在最上層。
+  - `marks` 強調記號：漫畫的「！」——三條短而粗的黃色筆畫，從 `at`（畫面的比例，變了的那個東西）往外放，表示「注意這裡、有東西變了」。中間那一條朝 `angle`（弳，0 往右、−π/2 往上），左右各偏 `spread`；`inner` 是內端離 `at` 多遠、`len` 多長、`width` 外端多粗（都是畫面高的幾倍），`n` 幾條（預設 3）、`color` 顏色（預設黃）。每一條一樣：外端圓頭最粗、往內收細成小圓頭，整圈包一道墨線（規則 5），黃色壓在紙上才讀得到。畫在最上層，放的時候別蓋到臉。例：第 1 頁第 3 格，在空了的兵器架上面。
 - **姿勢 `move`**（`critter.js` 的 `moveOverlay`）：
   - `pitch`：身體仰俯，正值是低頭那一側往下。
   - `headPitch`：正值低頭、負值抬頭。`headYaw`、`headTilt` 是頭轉、頭歪。

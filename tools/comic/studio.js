@@ -905,6 +905,41 @@ function puffs(g, w, h, list) {
   }
 }
 
+/**
+ * 強調記號（漫畫的「！」：有東西變了、注意這裡）：三條短而粗的筆畫，從 at（畫面的比例，變了的那個
+ * 東西）往外放，中間那一條朝 angle（弳，canvas 的角度：0 往右、−π/2 往上），左右兩條各偏 spread。
+ * 每一條一樣：內端離 at inner、長 len、外端最粗 width（都是畫面高的幾倍），兩頭都是圓頭、往內收細。
+ * 填 color，整圈包一道墨線（規則 5：要嘛整圈包，要嘛不畫——這裡整圈包，黃色壓在紙上才讀得到）。
+ * 畫在最上層（角色前面），放的時候別蓋到臉。可以是陣列。
+ */
+function marks(g, w, h, ink, { at = [0.5, 0.5], angle = -Math.PI / 2, spread = 0.5, n = 3, inner = 0.08, len = 0.1, width = 0.03, color = '#ffd02e' } = {}) {
+  const cx = at[0] * w, cy = at[1] * h;
+  const r2 = (width * h) / 2, r1 = r2 * 0.35, d = len * h - r1 - r2;
+  // 兩個圓（內端小、外端大）的外公切線：法線跟筆畫方向的夾角 α，cos α = −(r2 − r1) / d。
+  const al = Math.acos(-(r2 - r1) / d);
+  g.save();
+  g.fillStyle = color;
+  g.strokeStyle = `#${INK.toString(16).padStart(6, '0')}`;
+  g.lineWidth = ink;
+  g.lineJoin = 'round';
+  for (let i = 0; i < n; i++) {
+    const a = angle + (i - (n - 1) / 2) * spread;
+    const ux = Math.cos(a), uy = Math.sin(a);
+    const x1 = cx + ux * (inner * h + r1), y1 = cy + uy * (inner * h + r1);
+    const x2 = x1 + ux * d, y2 = y1 + uy * d;
+    g.beginPath();
+    g.moveTo(x1 + Math.cos(a + al) * r1, y1 + Math.sin(a + al) * r1);
+    g.lineTo(x2 + Math.cos(a + al) * r2, y2 + Math.sin(a + al) * r2);
+    g.arc(x2, y2, r2, a + al, a - al, true);
+    g.lineTo(x1 + Math.cos(a - al) * r1, y1 + Math.sin(a - al) * r1);
+    g.arc(x1, y1, r1, a - al, a + al - Math.PI * 2, true);
+    g.closePath();
+    g.fill();
+    g.stroke();
+  }
+  g.restore();
+}
+
 /** 拍好的那一張（網點之後）再畫上表情：一張 2D 畫布。 */
 const sheet = document.createElement('canvas');
 const sheetG = sheet.getContext('2d');
@@ -993,6 +1028,7 @@ function render(id) {
   for (const v of collage) if (!v.front) lay(v);
   lay(main);
   for (const v of collage) if (v.front) lay(v);
+  for (const m of [shot.marks || []].flat()) marks(sheetG, w, h, shot.ink, m);
   if (shot.puffs) puffs(sheetG, w, h, shot.puffs);
   return sheet.toDataURL('image/png');
 }
