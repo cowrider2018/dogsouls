@@ -807,7 +807,7 @@ export const SHOTS = [
     speedLines: { angle: 0.25, rows: 12, band: [0.15, 0.85], len: [0.4, 0.7], seed: 3 },
     cast: [
       { who: 'hero', at: [1.6, 0], y: 0.35, yaw: -Math.PI / 2 + 0.55, air: 1, move: LUNGE, face: 'proud', blade: 'knife', shadow: false },
-      { who: 'ghostKing', at: [0.45, -0.3], y: 0.15, yaw: Math.PI / 2 - 0.9, air: 3, alpha: 0.45, shields: 3, spin: 1.0,
+      { who: 'ghostKing', at: [0.45, -0.3], y: 0.15, yaw: Math.PI / 2 - 0.9, air: 3, alpha: 0.45, shields: 2, spin: 2.6,
         tip: -0.45, move: { pitch: -0.15, headPitch: 0.05, tailPitch: -0.5, front: -0.8, legs: 0.7, w: 1 }, face: 'ko', eyes: { lift: 0.4 }, shadow: false },
     ],
     props: [{ blade: 'king', at: [-0.3, -0.6], y: 1.9, yaw: -0.9, size: 1.4 }],
@@ -820,23 +820,16 @@ export const SHOTS = [
     light: [-2, 7, 6],
   },
   {
-    // 一路收集的靈魂：正面近景。主角微微抬頭、盼的眼神，一路收集的四顆靈魂（殭屍王、騎士、兩隻幽靈騎士的）
-    // 繞在頭的四周，背後放出淡藍的光；兩側是王座廳的柱子剪影。咬著刀，所以臉正對鏡頭（刀才不會橫在眼睛前面），
-    // 眼睛用 lift 抬到吻部上面。
-    id: 'p14-2', size: [1200, 720], ink: 4,
-    rays: { at: [0.55, 0.5], n: 24, inner: 0.16, width: 0.4, color: '#d7ecf8', alpha: 0.75 },
-    bg: [
-      { piece: 'column', r: 0.5, h: 6.4, x: 0.06, y: 1.0, size: 1.2 },
-      { piece: 'column', r: 0.5, h: 6.4, x: 0.94, y: 1.0, size: 1.2 },
-    ],
-    cast: [{ who: 'hero', at: [0, 0], yaw: 0.15, move: { headPitch: -0.25, headTilt: 0.12, tailPitch: 0.3, w: 1 }, face: 'hope', eyes: { lift: 0.9, spread: 0.35 }, blade: 'knife' }],
-    souls: [
-      { at: [-0.85, 1.0, 0.35], yaw: 2.2, scale: 0.4, seed: 3, trail: 15 },
-      { at: [0.0, 1.65, -0.3], yaw: -1.6, scale: 0.4, seed: 5, trail: 15 },
-      { at: [0.8, 1.35, -0.2], yaw: -0.4, scale: 0.4, seed: 7, trail: 15 },
-      { at: [0.95, 0.65, 0.45], yaw: 0.9, scale: 0.4, seed: 9, trail: 15 },
-    ],
-    cam: { focus: 'hero', yaw: 0.25, pitch: 0.0, dist: 2.3, fov: 40, frame: [0, 0.22] },
+    // 一路收集的靈魂：特寫。主角抬起頭往上看，三顆靈魂（發光的狗頭）在他頭頂上繞成一圈，每一顆朝著繞的方向、
+    // 後面拖著一串小球。鏡頭在前上方，主角仰頭迎著鏡頭——咬著刀，臉要正對鏡頭（刀才不會橫在眼睛前面），
+    // 從上往下拍帽簷又會擋眼睛，所以是頭抬起來、鏡頭跟著在上面。眼睛用 lift 抬到吻部上面。
+    id: 'p14-2', size: [1200, 720], ink: 4.5,
+    cast: [{ who: 'hero', at: [0, 0], yaw: 0, move: { headPitch: -0.45, tailPitch: 0.3, w: 1 }, face: 'hope', eyes: { lift: 0.9, spread: 0.35 }, blade: 'knife' }],
+    // 頭頂上一圈：圓心在頭上方，三顆隔 120°（正後方與左右前方，前面不放，免得擋到臉），朝著逆時針繞的方向。
+    souls: [Math.PI, Math.PI / 3, -Math.PI / 3].map((t, i) => ({
+      at: [0.42 * Math.sin(t), 1.32, 0.42 * Math.cos(t)], yaw: t + Math.PI / 2, scale: 0.3, seed: 3 + 2 * i, trail: 12,
+    })),
+    cam: { focus: 'hero', yaw: 0.1, pitch: 0.15, dist: 1.35, fov: 46, frame: [0, 0.26] },
     light: [2, 7, 6],
   },
   {
