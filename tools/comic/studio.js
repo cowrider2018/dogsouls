@@ -116,6 +116,7 @@ const screenCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
      ghostKing    國王的亡魂（幽靈那一件、王冠、shields 幾面盾繞著轉）
      knightGhost  騎士幽靈（幽靈加頭盔，劇本說的「先拼」：幽靈＋頭盔＋劍）
      folk         王國的人民：look 給哪一隻、哪一件毛（'cat/tabby'、'dog-drop/cow'……）
+     comrade      復活的夥伴：活著的騎士幽靈——立耳犬（幽靈的那個模型）、乳牛毛、同一頂頭盔
 
    同一種角色一格裡可以有好幾隻：照 cast 的順序一隻一隻借，不夠就再做一隻。 */
 const zoo = await loadZoo({ look: 'dog-prick/yellow', height: 1.0 });
@@ -129,6 +130,7 @@ const ROLES = {
   ghostKing: { monster: 'king', crown: true },
   knightGhost: { monster: 'ghost', helm: true },
   folk: {},
+  comrade: { look: 'dog-prick/cow', helm: true },
 };
 /** 腳下的影子的材質（每一隻一塊，共用材質）。 */
 const shadowMat = new THREE.MeshBasicMaterial({ color: INK, transparent: true, opacity: 0.22, depthWrite: false });
