@@ -81,15 +81,33 @@ const REAR = {
 /** 跪下：前半身伏低、頭垂下去（騎士幽靈在主角面前行禮）。 */
 const KNEEL = { pitch: 0.35, headPitch: 0.55, drop: 0.3, front: 1.2, knee: -1.6, hind: 0, legs: 1, tailPitch: -0.5, w: 1 };
 
+/** 固定種子的亂數（mulberry32，跟 studio.js 的 rng 同一個）：每次重拍擺出來都一樣。 */
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /**
- * 繞圈的靈魂在後面留下的幽靈血：從那一顆往回、沿著它繞的那一圈擺一滴一滴。ring(t) 是那一圈在參數 t 的位置，
- * 靈魂往 t 變大的方向繞、在 t0。離頭越遠越稀：每一滴跟上一滴的間隔照 grow 倍拉長，也越來越小；每一滴之間
- * 留得比它們融在一起的寬度大，一顆一顆分開，不會連成一條拖尾。只拿 ring 的形狀算距離，跟鏡頭無關。
- *   from  第一滴離頭的正中多遠（公尺，沿著圈）  gap  第一個間隔  grow  間隔每一滴乘多少
- *   n     幾滴   r  第一滴與最後一滴的半徑   speed  順著圈拉長的那一點（公尺／秒）
+ * 繞圈的靈魂在後面留下的幽靈血：從那一顆往回、沿著它繞的那一圈擺一站一站。ring(t) 是那一圈在參數 t 的位置，
+ * 靈魂往 t 變大的方向繞、在 t0。靠頭的那幾站血多：好幾滴並排、橫過那一條拖痕散開（往上下、往圈的裡外），
+ * 大小不一，挨得近的幾滴融成一塊——拖痕在頭後面是粗的。越往後每一站越少滴、散得越窄、每一滴越小，站與站
+ * 的間隔照 grow 倍拉長，最後只剩一滴一滴分開的小點，不會整條連成一根粗的拖尾。只拿 ring 的形狀算距離，
+ * 跟鏡頭無關；亂數照 seed 固定，重拍一樣。
+ *   from   第一站離頭的正中多遠（公尺，沿著圈）  gap  第一個間隔  grow  間隔每一站乘多少
+ *   abreast  每一站並排幾滴（陣列多長就幾站）  spread  第一站橫過拖痕散多寬（半寬，公尺），之後照滴數縮
+ *   r      第一站與最後一站的平均半徑；每一滴再乘 0.6～1.35 倍   slip  每一滴順著圈前後錯開（間隔的幾成）
+ *   speed  順著圈拉長的那一點（公尺／秒）   seed  亂數種子
  */
-function wake(ring, t0, { from = 0.22, gap = 0.13, grow = 1.35, n = 5, r = [0.022, 0.011], speed = 0.4 } = {}) {
-  const out = [], dt = 0.002;
+function wake(ring, t0, {
+  from = 0.2, gap = 0.1, grow = 1.3, abreast = [4, 3, 3, 2, 1, 1, 1], spread = 0.07,
+  r = [0.021, 0.008], slip = 0.35, speed = 0.4, seed = 1,
+} = {}) {
+  const out = [], dt = 0.002, n = abreast.length, rand = rng(seed);
   let t = t0, walked = 0, next = from;
   for (let i = 0; i < n; i++) {
     while (walked < next) {
@@ -97,9 +115,21 @@ function wake(ring, t0, { from = 0.22, gap = 0.13, grow = 1.35, n = 5, r = [0.02
       walked += Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
       t -= dt;
     }
-    const at = ring(t), b = ring(t + dt), d = Math.hypot(b[0] - at[0], b[1] - at[1], b[2] - at[2]);
-    out.push({ at, r: r[0] + ((r[1] - r[0]) * i) / Math.max(1, n - 1), v: at.map((p, j) => ((b[j] - p) / d) * speed) });
-    next += gap * grow ** i;
+    // 這一站的切線（靈魂往前的方向）、往上（扣掉切線那一份）、往圈外（兩條的外積）。
+    const p = ring(t), q = ring(t + dt);
+    const d = Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]), T = q.map((v, j) => (v - p[j]) / d);
+    const up = [-T[1] * T[0], 1 - T[1] * T[1], -T[1] * T[2]], ul = Math.hypot(...up);
+    const U = up.map((v) => v / ul), N = [T[1] * U[2] - T[2] * U[1], T[2] * U[0] - T[0] * U[2], T[0] * U[1] - T[1] * U[0]];
+    const m = abreast[i], half = (spread * (m - 1)) / Math.max(1, abreast[0] - 1), base = r[0] + ((r[1] - r[0]) * i) / Math.max(1, n - 1);
+    const step = gap * grow ** i;
+    for (let k = 0; k < m; k++) {
+      // 橫過拖痕：照滴數均分再抖一點；方向大多是上下（鏡頭看得出並排），帶一點往圈的裡外。
+      const across = m === 1 ? 0 : (((k + 0.5) / m) * 2 - 1 + (rand() - 0.5) * (1 / m)) * half;
+      const tw = (rand() - 0.5) * 1.2, along = (rand() - 0.5) * slip * step;
+      const off = [0, 1, 2].map((j) => (U[j] * Math.cos(tw) + N[j] * Math.sin(tw)) * across + T[j] * along);
+      out.push({ at: p.map((v, j) => v + off[j]), r: base * (0.6 + rand() * 0.75), v: T.map((v) => v * speed) });
+    }
+    next += step;
   }
   return out;
 }
@@ -861,8 +891,9 @@ export const SHOTS = [
     souls: P14_SOULS.map((t, i) => ({
       at: P14_RING(t), yaw: Math.atan2(0.6 * Math.cos(t), -0.25 * Math.sin(t)), scale: 0.4, seed: 3 + 2 * i, trail: 0,
     })),
-    // 每一顆後面沿著那一圈留一串幽靈血：稀稀落落、一滴一滴分開，離頭越遠越稀、越小。
-    ecto: P14_SOULS.flatMap((t) => wake(P14_RING, t)),
+    // 每一顆後面沿著那一圈留一串幽靈血：靠頭的地方好幾滴並排、大小不一、挨著融成粗粗的一段，越往後越稀、越小，
+    // 最後只剩一滴一滴分開的小點。
+    ecto: P14_SOULS.flatMap((t, i) => wake(P14_RING, t, { seed: 11 + 7 * i })),
     cam: { focus: 'hero', yaw: 0.1, pitch: 0.15, dist: 1.35, fov: 46, frame: [0, 0.26] },
     light: [2, 7, 6],
   },
