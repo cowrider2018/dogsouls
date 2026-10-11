@@ -807,7 +807,7 @@ export const SHOTS = [
     speedLines: { angle: 0.25, rows: 12, band: [0.15, 0.85], len: [0.4, 0.7], seed: 3 },
     cast: [
       { who: 'hero', at: [1.6, 0], y: 0.35, yaw: -Math.PI / 2 + 0.55, air: 1, move: LUNGE, face: 'proud', blade: 'knife', shadow: false },
-      { who: 'ghostKing', at: [0.45, -0.3], y: 0.15, yaw: Math.PI / 2 - 0.9, air: 3, alpha: 0.45, shields: 2, spin: 2.6,
+      { who: 'ghostKing', at: [0.45, -0.3], y: 0.15, yaw: Math.PI / 2 - 0.9, air: 3, alpha: 0.45, shields: 2, spin: 2.6, shieldBreak: true,
         tip: -0.45, move: { pitch: -0.15, headPitch: 0.05, tailPitch: -0.5, front: -0.8, legs: 0.7, w: 1 }, face: 'ko', eyes: { lift: 0.4 }, shadow: false },
     ],
     props: [{ blade: 'king', at: [-0.3, -0.6], y: 1.9, yaw: -0.9, size: 1.4 }],
