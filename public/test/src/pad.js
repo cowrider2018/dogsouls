@@ -171,7 +171,7 @@ function roundPath(g, u, pts) {
    HAND   那隻手擺在哪裡、斜多少（弧度，正的是指尖往上翹）：從右下往左上伸。點是以 0.92·r 為單位、
           [x, y, 圓角半徑]，c 是指尖的圓角；線寬 HAND.lw·r。
    SOUL_HEAD 狗頭：SOUL_SIDE 放大 k 倍（剪影長的那一邊半長 = k·r）、外框中心擺在 (x, y)。x 是原本那個
-          位置（0.06）再往左挪 0.85 個頭寬（頭寬 = 2k）。
+          位置（0.06）再往左挪 0.15 個頭寬（頭寬 = 2k）。
    GIVE   手與頭合起來的外框（含線寬）的中心挪到鍵的圓心：shift 是整個圖案要挪多少，box 是挪完之後
           的外框——模組載入時算一次（giveBox）。 */
 const HAND = {
@@ -189,7 +189,7 @@ const HAND = {
   ],
 };
 const SOUL_K = 0.34 * 1.3 * 1.3;
-const SOUL_HEAD = { k: SOUL_K, x: 0.06 - 0.85 * 2 * SOUL_K, y: -0.40, lw: 0.05 };
+const SOUL_HEAD = { k: SOUL_K, x: 0.06 - 0.15 * 2 * SOUL_K, y: -0.40, lw: 0.05 };
 
 /**
  * roundPath 畫出來的那條線上的點（倒圓角的弧取樣），單位跟 pts 一樣。arcTo 的幾何：頂點 P 兩邊的
