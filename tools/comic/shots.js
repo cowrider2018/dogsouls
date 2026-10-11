@@ -30,6 +30,8 @@
             跟角色一起拍，顏色跟背景的剪影一樣；{ blade, at, y, yaw, size } 是一把掉在地上的刀劍（原本的顏色）
      souls  靈魂（發光的狗頭）：[{ at: [x, y, z], yaw, scale, seed, trail }]——trail 是周圍的小球冒幾幀（預設 90），
             同一格好幾顆的時候給少一點
+     ecto   幽靈血（靈質的血滴，跟遊戲同一種畫法）：[{ at: [x, y, z], r, v }]——半徑 r 公尺，v 是在飛的速度（只拿來
+            順著它拉長一點）
      rays   光芒：{ at: [fx, fy], n, from, to, inner, width, color, alpha, front }（或好幾道的陣列），畫在角色底下、
             剪影後面；front 的畫在剪影前面
      speedLines  速度線：{ angle, rows, band, len, width, seed }，畫在角色底下
@@ -78,6 +80,33 @@ const REAR = {
 };
 /** 跪下：前半身伏低、頭垂下去（騎士幽靈在主角面前行禮）。 */
 const KNEEL = { pitch: 0.35, headPitch: 0.55, drop: 0.3, front: 1.2, knee: -1.6, hind: 0, legs: 1, tailPitch: -0.5, w: 1 };
+
+/**
+ * 繞圈的靈魂在後面留下的幽靈血：從那一顆往回、沿著它繞的那一圈擺一滴一滴。ring(t) 是那一圈在參數 t 的位置，
+ * 靈魂往 t 變大的方向繞、在 t0。離頭越遠越稀：每一滴跟上一滴的間隔照 grow 倍拉長，也越來越小；每一滴之間
+ * 留得比它們融在一起的寬度大，一顆一顆分開，不會連成一條拖尾。只拿 ring 的形狀算距離，跟鏡頭無關。
+ *   from  第一滴離頭的正中多遠（公尺，沿著圈）  gap  第一個間隔  grow  間隔每一滴乘多少
+ *   n     幾滴   r  第一滴與最後一滴的半徑   speed  順著圈拉長的那一點（公尺／秒）
+ */
+function wake(ring, t0, { from = 0.22, gap = 0.13, grow = 1.35, n = 5, r = [0.022, 0.011], speed = 0.4 } = {}) {
+  const out = [], dt = 0.002;
+  let t = t0, walked = 0, next = from;
+  for (let i = 0; i < n; i++) {
+    while (walked < next) {
+      const a = ring(t), b = ring(t - dt);
+      walked += Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+      t -= dt;
+    }
+    const at = ring(t), b = ring(t + dt), d = Math.hypot(b[0] - at[0], b[1] - at[1], b[2] - at[2]);
+    out.push({ at, r: r[0] + ((r[1] - r[0]) * i) / Math.max(1, n - 1), v: at.map((p, j) => ((b[j] - p) / d) * speed) });
+    next += gap * grow ** i;
+  }
+  return out;
+}
+
+/** 第 14 頁第 2 格那一圈（主角頭頂上，前後壓扁、前緣抬高一點）：三顆靈魂在 t = 0、±2π/3。 */
+const P14_RING = (t) => [0.6 * Math.sin(t), 1.27 + 0.08 * Math.cos(t), 0.25 * Math.cos(t)];
+const P14_SOULS = [0, 2 * Math.PI / 3, -2 * Math.PI / 3];
 /** 捧著：上半身立起來，兩隻前腳收在胸前（捧出自己的靈魂）。 */
 const OFFER = { pitch: -0.8, headPitch: 0.6, drop: -0.1, front: -1.2, knee: 1.2, hind: -0.2, legs: 1, tailPitch: 0.3, w: 1 };
 /** 立誓：前腳收在身下跪著、頭垂下去，後半身還撐著（主角在國王面前跪下）。 */
@@ -829,9 +858,11 @@ export const SHOTS = [
     // 頭頂上一圈：圓心在頭上方，三顆隔 120°（正前方與左右後方），每一顆朝著那一點的切線、同一個繞的方向。
     // 圈壓扁成前後窄的橢圓、前緣抬高一點：正前方那顆是側臉朝右，後面兩顆朝左，從下面看是一圈順時針在轉；
     // 前後窄，後面兩顆的切線才偏橫、讀得出側臉，不會一顆正臉一顆後腦勺。
-    souls: [0, 2 * Math.PI / 3, -2 * Math.PI / 3].map((t, i) => ({
-      at: [0.6 * Math.sin(t), 1.27 + 0.08 * Math.cos(t), 0.25 * Math.cos(t)], yaw: Math.atan2(0.6 * Math.cos(t), -0.25 * Math.sin(t)), scale: 0.4, seed: 3 + 2 * i, trail: 0,
+    souls: P14_SOULS.map((t, i) => ({
+      at: P14_RING(t), yaw: Math.atan2(0.6 * Math.cos(t), -0.25 * Math.sin(t)), scale: 0.4, seed: 3 + 2 * i, trail: 0,
     })),
+    // 每一顆後面沿著那一圈留一串幽靈血：稀稀落落、一滴一滴分開，離頭越遠越稀、越小。
+    ecto: P14_SOULS.flatMap((t) => wake(P14_RING, t)),
     cam: { focus: 'hero', yaw: 0.1, pitch: 0.15, dist: 1.35, fov: 46, frame: [0, 0.26] },
     light: [2, 7, 6],
   },
