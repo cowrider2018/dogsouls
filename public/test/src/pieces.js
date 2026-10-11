@@ -1335,7 +1335,8 @@ export function pavilion(B, o) {
  * 武器架：兩根柱、上下兩道橫木，一排靠著上橫木的長槍，前面靠著兩面圓盾。
  * 架子沿 local x、正面朝 local +z（世界的 (sin yaw, cos yaw)）。
  * rack: false 不砌架子、spears: false 不放長槍、shields: false 不放盾（漫畫拿來分開畫：架子是
- * 剪影、兵器只剩虛線），預設都有；碰撞箱照舊。
+ * 剪影、兵器只剩虛線），預設都有；碰撞箱照舊。spears、shields 給數字就是幾支、幾面（漫畫裡少放
+ * 幾件、每件才看得清楚）：長槍平均排在同一段（預設 6 支，間隔 0.36），一面盾放正中間，兩面照舊。
  */
 export function weaponRack(B, o) {
   const yaw = o.yaw || 0, y = o.y || 0, at = frame(o.x, y, o.z, yaw);
@@ -1349,8 +1350,9 @@ export function weaponRack(B, o) {
   }
   /* 長槍：槍尾在前面的地上，槍身靠在上橫木的**前緣**上（在 1.6 的高度離架心
      8.6 公分，橫木前緣在 6 公分），槍頭過了橫木半公尺多。 */
-  if (o.spears !== false) for (let i = 0; i < 6; i++) {
-    const lx = -0.9 + i * 0.36;
+  const nSpears = typeof o.spears === 'number' ? o.spears : o.spears === false ? 0 : 6;
+  for (let i = 0; i < nSpears; i++) {
+    const lx = nSpears > 1 ? -0.9 + i * (1.8 / (nSpears - 1)) : 0;
     const a = at(lx, 0, 0.3), b = at(lx, 2.24, 0);
     rod(B, a, b, 0.045, C.wood);
     const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L = Math.hypot(...d);
@@ -1362,7 +1364,8 @@ export function weaponRack(B, o) {
   // 兩面圓盾，面朝前、往後靠 15°，下緣著地。
   const lean = 0.27, sc = Math.cos(yaw), ss = Math.sin(yaw);
   const nrm = [ss * Math.cos(lean), Math.sin(lean), sc * Math.cos(lean)];
-  if (o.shields !== false) for (const [lx, color] of [[-0.55, C.banner], [0.6, C.bannerAlt]]) {
+  const shieldSpots = o.shields === false ? [] : o.shields === 1 ? [[0, C.banner]] : [[-0.55, C.banner], [0.6, C.bannerAlt]];
+  for (const [lx, color] of shieldSpots) {
     const c = at(lx, 0.36 * Math.cos(lean) + 0.03, 0.44);
     B.add(B.kit.drum(0.36, 0.36, 0.05, 12), { p: c, r: tilt(...nrm), color });
     B.add(B.kit.blob(0.07), { p: [c[0] + nrm[0] * 0.04, c[1] + nrm[1] * 0.04, c[2] + nrm[2] * 0.04], color: C.ironLit, ink: false });
