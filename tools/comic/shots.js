@@ -142,14 +142,14 @@ export const SHOTS = [
     light: [5, 7, 4],
   },
   {
-    // ……睡過頭了：近景，橫線的疲憊眼睛。鏡頭在眼睛的高度，帽簷不擋。後面是兵器架（武器一把都沒少）、
-    // 隔壁的營帳，太陽已經很高。
+    // 帳篷外太陽已經很高：近景，橫線的疲憊眼睛。鏡頭在眼睛的高度，帽簷不擋。後面是兵器架——武器全不見了，
+    // 原本靠著的長槍、擋在前面的盾只剩粗虛線的輪廓（沒有實體）——與隔壁的營帳。
     id: 'p1-3', size: [1200, 720], ink: 4,
-    // 構圖：臉佔左邊，右邊是插滿長槍的兵器架（一把都沒少），後面露出一角營帳。
+    // 構圖：臉佔左邊，右邊是空了的兵器架（架子是剪影，長槍與盾是 dash 的虛線），後面露出一角營帳。
     horizon: 0.8,
     bg: [
       { piece: 'pavilion', R: 1.9, h: 1.45, roof: 1.25, x: 0.98, y: 0.82, size: 0.46 },
-      { piece: 'weaponRack', x: 0.77, y: 0.86, size: 0.5 },
+      { piece: 'weaponRack', spears: false, shields: false, dash: [{ rack: false, spears: true }, { rack: false, shields: true }], x: 0.79, y: 0.87, size: 0.56 },
     ],
     cast: [{ who: 'hero', at: [0, 0], yaw: -0.45, move: DROWSY, face: 'tired' }],
     cam: { focus: 'hero', yaw: -0.8, pitch: -0.08, dist: 1.0, fov: 32, frame: [-0.12, 0.08] },
