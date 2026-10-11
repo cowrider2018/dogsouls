@@ -368,7 +368,7 @@ console.log('9. 路標');
       const seen = new Set(STAGES.slice(0, k + 1).map((s) => s.room));
       return signposts(ruins.portals, room, seen).map((sp) => sp.name).sort().join('、');
     };
-    ok(at(0, 'wallwalk') === ['城牆上', '調查殭屍來歷'].sort().join('、'), `兵營打完：往中庭的霧口寫「調查殭屍來歷」（${at(0, 'wallwalk')}）`);
+    ok(at(0, 'wallwalk') === ['城牆上', '去中庭看看'].sort().join('、'), `兵營打完：往中庭的霧口寫「去中庭看看」（${at(0, 'wallwalk')}）`);
     ok(at(1, 'courtyard') === ['兵營', '喝水', '見國王'].sort().join('、'), `中庭打完：去過的兵營寫地名，窄巷寫「喝水」、王座廳寫「見國王」（${at(1, 'courtyard')}）`);
     ok(at(2, 'alley') === ['喝水', '中庭'].sort().join('、'), `窄巷打完：井寫「喝水」（${at(2, 'alley')}）`);
     ok(at(3, 'cistern') === ['城鎮窄巷', '調查幽靈來歷'].sort().join('、'), `水窖打完：往墓室的鐵閘寫「調查幽靈來歷」（${at(3, 'cistern')}）`);

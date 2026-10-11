@@ -110,7 +110,7 @@ export const STAGES = [
   },
   {
     id: 'courtyard', name: '中庭', hint: '從兵營南邊的黑霧過去。',
-    room: 'courtyard', goal: '調查殭屍來歷', debut: 'comic',
+    room: 'courtyard', goal: '去中庭看看', debut: 'comic',
     foes: [{ kind: 'boss', x: -4, y: 0, z: 0, yaw: Math.PI / 2, boss: true }],
     rest: 'wallwalk.fog', entry: { from: 'wallwalk', to: 'courtyard.east' },
   },
