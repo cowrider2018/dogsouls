@@ -401,8 +401,7 @@ export class Pad {
     }
     if (this.bOn) return;
     this.bOn = true; this.bPid = pid;
-    for (let i = 0; i < 3; i++) this.bPh[i] = Math.random() * TAU;
-    this.bPressv = 26;
+    this._squeeze();
     this._splash();
     try { if (navigator.vibrate) navigator.vibrate(10); } catch { /* 不支援就算了 */ }
     this._queued = true;
@@ -453,6 +452,12 @@ export class Pad {
     this.axis.x = ((x - this.slotJoy.x) / travel / len) * k;
     this.axis.y = ((y - this.slotJoy.y) / travel / len) * k;
     this.mag = k;
+  }
+
+  /** 跳躍鍵那顆水被按下去的那一下：擾動換一組相位、往下踢一下（之後由 update 的彈簧接手）。 */
+  _squeeze() {
+    for (let i = 0; i < 3; i++) this.bPh[i] = Math.random() * TAU;
+    this.bPressv = 26;
   }
 
   _splash() {
