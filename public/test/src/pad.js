@@ -175,8 +175,9 @@ function roundPath(g, u, pts) {
           那一個：頭（對在手的正中）也整顆留在同一圈 clip 裡——手越往上擺，切口那一點就越往右，頭跟著
           往右上跑出鍵外。
    SOUL_HEAD 狗頭：SOUL_SIDE 放大 k 倍（剪影長的那一邊半長 = k·r）。y 擺到頭最低的那一點（含線寬）
-          比手最高的那一點（拇指的尖，含線寬）再高 gap，看起來是浮在手上面；x 對在露出來的手（指尖的
-          外緣到切口）的正中。
+          比手最高的那一點（拇指的尖，含線寬）再高 gap，看起來是浮在手上面。x 從露出來的手（指尖的
+          外緣到切口）的正中再挪 dx 個頭寬（頭寬 = 2k，負的是往左）。手的高度照「對在正中」的那顆頭
+          挑（見 HAND），挪頭不會動到手。
    GIVE   算好的擺法與量出來的幾個數（模組載入時算一次）。 */
 const HAND = {
   tilt: 0, unit: 0.92, lw: 0.07, clip: 0.9, root: 1,
@@ -193,7 +194,7 @@ const HAND = {
   ],
 };
 const SOUL_K = 0.34 * 1.3 * 1.3;
-const SOUL_HEAD = { k: SOUL_K, lw: 0.05, gap: 0.08 };
+const SOUL_HEAD = { k: SOUL_K, lw: 0.05, gap: 0.08, dx: -0.3 };
 
 /**
  * roundPath 畫出來的那條線上的點（倒圓角的弧取樣），單位跟 pts 一樣。arcTo 的幾何：頂點 P 兩邊的
@@ -275,10 +276,10 @@ export const GIVE = (() => {
   }
   const L = layoutAt((lo + hi) / 2);
   HAND.x = L.x; HAND.y = (lo + hi) / 2;
-  SOUL_HEAD.x = L.headX; SOUL_HEAD.y = L.headY;
+  SOUL_HEAD.x = L.headX + SOUL_HEAD.dx * 2 * SOUL_HEAD.k; SOUL_HEAD.y = L.headY;
   const o = SOUL_SIDE.outline, head = [];
   for (let i = 0; i < o.length; i += 2) head.push([SOUL_HEAD.x + o[i] * SOUL_HEAD.k, SOUL_HEAD.y + o[i + 1] * SOUL_HEAD.k]);
-  // headReach：頭離圓心最遠的那一筆（含線寬）：就是 clip，鍵的邊緣也留 0.1 的空白。
+  // headReach：頭離圓心最遠的那一筆（含線寬）；不超過 clip 的話鍵的邊緣也留著 0.1 的空白。
   const headReach = headReachAt(SOUL_HEAD.x, SOUL_HEAD.y);
   // clear：頭最低的那一點與手最高的那一點之間空多少（都含線寬）。
   const clear = L.top - (Math.max(...head.map(([, y]) => y)) + SOUL_HEAD.lw / 2);
@@ -287,7 +288,7 @@ export const GIVE = (() => {
   const rootR = Math.hypot(HAND.x + rx * HAND.unit + HAND.lw / 2, HAND.y + ry * HAND.unit);
   return {
     hand: { x: HAND.x, y: HAND.y, tilt: HAND.tilt, clip: HAND.clip },
-    head: { x: SOUL_HEAD.x, y: SOUL_HEAD.y },
+    head: { x: SOUL_HEAD.x, y: SOUL_HEAD.y, centred: L.headX, width: 2 * SOUL_HEAD.k },
     headReach, clear, rootR, top: L.headTop, bottom: L.bottom,
   };
 })();

@@ -2182,12 +2182,14 @@ head('手把');
   jp.up(9);
 
   /* 交靈魂的圖案：掌心那一條線是水平的；手從右下伸進來，在離圓心 0.9 r 的那一圈切掉，切口剛好在
-     拇指根部的外緣；頭浮在手上面 0.08 r，整顆也在那一圈裡。 */
+     拇指根部的外緣；頭浮在手上面 0.08 r、從對在手正中的位置往左挪 0.3 個頭寬，整顆也在那一圈裡。 */
   {
     const { hand, head } = GIVE;
     ok(hand.tilt === 0 && hand.clip === 0.9 && Math.abs(GIVE.rootR - 0.9) < 1e-9 && hand.x > 0 && hand.y > 0,
       '交靈魂的手：掌心水平、從右下伸進來，在 0.9 r 那一圈切在拇指的根部（鍵的邊緣留 0.1 r）',
       `手擺在 (${hand.x.toFixed(2)}, ${hand.y.toFixed(2)})、根部離圓心 ${GIVE.rootR.toFixed(3)} r`);
+    ok(Math.abs(head.x - (head.centred - 0.3 * head.width)) < 1e-9, '狗頭從對在手正中的位置往左挪 0.3 個頭寬',
+      `正中 ${head.centred.toFixed(3)} → ${head.x.toFixed(3)} r（頭寬 ${head.width.toFixed(3)}）`);
     ok(Math.abs(GIVE.clear - 0.08) < 1e-9 && GIVE.headReach <= 0.9 + 1e-9 && GIVE.bottom <= 0.9 + 1e-9,
       '狗頭浮在手上面 0.08 r（都含線寬），頭與露出來的手都在 0.9 r 那一圈裡',
       `頭擺在 (${head.x.toFixed(2)}, ${head.y.toFixed(2)})、空 ${GIVE.clear.toFixed(3)} r、頭離圓心最遠 ${GIVE.headReach.toFixed(3)} r`);
