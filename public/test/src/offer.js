@@ -35,6 +35,12 @@ export const makeOffer = (need = 0) => ({ need, given: 0, held: 0, blink: 0, tol
 /** 交滿了嗎。 */
 export const offerDone = (o) => o.given >= o.need;
 
+/**
+ * 在國王身邊、還收得了靈魂：`a` 是獻靈魂的地方（Fight.altar，國王還沒躺下是 null），玩家 `p` 離它
+ * 水平 OFFER.near 公尺以內、還沒交滿。這時候按跳是獻靈魂，不是跳（模式不交給連段）。
+ */
+export const nearOffer = (o, a, p) => !!a && !offerDone(o) && Math.hypot(p.x - a.x, p.z - a.z) < OFFER.near;
+
 /** 現在交得出去嗎：還沒交滿、最大血量比一開始多（有撿來的可以交）。 */
 export const canGive = (o, p) => !offerDone(o) && p.max > LIFE.start;
 

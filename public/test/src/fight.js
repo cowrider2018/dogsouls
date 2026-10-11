@@ -53,7 +53,7 @@ import {
   coneFx, showCone, stripFx, showStrip, galeFx, showGale,
 } from './fx.js';
 import { SoulLook } from './soul.js';
-import { OFFER, makeOffer, offerStep, offerDone, blinkOf, throwSoul, flySoul } from './offer.js';
+import { makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, flySoul } from './offer.js';
 import { DEATH, tipAngle, footprint, fallSide, fallHalf, tipNode } from './death.js';
 import { SKILL, GUST, WHIRL_LEN, REAP, REND, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, ringsStep, shotHits, strikeHits, gustHits, ringHits, laneLength } from './skills.js';
 import { Hearts } from './hearts.js';
@@ -546,8 +546,7 @@ export class Fight {
 
   /** 玩家在國王身邊、還收得了靈魂：這時候按跳是獻靈魂，不是跳（模式不交給 lead）。 */
   nearAltar(p) {
-    const a = this.altar();
-    return !!a && !offerDone(this.offer) && Math.hypot(p.x - a.x, p.z - a.z) < OFFER.near;
+    return nearOffer(this.offer, this.altar(), p);
   }
 
   /**
