@@ -139,18 +139,26 @@ function fillLiquid(ctx, p, cx, cy, r, tn, glow, col = SOUL) {
 }
 
 /**
- * 靈魂狗頭的側面剪影，臉朝左：soul.js 的 headParts 從立耳犬模型挑出來的那一份（皮＋臉，頭骨座標、
- * 靜置姿勢），投影到側面（螢幕 x = −z、y = −y），描出外框、簡化成這幾個點；剪影外框的中心在 (0, 0)、
- * 長的那一邊半長是 1（y 朝下）。eye 是近側那隻眼睛的中心，同一個座標。verify-combat 的「獻靈魂」
- * 拿模型重投影一次，對得上才算數——模型改了這裡要重描。
+ * 靈魂的剪影：實心、一條尾巴。一顆圓角方的身體，右上角拉出一條往右上收尖的尾巴（往左飄、尾巴拖在
+ * 後面）。全是直邊，每一個轉折都倒圓角（roundPath 的 [x, y, 圓角半徑]），沒有一段是畫出來的圓弧；
+ * 尾巴尖也只是一個很小的圓角。path 是一圈：從底邊正中出發、繞回同一點（頭尾兩點不用半徑）。
+ * 身體的正中在 (0, 0)、身體半寬約 0.5（y 朝下）。body 是量身體左右到哪的那一條水平線：在尾巴的根
+ * 下面，碰到的只有身體。
  */
-export const SOUL_SIDE = {
-  outline: [
-    0.14, -0.82, 0.44, -0.66, 0.64, -0.49, 0.85, -0.45, 0.96, -0.36, 1, -0.2, 1, 0.59, 0.93, 0.72,
-    0.77, 0.81, -0.17, 0.83, -0.45, 0.8, -0.6, 0.71, -0.94, 0.7, -0.99, 0.63, -1, 0.26, -0.93, 0.16,
-    -0.66, 0.14, -0.66, -0.23, -0.6, -0.38, -0.55, -0.43, -0.36, -0.49, -0.03, -0.5, 0, -0.58, 0.05, -0.59,
+export const SOUL_SHAPE = {
+  path: [
+    [0, 0.5],
+    [0.5, 0.5, 0.32],                   // 右下
+    [0.55, 0, 0.25],                    // 右邊往上，轉進尾巴的下緣
+    [0.95, -0.4, 0.15],                 // 尾巴往上翹的那一折
+    [1.2, -1.0, 0.04],                  // 尾巴尖
+    [0.68, -0.55, 0.18],                // 尾巴的上緣折回來
+    [0.1, -0.5, 0.25],                  // 身體的頂
+    [-0.5, -0.5, 0.35],                 // 左上
+    [-0.55, 0.5, 0.35],                 // 左下
+    [0, 0.5],
   ],
-  eye: [-0.49, 0.08],
+  body: 0.2,
 };
 
 /**
@@ -172,14 +180,12 @@ function roundPath(g, u, pts) {
           掌心那一條線是水平的。從右下伸進來，在離圓心 clip（0.9）的那一圈被切掉——鍵的邊緣留 0.1 的
           空白，切口照著那一圈的弧走。沿著手的方向（水平）滑到那一圈剛好切在右邊那根指頭（立著的
           拇指）的根部外緣：圈裡只剩手掌、手指與那根指頭。x 由這一條算（placeHand）。y 挑能擺的最高
-          那一個：頭（對在手的正中）也整顆留在同一圈 clip 裡——手越往上擺，切口那一點就越往右，頭跟著
-          往右上跑出鍵外。
-   SOUL_HEAD 狗頭：SOUL_SIDE 放大 k 倍（剪影長的那一邊半長 = k·r）。y 擺到頭最低的那一點（含線寬）
-          比手最高的那一點（拇指的尖，含線寬）再高 gap，看起來是浮在手上面。x 擺到頭顱（cranium）的
-          左右正中對在鍵的直中線（x = 0）上：頭顱是剪影在眼睛那一條水平線上的那一段——眼睛長在頭顱
-          上、吻部的上面，那一條線左邊碰到的是額頭（吻部往左凸出去的那一截在它下面），右邊是後腦；
-          耳朵在更上面，也不算。手的高度還是照「對在露出來的手正中」的那顆頭挑（見 HAND），頭怎麼
-          擺都不會動到手。
+          那一個：靈魂（對在手的正中）也整顆留在同一圈 clip 裡——手越往上擺，切口那一點就越往右，靈魂
+          跟著往右上跑出鍵外。
+   SOUL_ICON 靈魂：SOUL_SHAPE 放大 k 倍。y 擺到靈魂最低的那一點（含線寬）比手最高的那一點（拇指的
+          尖，含線寬）再高 gap，看起來是浮在手上面。x 擺到身體的左右正中對在鍵的直中線（x = 0）上：
+          身體是剪影在 SOUL_SHAPE.body 那一條水平線上的那一段，尾巴往右上伸出去，不算。手的高度還是
+          照「對在露出來的手正中」的那顆靈魂挑（見 HAND），靈魂怎麼擺都不會動到手。
    GIVE   算好的擺法與量出來的幾個數（模組載入時算一次）。 */
 const HAND = {
   tilt: 0, unit: 0.92, lw: 0.07, clip: 0.9, root: 1,
@@ -195,15 +201,17 @@ const HAND = {
     [0.46, 0.61],                       // 手臂下緣（圈外切掉）
   ],
 };
-const SOUL_K = 0.34 * 1.3 * 1.3;
-const SOUL_HEAD = { k: SOUL_K, lw: 0.05, gap: 0.08 };
+const SOUL_ICON = { k: 0.5, lw: 0.05, gap: 0.08 };
+
+/** 靈魂畫出來的外框（含倒圓角的弧），攤平成 [x, y, x, y, …]，SOUL_SHAPE 的單位。 */
+export const SOUL_OUTLINE = filletPoints(SOUL_SHAPE.path).slice(0, -1).flat();
 
 /**
- * 頭顱左右到哪（SOUL_SIDE 的單位）：剪影的外框跟眼睛那一條水平線交在哪幾點，取最左與最右。
- * 吻部在眼睛下面、耳朵在上面，所以這一段只有頭顱（額頭到後腦）。
+ * 身體左右到哪（SOUL_SHAPE 的單位）：外框跟 body 那一條水平線交在哪幾點，取最左與最右。
+ * 那一條在尾巴的根下面，所以這一段只有身體。
  */
-export function craniumSpan() {
-  const o = SOUL_SIDE.outline, y = SOUL_SIDE.eye[1], xs = [];
+export function bodySpan() {
+  const o = SOUL_OUTLINE, y = SOUL_SHAPE.body, xs = [];
   for (let i = 0, j = o.length - 2; i < o.length; j = i, i += 2) {
     const [xi, yi, xj, yj] = [o[i], o[i + 1], o[j], o[j + 1]];
     if ((yi > y) !== (yj > y)) xs.push(xi + ((xj - xi) * (y - yi)) / (yj - yi));
@@ -260,15 +268,15 @@ function placeHand(y) {
   return Math.sqrt(HAND.clip * HAND.clip - yy * yy) - rx * HAND.unit - HAND.lw / 2;
 }
 
-/** 頭擺在 (x, y) 的時候，離圓心最遠的那一筆（含線寬）。 */
-function headReachAt(x, y) {
-  const o = SOUL_SIDE.outline;
+/** 靈魂擺在 (x, y) 的時候，離圓心最遠的那一筆（含線寬）。 */
+function soulReachAt(x, y) {
+  const o = SOUL_OUTLINE;
   let far = 0;
-  for (let i = 0; i < o.length; i += 2) far = Math.max(far, Math.hypot(x + o[i] * SOUL_HEAD.k, y + o[i + 1] * SOUL_HEAD.k));
-  return far + SOUL_HEAD.lw / 2;
+  for (let i = 0; i < o.length; i += 2) far = Math.max(far, Math.hypot(x + o[i] * SOUL_ICON.k, y + o[i + 1] * SOUL_ICON.k));
+  return far + SOUL_ICON.lw / 2;
 }
 
-/** 手擺在高度 y 的時候：露出來的手最低到哪、頭該擺在哪、頭最高到哪。 */
+/** 手擺在高度 y 的時候：露出來的手最低到哪、靈魂該擺在哪、靈魂最高到哪。 */
 function layoutAt(y) {
   const x = placeHand(y), pts = handPoints(x, y), pad = HAND.lw / 2;
   const seen = pts.filter(([px, py]) => Math.hypot(px, py + pad) <= HAND.clip);
@@ -276,41 +284,41 @@ function layoutAt(y) {
   const top = Math.min(...pts.map(([, py]) => py)) - pad;            // 拇指的尖
   const left = Math.min(...pts.map(([px]) => px)) - pad;             // 指尖的外緣
   const right = x + HAND.path[HAND.root][0] * HAND.unit + pad;       // 切口
-  const oy = SOUL_SIDE.outline.filter((_, i) => i % 2 === 1);
-  const headY = top - SOUL_HEAD.gap - (Math.max(...oy) * SOUL_HEAD.k + SOUL_HEAD.lw / 2);
-  const headTop = headY + Math.min(...oy) * SOUL_HEAD.k - SOUL_HEAD.lw / 2;
-  return { x, bottom, top, headX: (left + right) / 2, headY, headTop };
+  const oy = SOUL_OUTLINE.filter((_, i) => i % 2 === 1);
+  const soulY = top - SOUL_ICON.gap - (Math.max(...oy) * SOUL_ICON.k + SOUL_ICON.lw / 2);
+  const soulTop = soulY + Math.min(...oy) * SOUL_ICON.k - SOUL_ICON.lw / 2;
+  return { x, bottom, top, soulX: (left + right) / 2, soulY, soulTop };
 }
 
 export const GIVE = (() => {
-  // 手能擺的最高那一個：頭剛好整顆在 clip 那一圈裡。二分（手越往下擺，頭越往圓心收）。
+  // 手能擺的最高那一個：靈魂剛好整顆在 clip 那一圈裡。二分（手越往下擺，靈魂越往圓心收）。
   let lo = 0, hi = 0.6;
   for (let i = 0; i < 60; i++) {
     const m = (lo + hi) / 2, L = layoutAt(m);
-    if (headReachAt(L.headX, L.headY) > HAND.clip) lo = m; else hi = m;
+    if (soulReachAt(L.soulX, L.soulY) > HAND.clip) lo = m; else hi = m;
   }
   const L = layoutAt((lo + hi) / 2);
   HAND.x = L.x; HAND.y = (lo + hi) / 2;
-  const [cl, cr] = craniumSpan();
-  SOUL_HEAD.x = -((cl + cr) / 2) * SOUL_HEAD.k; SOUL_HEAD.y = L.headY;   // 頭顱的正中對在 x = 0
-  const o = SOUL_SIDE.outline, head = [];
-  for (let i = 0; i < o.length; i += 2) head.push([SOUL_HEAD.x + o[i] * SOUL_HEAD.k, SOUL_HEAD.y + o[i + 1] * SOUL_HEAD.k]);
-  // headReach：頭離圓心最遠的那一筆（含線寬）；不超過 clip 的話鍵的邊緣也留著 0.1 的空白。
-  const headReach = headReachAt(SOUL_HEAD.x, SOUL_HEAD.y);
-  // clear：頭最低的那一點與手最高的那一點之間空多少（都含線寬）。
-  const clear = L.top - (Math.max(...head.map(([, y]) => y)) + SOUL_HEAD.lw / 2);
+  const [bl, br] = bodySpan();
+  SOUL_ICON.x = -((bl + br) / 2) * SOUL_ICON.k; SOUL_ICON.y = L.soulY;   // 身體的正中對在 x = 0
+  const o = SOUL_OUTLINE, soul = [];
+  for (let i = 0; i < o.length; i += 2) soul.push([SOUL_ICON.x + o[i] * SOUL_ICON.k, SOUL_ICON.y + o[i + 1] * SOUL_ICON.k]);
+  // soulReach：靈魂離圓心最遠的那一筆（含線寬）；不超過 clip 的話鍵的邊緣也留著 0.1 的空白。
+  const soulReach = soulReachAt(SOUL_ICON.x, SOUL_ICON.y);
+  // clear：靈魂最低的那一點與手最高的那一點之間空多少（都含線寬）。
+  const clear = L.top - (Math.max(...soul.map(([, y]) => y)) + SOUL_ICON.lw / 2);
   // rootR：拇指根部的外緣離圓心多遠（就是切口那一圈）。
   const [rx, ry] = HAND.path[HAND.root];
   const rootR = Math.hypot(HAND.x + rx * HAND.unit + HAND.lw / 2, HAND.y + ry * HAND.unit);
   return {
     hand: { x: HAND.x, y: HAND.y, tilt: HAND.tilt, clip: HAND.clip },
-    head: { x: SOUL_HEAD.x, y: SOUL_HEAD.y, k: SOUL_HEAD.k, cranium: [SOUL_HEAD.x + cl * SOUL_HEAD.k, SOUL_HEAD.x + cr * SOUL_HEAD.k] },
-    headReach, clear, rootR, top: L.headTop, bottom: L.bottom,
+    soul: { x: SOUL_ICON.x, y: SOUL_ICON.y, k: SOUL_ICON.k, body: [SOUL_ICON.x + bl * SOUL_ICON.k, SOUL_ICON.x + br * SOUL_ICON.k] },
+    soulReach, clear, rootR, top: L.soulTop, bottom: L.bottom,
   };
 })();
 
-/** 圖案的小畫布半邊多寬（r）：至少是鍵的半徑，交靈魂的頭伸出去的話照它再留一點。 */
-const GLYPH_HALF = Math.max(1, GIVE.headReach) + 0.02;
+/** 圖案的小畫布半邊多寬（r）：至少是鍵的半徑，交靈魂的靈魂伸出去的話照它再留一點。 */
+const GLYPH_HALF = Math.max(1, GIVE.soulReach) + 0.02;
 
 /* ── 跳躍鍵上的圖案 ─────────────────────────────────────────────
    每一個都以鍵的圓心為 (0, 0)、用 r（鍵的半徑）量，畫在 _glyph 給的那張小畫布上（筆的顏色、
@@ -362,10 +370,10 @@ const GLYPHS = {
   },
 
   /**
-   * 交靈魂：一隻從右下伸進來（HAND，在離圓心 0.9 的那一圈切掉）、掌心朝上托著的手，上面浮著一顆狗頭靈魂的側面剪影（SOUL_SIDE、
-   * SOUL_HEAD，臉朝左）、叉叉眼挖空。手跟頭一樣是實心的：兩隻指頭——靠手腕立著的拇指、往左平平伸出去
+   * 交靈魂：一隻從右下伸進來（HAND，在離圓心 0.9 的那一圈切掉）、掌心朝上托著的手，上面浮著一顆靈魂（SOUL_SHAPE、
+   * SOUL_ICON：實心、一條尾巴往右上拖）。手跟靈魂一樣是實心的：兩隻指頭——靠手腕立著的拇指、往左平平伸出去
    * 的手指——拇指與掌心是一個托；拇指是上窄下寬的梯形，兩個指尖都是圓角矩形（平的頭、圓的角），手腕接拇指、拇指接掌心、
-   * 手指接掌根、掌根接手臂，每一個轉折都倒圓角（roundPath），沒有一個尖角。
+   * 手指接掌根、掌根接手臂，每一個轉折都倒圓角（roundPath），沒有一個尖角。靈魂也是同一種畫法：直邊、圓角轉折。
    */
   give(g, r) {
     g.lineWidth = r * HAND.lw;
@@ -379,27 +387,18 @@ const GLYPHS = {
     g.beginPath();
     roundPath(g, r * HAND.unit, HAND.path);
     g.closePath();                                                  // 手腕那一頭接起來（在圈外，切掉）
-    g.fill();                                                       // 實心，跟頭一樣
+    g.fill();                                                       // 實心，跟靈魂一樣
     g.stroke();                                                     // 外面描一圈：外緣跟原本那條線的外緣一樣
     g.restore();
 
-    const k = SOUL_HEAD.k * r, { outline: o, eye } = SOUL_SIDE;
     g.save();
-    g.translate(SOUL_HEAD.x * r, SOUL_HEAD.y * r);
-    g.scale(k, k);
+    g.translate(SOUL_ICON.x * r, SOUL_ICON.y * r);
     g.fillStyle = g.strokeStyle;
-    g.lineWidth = (r * SOUL_HEAD.lw) / k;                                        // 描一圈，剪影的角圓一點
+    g.lineWidth = r * SOUL_ICON.lw;                                 // 描一圈，跟手一樣
     g.beginPath();
-    for (let i = 0; i < o.length; i += 2) g.lineTo(o[i], o[i + 1]);
+    roundPath(g, r * SOUL_ICON.k, SOUL_SHAPE.path);
     g.closePath();
     g.fill();
-    g.stroke();
-    g.globalCompositeOperation = 'destination-out';                         // 叉叉眼挖空
-    g.lineWidth = Math.max(1.44, r * 0.048) / k;                           // 每一劃 0.048 r 粗
-    const e = 0.153;                                                        // 每一劃半長（剪影的單位）
-    g.beginPath();
-    g.moveTo(eye[0] - e, eye[1] - e); g.lineTo(eye[0] + e, eye[1] + e);
-    g.moveTo(eye[0] + e, eye[1] - e); g.lineTo(eye[0] - e, eye[1] + e);
     g.stroke();
     g.restore();
   },
@@ -820,7 +819,7 @@ export class Pad {
     }
 
     /* 圖案：這顆鍵在說什麼，一眼就懂。平常是向上的箭頭（跳）；第二、三段攻擊的那一段是一把
-       往右上斜指的刀（按下去是出招）；在倒下的國王身邊是一隻往上托的手、上面浮著一顆狗頭
+       往右上斜指的刀（按下去是出招）；在倒下的國王身邊是一隻往上托的手、上面浮著一顆
        靈魂（長按是交靈魂）。幾個交叉淡換（iconW）。
 
        每個圖案先用不透明的顏色畫進一張離屏的小畫布（_glyph），再整張用一個透明度貼上來：
@@ -841,7 +840,7 @@ export class Pad {
   /**
    * 畫一個圖案：在離屏的小畫布上以 (0, 0) 為圓心、用不透明的 color 畫 draw(g)，再整張以
    * alpha 貼到 (cx, cy)。重疊的筆畫因此是同一個透明度。小畫布至少跳躍鍵那麼大（2r 見方），
-   * 交靈魂的頭伸出去的話照它（GIVE.headReach）放大，不切到筆畫；照 dpr 放大，不夠大才重新配。
+   * 交靈魂的靈魂伸出去的話照它（GIVE.soulReach）放大，不切到筆畫；照 dpr 放大，不夠大才重新配。
    */
   _glyph(ctx, cx, cy, r, color, alpha, draw) {
     if (alpha <= 0.002) return;

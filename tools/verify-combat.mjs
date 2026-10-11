@@ -166,8 +166,7 @@ import { bladeAt } from '../public/test/src/trail.js';
 import { BLEED, LUMP, SPLAT, STYLE, dropSize, dropCount, volumeOf, sizeRange, speedOf, hitFrame, burstFrame, lumpFrame, hurtFrame, spurtOf, floorUnder, splatScale, bleedStep, GATHER } from '../public/test/src/bleed.js';
 import { taken } from '../public/test/src/combat.js';
 import { OFFER, makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, flySoul } from '../public/test/src/offer.js';
-import { iconOf, ICONS, SOUL_SIDE } from '../public/test/src/pad.js';
-import { headParts } from '../public/test/src/soul.js';
+import { iconOf, ICONS, SOUL_SHAPE } from '../public/test/src/pad.js';
 import { readFileSync } from 'node:fs';
 import * as THREE from '../public/test/vendor/three.module.js';
 import { loadZoo } from '../public/test/src/critter.js';
@@ -2989,51 +2988,22 @@ console.log('34. 獻靈魂');
     ok(icon(makeOffer(), altar, pl) === 'arrow', '沒有要收的（戰鬥模式）：國王身邊也是箭頭');
   }
 
-  /* 托著的那一顆是靈魂本人的側面：把 soul.js 從立耳犬挑出來的頭（皮＋臉）投影到側面、臉朝左
-     （x = −z、y = −y），照剪影的外框擺到跟 SOUL_SIDE 同一個座標，逐格比「在模型的剪影裡」與
-     「在 SOUL_SIDE 的外框裡」，兩塊要幾乎疊在一起；眼睛也要在近側那隻眼睛上。 */
+  /* 托著的那一顆是靈魂：實心、一條尾巴，直邊加圓角轉折。外框是一圈（頭尾同一點），中間每一個轉折都
+     倒圓角；只有一個轉折是尖的（圓角最小、夾角最窄）——那一條尾巴的尖，在右上（尾巴往右上拖）。 */
   {
-    const buf = readFileSync('public/assets/cat.bin');
-    const zoo = await loadZoo({ buffer: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) });
-    const h = headParts(zoo.critters.get('dog-prick'));
-    const tris = [];
-    for (const g of [h.skin, h.face]) {
-      const P = g.attributes.position.array, I = g.index.array;
-      for (let k = 0; k < I.length; k += 3) tris.push([0, 1, 2].map((j) => [-P[I[k + j] * 3 + 2], -P[I[k + j] * 3 + 1]]));
-    }
-    let lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
-    for (const t of tris) for (const [x, y] of t) { lo = [Math.min(lo[0], x), Math.min(lo[1], y)]; hi = [Math.max(hi[0], x), Math.max(hi[1], y)]; }
-    const mid = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2], half = Math.max(hi[0] - lo[0], hi[1] - lo[1]) / 2;
-    const norm = ([x, y]) => [(x - mid[0]) / half, (y - mid[1]) / half];
-    const T = tris.map((t) => t.map(norm));
-    const side = (a, b, x, y) => (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
-    const inModel = (x, y) => T.some(([a, b, c]) => {
-      const w0 = side(a, b, x, y), w1 = side(b, c, x, y), w2 = side(c, a, x, y);
-      return (w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0);
-    });
-    const O = SOUL_SIDE.outline;
-    const inIcon = (x, y) => {
-      let inside = false;
-      for (let i = 0, j = O.length - 2; i < O.length; j = i, i += 2) {
-        const [xi, yi, xj, yj] = [O[i], O[i + 1], O[j], O[j + 1]];
-        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-      }
-      return inside;
+    const P = SOUL_SHAPE.path, mid = P.slice(1, -1);
+    const turn = (i) => {
+      const [ax, ay] = P[i - 1], [px, py] = P[i], [bx, by] = P[i + 1];
+      const u = [ax - px, ay - py], v = [bx - px, by - py];
+      return Math.acos((u[0] * v[0] + u[1] * v[1]) / Math.hypot(...u) / Math.hypot(...v));
     };
-    let both = 0, either = 0;
-    for (let y = -1.05; y <= 1.05; y += 0.025) for (let x = -1.05; x <= 1.05; x += 0.025) {
-      const m = inModel(x, y), c = inIcon(x, y);
-      if (m && c) both++;
-      if (m || c) either++;
-    }
-    const iou = both / either;
-    // 螢幕右邊是 −z、上面是 +y，鏡頭就在 +x 那一側：近側是 +x 那一隻眼睛。
-    const nearEye = h.eyes.reduce((a, e) => (e[0] > a[0] ? e : a));
-    const eye = norm([-nearEye[2], -nearEye[1]]);
-    ok(iou > 0.92 && Math.hypot(eye[0] - SOUL_SIDE.eye[0], eye[1] - SOUL_SIDE.eye[1]) < 0.06,
-      `交靈魂的圖案上那顆頭是模型的側面剪影（臉朝左）：跟模型投影疊在一起 ${(iou * 100).toFixed(1)}%，眼睛對在近側那一隻上`);
-    ok(Math.min(...O.filter((_, i) => i % 2 === 0)) < -0.9 && T.flat().filter(([x]) => x < -0.9).every(([, y]) => y > 0),
-      '吻部在左邊（臉朝左），在頭的下半');
+    const angles = mid.map((_, k) => turn(k + 1));
+    const sharp = angles.filter((a) => a < Math.PI / 4).length;
+    const tip = mid[angles.indexOf(Math.min(...angles))];
+    ok(P[0][0] === P[P.length - 1][0] && P[0][1] === P[P.length - 1][1] && mid.every((p) => p[2] > 0)
+      && sharp === 1 && tip[2] === Math.min(...mid.map((p) => p[2])) && tip[0] > 0.5 && tip[1] < -0.5,
+      '交靈魂的圖案上那顆是靈魂：一圈直邊、每個轉折都倒圓角，只有一個尖（一條尾巴，往右上拖）',
+      `${mid.length} 個轉折、尾巴尖在 (${tip[0]}, ${tip[1]})`);
   }
 }
 
