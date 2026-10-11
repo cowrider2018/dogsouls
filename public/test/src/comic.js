@@ -25,19 +25,19 @@
 export const PAGES = [
   { title: '兵營', panels: [
     { note: '回憶：王座廳裡主角單膝跪在國王面前受封', say: '旁白：王國最強的戰士。', src: 'comic/p1-1.png', memory: true, focus: '67% 48%' },
-    { note: '主角在帳篷裡猛然彈起來', say: '——！', src: 'comic/p1-2.png', capAt: 'bottom', focus: '50% 40%' },
-    { note: '帳篷外太陽已經很高，兵器架上的武器一把都沒少', say: '……睡過頭了。', src: 'comic/p1-3.png', focus: '40% 50%' },
-    { note: '整片兵營空蕩蕩，主角小小一隻站在中間', say: '人呢？', src: 'comic/p1-4.png', focus: '60% 35%' },
+    { note: '主角在帳篷裡猛然彈起來', say: '睡過頭了！', src: 'comic/p1-2.png', capAt: 'bottom', focus: '50% 40%' },
+    { note: '帳篷外太陽已經很高，兵器架上的武器全不見了，只剩粗虛線的輪廓', src: 'comic/p1-3.png', focus: '40% 50%' },
+    { note: '整片兵營空蕩蕩，主角小小一隻站在中間', say: '大家都去哪了？', src: 'comic/p1-4.png', focus: '60% 35%' },
   ] },
   { title: '兵營', panels: [
     { note: '殭屍倒了一地，主角站在中間喘氣', src: 'comic/p2-1.png', focus: '50% 40%' },
-    { note: '主角低頭看著腳邊一隻殭屍', say: '這些傢伙從哪來的？', src: 'comic/p2-2.png', focus: '50% 60%' },
-    { note: '主角轉向南邊的黑霧', say: '去中庭問問其他人。', src: 'comic/p2-3.png', focus: '30% 55%' },
+    { note: '主角低頭看著腳邊一隻殭屍', say: '殭屍怎麼在這裡？', src: 'comic/p2-2.png', focus: '50% 60%' },
+    { note: '主角轉向南邊的黑霧', say: '去中庭找找。', src: 'comic/p2-3.png', focus: '30% 55%' },
   ] },
   { title: '中庭', panels: [
     { note: '中庭一圈斷柱、兩側拱廊，還是沒有人', say: '有人嗎？', src: 'comic/p3-1.png', capAt: 'bottom', focus: '68% 70%' },
     { note: '地面震一下，碎石跳起來', src: 'comic/p3-2.png', focus: '50% 40%' },
-    { note: '殭屍王在門樓前站起來，兩倍大、戴頭盔', say: '……問錯人了。', src: 'comic/p3-3.png', capAt: 'bottom', focus: '50% 35%' },
+    { note: '殭屍王在門樓前站起來，兩倍大、戴頭盔', say: '你怎麼在這？', src: 'comic/p3-3.png', capAt: 'bottom', focus: '50% 35%' },
   ] },
   { title: '中庭', panels: [
     { note: '殭屍王倒下，靈魂從身上浮出來', src: 'comic/p4-1.png', focus: '50% 45%' },
@@ -64,8 +64,8 @@ export const PAGES = [
   { title: '水窖', panels: [
     { note: '最後一隻幽靈散成霧', src: 'comic/p8-1.png', focus: '50% 45%' },
     { note: '霧往南邊的鐵閘飄，鐵閘後面透出冷光', src: 'comic/p8-2.png', focus: '45% 55%' },
-    { note: '主角盯著那扇鐵閘', say: '牠們是從那裡來的。', src: 'comic/p8-3.png', focus: '35% 65%' },
-    { note: '主角走向鐵閘', say: '去查清楚。', src: 'comic/p8-4.png', capAt: 'bottom', focus: '40% 50%' },
+    { note: '主角盯著那扇鐵閘', say: '井底怎麼有幽靈？', src: 'comic/p8-3.png', focus: '35% 65%' },
+    { note: '主角走向鐵閘', say: '那裡有路……', src: 'comic/p8-4.png', capAt: 'bottom', focus: '40% 50%' },
   ] },
   { title: '地下墓室', panels: [
     { note: '鐵閘升起，主角走進去', src: 'comic/p9-1.png', focus: '50% 60%' },
@@ -74,8 +74,8 @@ export const PAGES = [
   ] },
   { title: '地下墓室', panels: [
     { note: '幽靈散去，墓室只剩燭火', src: 'comic/p10-1.png', focus: '50% 50%' },
-    { note: '石棺一整排、數不完——全國的人都在這裡', say: '全都……在這裡。', src: 'comic/p10-2.png', focus: '25% 55%' },
-    { note: '一隻騎士幽靈在主角面前跪下', src: 'comic/p10-3.png', focus: '50% 55%' },
+    { note: '石棺一整排、數不完——逃進來的人都在這裡', say: '大家都在這裡……', src: 'comic/p10-2.png', focus: '25% 55%' },
+    { note: '一隻騎士幽靈在主角面前跪下，主角認出牠是自己的夥伴', say: '夥伴？', src: 'comic/p10-3.png', focus: '50% 55%' },
     { note: '騎士幽靈從胸口捧出自己的靈魂交給主角', src: 'comic/p10-4.png', focus: '45% 55%' },
     { note: '騎士幽靈指向上方，身體開始散掉', say: '騎士幽靈：國王……拜託你了。', src: 'comic/p10-5.png', focus: '50% 60%' },
   ] },
@@ -100,12 +100,12 @@ export const PAGES = [
     { note: '國王跪倒在台座前，失控的亡魂安靜下來', src: 'comic/p14-1.png', focus: '45% 50%' },
     { note: '主角把一路收集的靈魂倒在國王身上', src: 'comic/p14-2.png', focus: '50% 50%' },
     { note: '國王從半透明變回實體，光從他身上擴散出去', src: 'comic/p14-3.png', focus: '50% 45%' },
-    { note: '光掃過中庭、窄巷、兵營，殭屍和幽靈變回原來的人', strips: [
+    { note: '光掃過中庭、窄巷、兵營，大家都復活了', strips: [
       { src: 'comic/p14-4a.png', focus: '50% 50%' },
       { src: 'comic/p14-4b.png', focus: '50% 50%' },
       { src: 'comic/p14-4c.png', focus: '50% 50%' },
     ] },
-    { note: '國王回到王座上，廳裡站滿了人，主角站在旁邊', say: '旁白：完', src: 'comic/p14-5.png', focus: '52% 50%' },
+    { note: '國王回到王座上，廳裡站滿了人，主角站在旁邊，復活的夥伴站在主角身邊', say: '旁白：完', src: 'comic/p14-5.png', focus: '52% 50%' },
   ] },
 ];
 
