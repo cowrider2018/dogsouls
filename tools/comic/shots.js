@@ -918,8 +918,8 @@ export const SHOTS = [
         ['dog-prick/grey', 0.7, 1.4], ['cat/calico', 2.1, 0.6], ['dog-drop/yellow', 3.4, -0.6],
         ['cat/orangin', 4.3, 1.0],
       ].map(([look, x, z]) => ({ who: 'folk', look, at: [x, z], yaw: Math.atan2(0.05 - x, -4.1 - z), move: { headPitch: -0.25, tailPitch: 0.5, w: 1 } })),
-      // 復活的夥伴是群眾裡的一隻（左前那一隻），跟大家一樣大、一樣看著國王；側一點，頭盔與咬著的劍才看得到。
-      { who: 'comrade', at: [-4.4, 0.9], yaw: 1.4, blade: 'knight', move: { headPitch: -0.25, tailPitch: 0.5, w: 1 } },
+      // 復活的夥伴是群眾裡的一隻（左前那一隻），跟大家一樣大、一樣背對鏡頭看著國王；從背後靠頭盔認得出來。
+      { who: 'comrade', at: [-4.4, 0.9], yaw: Math.atan2(0.05 + 4.4, -4.1 - 0.9), blade: 'knight', move: { headPitch: -0.25, tailPitch: 0.5, w: 1 } },
     ],
     cam: { pos: [0, 2.8, 7.5], look: [0, 0.9, -2.6], fov: 36 },
     light: [-3, 7, 6],
