@@ -260,7 +260,7 @@ console.log('6. 人民');
           const [px, pz] = solveXZ(COLS, o.x, o.z, o.y, open);
           if (Math.hypot(px - o.x, pz - o.z) > 1e-4) bad ||= `嵌在碰撞盒裡 (${o.x}, ${o.z})`;
           if (!okAt(o.x, o.z)) bad ||= `太靠近黑牆或感測區 (${o.x}, ${o.z})`;
-          if (!FOLK.looks.includes(o.look)) bad ||= `不是第 14 頁的動物 ${o.look}`;
+          if (!FOLK.looks.includes(o.look)) bad ||= `不是第 15 頁的動物 ${o.look}`;
           if (g.some((q) => q !== o && Math.hypot(q.x - o.x, q.z - o.z) < FOLK.gap - 1e-9)) bad ||= '一叢裡擠在一起';
           if (Math.abs(Math.atan2(cx - o.x, cz - o.z) - o.yaw) > 1e-9) bad ||= '沒有面朝自己那一叢';
         }

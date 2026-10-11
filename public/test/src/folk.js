@@ -1,6 +1,6 @@
 /* ── test/src/folk.js ────────────────────────────────────────────────
-   王國的人民（完整流程模式）：國王復活那一頁（第 14 頁）蓋住畫面的時候，每一張圖撒出幾叢——
-   就是那一頁漫畫裡站滿王座廳的那幾隻（tools/comic/shots.js 的 p14-5，FOLK.looks）。書頁走了
+   王國的人民（完整流程模式）：國王復活那一頁（第 15 頁）蓋住畫面的時候，每一張圖撒出幾叢——
+   就是那一頁漫畫裡站滿王座廳的那幾隻（tools/comic/shots.js 的 p15-5，FOLK.looks）。書頁走了
    就看得到。
 
    ── 撒在哪 ──────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ import { solveXZ, supportInfo, arenaGap, portalGap, colsNear, PHYS } from './wal
 import { Gaze, aimHead, GAZE } from './gaze.js';
 
 /**
- * looks     撒哪幾種（第 14 頁第 5 格那幾隻）
+ * looks     撒哪幾種（第 15 頁第 5 格那幾隻）
  * clusters  一張圖幾叢 [最少, 最多]；members 一叢幾隻 [最少, 最多]
  * cell      淹的時候一格多大（公尺）；clear 身體四周再留多少
  * edge      離黑牆至少多遠；portal 離感測區至少多遠

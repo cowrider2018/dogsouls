@@ -13,9 +13,9 @@
      5. 翻頁     不是最後一頁的時候按一下是翻頁：一直蓋著、世界一直停住；下一頁從頭拼，
                  STORY.readyNext 秒之前按的不算。`cover` 在第一次蓋住的那一幀叫一次。
      6. 取消     演到一半取消（重玩、倒下）：直接收掉，`then`、`cover` 都不叫。
-     7. 頁表     十四頁、每頁 3～5 格（index.html 有那幾種版面）、SCRIPT 指到的頁都在、
+     7. 頁表     十五頁、每頁 3～5 格（index.html 有那幾種版面）、SCRIPT 指到的頁都在、
                  每一頁剛好被翻一次。
-     8. 只有慢動作 沒有書頁（王座廳打完）：STORY.slow 秒 STORY.scale 倍、操作收起來，接著
+     8. 只有慢動作 沒有書頁（哪一場沒給戰後頁的話）：STORY.slow 秒 STORY.scale 倍、操作收起來，接著
                  STORY.thaw 秒一路變快回到 1，回到 1 的那一幀 `then` 一次；從頭到尾不蓋住。
 
    跑法：node tools/verify-story.mjs
@@ -141,17 +141,17 @@ console.log('6. 取消');
 }
 
 console.log('7. 頁表');
-ok(PAGES.length === 14, `十四頁（${PAGES.length}）`);
+ok(PAGES.length === 15, `十五頁（${PAGES.length}）`);
 ok(PAGES.every((p) => p.panels.length >= 3 && p.panels.length <= 5), '每一頁 3～5 格');
 ok(SCRIPT.open.length === STAGES.length && SCRIPT.after.length === STAGES.length,
   `開場頁與戰後頁照場次排（${STAGES.length} 場）`);
 {
   const used = [SCRIPT.start, ...SCRIPT.open, ...SCRIPT.after, SCRIPT.offered].filter(Boolean).flat().sort((a, b) => a - b);
-  ok(used.length === PAGES.length && used.every((n, i) => n === i + 1), '每一頁剛好被翻一次，頁碼 1～14 都在');
+  ok(used.length === PAGES.length && used.every((n, i) => n === i + 1), `每一頁剛好被翻一次，頁碼 1～${PAGES.length} 都在`);
 }
 ok(SCRIPT.after.every((a, k) => !a || a.length === 1 || STAGES[k].warp), '一次翻好幾頁的只有打完要傳送的那一場（墓室）');
-ok(!SCRIPT.after[STAGES.length - 1] && SCRIPT.offered.join() === String(PAGES.length),
-  '王座廳打完不翻；最後一頁等靈魂交完才翻');
+ok(SCRIPT.after[STAGES.length - 1]?.join() === String(PAGES.length - 1) && SCRIPT.offered.join() === String(PAGES.length),
+  '王座廳打完只翻倒數第二頁（國王倒下）；最後一頁等靈魂交完才翻');
 
 console.log('8. 只有慢動作');
 {

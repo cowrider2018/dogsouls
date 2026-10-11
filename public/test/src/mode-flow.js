@@ -21,7 +21,7 @@
      打死全部            這一場清完：只開從這張圖往下一場的那一步（route.js 的 openPortals，每進一張圖重算）。斬殺的那一刻起
                          演一段劇情（story.js）：慢動作，一大張書頁跑進來蓋住畫面，上面是
                          戰後那一頁漫畫；點一下（或按跳）翻頁、最後一頁書頁跑走，接著玩。
-                         沒有戰後頁的那一場（王座廳）只有慢動作，慢完回到正常速度。
+                         每一場都有戰後頁；哪一場沒給（SCRIPT.after[k] 是 null）就只有慢動作，慢完回到正常速度。
      挨打                扣血（頭頂的愛心，fight.js）。殭屍王、騎士的屍體落地時（幽靈騎士是炸開時）掉出的靈魂撿起來
                          最大血量 +1，一路帶到後面的場。沒撿的不必回去找：離開有靈魂的房間（route.js 的
                          roomOf；走過去、被送過去——墓室打完翻漫畫的時候——、倒下回到休息點都算）就算撿到，
@@ -31,12 +31,13 @@
                          就停，再按重新等 0.5 秒。一輪掉得出幾顆就要交幾顆（route.js 的 SOULS），
                          交出去的只有撿來的那幾顆（最大血量最少剩一開始的 3 顆）；還沒交滿就交
                          不出去的話提示需要更多，自己回去撿（offer.js）。在國王身邊按跳不跳。
-                         王座廳打完不翻戰後頁，只有慢動作。交滿之後不慢：最後一顆靈魂落到國王身上的那一刻，
+                         王座廳打完翻第 14 頁（打倒國王、看著身邊的靈魂、看著倒下的國王），書頁走了國王還躺著，
+                         這時才走過去交。交滿之後不慢：最後一顆靈魂落到國王身上的那一刻，
                          國王復甦（fight.js 的 REVIVE）——屍體炸成一團幽靈血，血慢下來再加速聚攏，
                          活著的國王（原本的灰毛）從 0 長到原本大小；演完才慢動作，翻國王復活那一頁
-                         （第 14 頁）。
-     國王復活之後        第 14 頁蓋住畫面的時候，每一張圖撒出王國的人民（folk.js：每一張 1～3 叢、
-                         每一叢 2～4 隻，第 14 頁那幾隻）。書頁走了，國王走回王座坐下（king.js 的
+                         （第 15 頁）。
+     國王復活之後        第 15 頁蓋住畫面的時候，每一張圖撒出王國的人民（folk.js：每一張 1～3 叢、
+                         每一叢 2～4 隻，第 15 頁那幾隻）。書頁走了，國王走回王座坐下（king.js 的
                          enthrone；人民不撒在牠要走的路上）。人民與國王的頭都跟著主角轉（gaze.js）。
                          門在王座廳打完的那一刻就全開了，之後一直開著（route.js 的 doorsFor）。
      不在戰鬥中          清完一場之後、還沒走進下一場之前：很快回血到最大血量
@@ -286,7 +287,7 @@ function appear(k, rise) {
 /**
  * 怪物全部打死了：這一場清完，演劇情（慢動作、書頁、漫畫），開往下一場的門。門等書頁整個
  * 蓋住的那一刻才開：漫畫講完「接下來去哪」，書頁走了門已經開好，路標（signpost.js）這時才
- * 淡進來。沒有戰後頁的那一場（王座廳）慢動作完才開。字等書頁走了才浮，不然被蓋住。
+ * 淡進來。沒有戰後頁的話慢動作完才開。字等書頁走了才浮，不然被蓋住。
  */
 function clear() {
   run.active = false;
@@ -297,7 +298,8 @@ function clear() {
   // 墓室打完不走回去：書頁蓋住的時候直接送到下一場的休息點（route.js 的 warp）。
   const warpTo = STAGES[k].warp && !done ? () => place(restAt(run.next, ruins)) : null;
   const say = () => hud.flash(done ? '六場全部打完——門全開了' : `這一場清完了。下一場：${stageName(run.next)}`);
-  // 沒有戰後頁的那一場（王座廳：要先交靈魂，comic.js 的 SCRIPT.offered）只有慢動作，慢完才開門、浮字。
+  // 王座廳的戰後頁（第 14 頁）只演到國王倒下：書頁走了才交靈魂，國王復活那一頁另外翻（SCRIPT.offered）。
+  // 沒有戰後頁的話只有慢動作，慢完才開門、浮字。
   const pages = SCRIPT.after[k] ? pagesOf(SCRIPT.after[k]) : [];
   const cover = () => { if (warpTo) warpTo(); applyDoors(); };
   story.start(pages, { slow: true, cover: pages.length ? cover : null, then: pages.length ? say : () => { applyDoors(); say(); } });
@@ -418,9 +420,11 @@ function frame(now) {
   const pressed = tapped && !still;
   const sliding = player.grounded && player.slip === 'fall';
   // 在國王身邊（還收得了靈魂）：跳留給獻靈魂，不跳、不出招。
+  // 提示等劇情演完才浮：國王倒下那一頁（第 14 頁）翻完、站在國王身邊的話，那時候才提示。
   const altar = fight.nearAltar(player);
-  if (altar && !byAltar) hud.flash('長按跳，把靈魂交給國王');
-  byAltar = altar;
+  const hint = altar && !story.busy;
+  if (hint && !byAltar) hud.flash('長按跳，把靈魂交給國王');
+  byAltar = hint;
   if (!death.busy) fight.lead(dt, player, pressed && !sliding && !altar);
   // 被擊退的那一段（combat.js 的 knockHero）也不操控：照那一下的速度飛，落地才還回來。
   if (!fight.breaking && !player.knocked) steerHero(player, dt, controls, input);
