@@ -168,30 +168,32 @@ function roundPath(g, u, pts) {
 }
 
 /* ── 交靈魂的圖案的擺法（都以 r：鍵的半徑為單位）──────────────────────────
-   HAND   那隻手擺在哪裡、斜多少（弧度，正的是指尖往上翹）：從右下往左上伸。點是以 0.92·r 為單位、
-          [x, y, 圓角半徑]，c 是指尖的圓角；實心的手外面再描一圈 HAND.lw·r 寬（外緣
-          就是原本那條線的外緣）。
-   SOUL_HEAD 狗頭：SOUL_SIDE 放大 k 倍（剪影長的那一邊半長 = k·r）、外框中心擺在 (x, y)。x 是原本那個
-          位置（0.06）再往左挪 0.15 個頭寬（頭寬 = 2k）；y 往上擺到頭最低的那一點（含線寬）比手最高的
-          那一點（含線寬）再高 gap，看起來是浮在手上面。
-   GIVE   手與頭合起來的外框（含線寬）的中心挪到鍵的圓心：shift 是整個圖案要挪多少，box 是挪完之後
-          的外框——模組載入時算一次（giveBox）。 */
+   HAND   那隻手：點是以 0.92·r（unit）為單位、[x, y, 圓角半徑]；實心，外面再描一圈 lw 寬。tilt 是 0：
+          掌心那一條線是水平的。從右下伸進來，在離圓心 clip（0.9）的那一圈被切掉——鍵的邊緣留 0.1 的
+          空白，切口照著那一圈的弧走。沿著手的方向（水平）滑到那一圈剛好切在右邊那根指頭（立著的
+          拇指）的根部外緣：圈裡只剩手掌、手指與那根指頭。x 由這一條算（placeHand）。y 挑能擺的最高
+          那一個：頭（對在手的正中）也整顆留在同一圈 clip 裡——手越往上擺，切口那一點就越往右，頭跟著
+          往右上跑出鍵外。
+   SOUL_HEAD 狗頭：SOUL_SIDE 放大 k 倍（剪影長的那一邊半長 = k·r）。y 擺到頭最低的那一點（含線寬）
+          比手最高的那一點（拇指的尖，含線寬）再高 gap，看起來是浮在手上面；x 對在露出來的手（指尖的
+          外緣到切口）的正中。
+   GIVE   算好的擺法與量出來的幾個數（模組載入時算一次）。 */
 const HAND = {
-  x: 0.16 * 0.92, y: -0.08 * 0.92, tilt: 0.22, unit: 0.92, lw: 0.07, c: 0.035,
+  tilt: 0, unit: 0.92, lw: 0.07, clip: 0.9, root: 1,
   path: [
-    [0.46, 0.33],                       // 手臂上緣（從右下伸進來）
-    [0.31, 0.24, 0.07],                 // 手腕接拇指
-    [0.31, 0.06, 0.035],                // 拇指的尖：圓角矩形
+    [0.46, 0.33],                       // 手臂上緣（從右下伸進來，圈外切掉）
+    [0.31, 0.24, 0.07],                 // 手腕接拇指：拇指的根部（root），切口切在這裡的外緣
+    [0.26, 0.06, 0.035],                // 拇指的尖：右邊那一側往裡收，拇指是上窄下寬的梯形，尖是圓角矩形
     [0.15, 0.06, 0.035],
     [0.15, 0.21, 0.05],                 // 拇指接掌心
     [-0.43, 0.21, 0.035],               // 掌心、手指平平地往左伸出去，指尖是圓角矩形
     [-0.43, 0.40, 0.035],
     [0.08, 0.46, 0.12],                 // 掌根接手臂
-    [0.46, 0.61],                       // 手臂下緣
+    [0.46, 0.61],                       // 手臂下緣（圈外切掉）
   ],
 };
 const SOUL_K = 0.34 * 1.3 * 1.3;
-const SOUL_HEAD = { k: SOUL_K, x: 0.06 - 0.15 * 2 * SOUL_K, lw: 0.05, gap: 0.08 };
+const SOUL_HEAD = { k: SOUL_K, lw: 0.05, gap: 0.08 };
 
 /**
  * roundPath 畫出來的那條線上的點（倒圓角的弧取樣），單位跟 pts 一樣。arcTo 的幾何：頂點 P 兩邊的
@@ -221,50 +223,77 @@ function filletPoints(pts, steps = 12) {
   return out;
 }
 
-/** 手畫出來的每一點（含倒圓角的弧，還沒置中），單位 r。 */
-function handPoints() {
+/** 手畫出來的每一點（含倒圓角的弧，直線段也切細），擺在 (x, y)，單位 r。 */
+function handPoints(x = HAND.x, y = HAND.y) {
   const cs = Math.cos(HAND.tilt), sn = Math.sin(HAND.tilt);
-  return filletPoints(HAND.path).map(([px, py]) => {
-    const x = px * HAND.unit, y = py * HAND.unit;
-    return [HAND.x + x * cs - y * sn, HAND.y + x * sn + y * cs];
-  });
+  const f = filletPoints(HAND.path), out = [];
+  for (let i = 0; i < f.length; i++) {
+    const [ax, ay] = f[i], [bx, by] = f[Math.min(i + 1, f.length - 1)];
+    for (let k = 0; k < 8; k++) {
+      const px = (ax + ((bx - ax) * k) / 8) * HAND.unit, py = (ay + ((by - ay) * k) / 8) * HAND.unit;
+      out.push([x + px * cs - py * sn, y + px * sn + py * cs]);
+    }
+  }
+  return out;
 }
 
-{
-  const handTop = Math.min(...handPoints().map(([, y]) => y)) - HAND.lw / 2;
-  const below = Math.max(...SOUL_SIDE.outline.filter((_, i) => i % 2 === 1)) * SOUL_HEAD.k + SOUL_HEAD.lw / 2;
-  SOUL_HEAD.y = handTop - SOUL_HEAD.gap - below;
+/** 手擺在高度 y 的時候，x 要多少：拇指根部的外緣剛好落在 clip 那一圈上（掌心水平，外緣往右 lw/2）。 */
+function placeHand(y) {
+  const [rx, ry] = HAND.path[HAND.root];
+  const yy = y + ry * HAND.unit;
+  return Math.sqrt(HAND.clip * HAND.clip - yy * yy) - rx * HAND.unit - HAND.lw / 2;
 }
 
-/** 交靈魂的圖案還沒挪之前，手與頭合起來的外框（含線寬的一半），單位 r。 */
-function giveBox() {
-  const lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
-  const add = (x, y, pad) => {
-    lo[0] = Math.min(lo[0], x - pad); lo[1] = Math.min(lo[1], y - pad);
-    hi[0] = Math.max(hi[0], x + pad); hi[1] = Math.max(hi[1], y + pad);
-  };
-  for (const [x, y] of handPoints()) add(x, y, HAND.lw / 2);
+/** 頭擺在 (x, y) 的時候，離圓心最遠的那一筆（含線寬）。 */
+function headReachAt(x, y) {
   const o = SOUL_SIDE.outline;
-  for (let i = 0; i < o.length; i += 2) add(SOUL_HEAD.x + o[i] * SOUL_HEAD.k, SOUL_HEAD.y + o[i + 1] * SOUL_HEAD.k, SOUL_HEAD.lw / 2);
-  return { lo, hi };
+  let far = 0;
+  for (let i = 0; i < o.length; i += 2) far = Math.max(far, Math.hypot(x + o[i] * SOUL_HEAD.k, y + o[i + 1] * SOUL_HEAD.k));
+  return far + SOUL_HEAD.lw / 2;
+}
+
+/** 手擺在高度 y 的時候：露出來的手最低到哪、頭該擺在哪、頭最高到哪。 */
+function layoutAt(y) {
+  const x = placeHand(y), pts = handPoints(x, y), pad = HAND.lw / 2;
+  const seen = pts.filter(([px, py]) => Math.hypot(px, py + pad) <= HAND.clip);
+  const bottom = Math.max(...seen.map(([, py]) => py + pad));
+  const top = Math.min(...pts.map(([, py]) => py)) - pad;            // 拇指的尖
+  const left = Math.min(...pts.map(([px]) => px)) - pad;             // 指尖的外緣
+  const right = x + HAND.path[HAND.root][0] * HAND.unit + pad;       // 切口
+  const oy = SOUL_SIDE.outline.filter((_, i) => i % 2 === 1);
+  const headY = top - SOUL_HEAD.gap - (Math.max(...oy) * SOUL_HEAD.k + SOUL_HEAD.lw / 2);
+  const headTop = headY + Math.min(...oy) * SOUL_HEAD.k - SOUL_HEAD.lw / 2;
+  return { x, bottom, top, headX: (left + right) / 2, headY, headTop };
 }
 
 export const GIVE = (() => {
-  const { lo, hi } = giveBox();
-  const shift = [-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2];
-  // reach：整個圖案離鍵的圓心最遠的那一筆（含線寬），小於 1 就整個在鍵裡。
+  // 手能擺的最高那一個：頭剛好整顆在 clip 那一圈裡。二分（手越往下擺，頭越往圓心收）。
+  let lo = 0, hi = 0.6;
+  for (let i = 0; i < 60; i++) {
+    const m = (lo + hi) / 2, L = layoutAt(m);
+    if (headReachAt(L.headX, L.headY) > HAND.clip) lo = m; else hi = m;
+  }
+  const L = layoutAt((lo + hi) / 2);
+  HAND.x = L.x; HAND.y = (lo + hi) / 2;
+  SOUL_HEAD.x = L.headX; SOUL_HEAD.y = L.headY;
   const o = SOUL_SIDE.outline, head = [];
   for (let i = 0; i < o.length; i += 2) head.push([SOUL_HEAD.x + o[i] * SOUL_HEAD.k, SOUL_HEAD.y + o[i + 1] * SOUL_HEAD.k]);
-  const far = (pts, pad) => Math.max(...pts.map(([x, y]) => Math.hypot(x + shift[0], y + shift[1]) + pad));
-  const reach = Math.max(far(handPoints(), HAND.lw / 2), far(head, SOUL_HEAD.lw / 2));
+  // headReach：頭離圓心最遠的那一筆（含線寬）：就是 clip，鍵的邊緣也留 0.1 的空白。
+  const headReach = headReachAt(SOUL_HEAD.x, SOUL_HEAD.y);
   // clear：頭最低的那一點與手最高的那一點之間空多少（都含線寬）。
-  const clear = (Math.min(...handPoints().map(([, y]) => y)) - HAND.lw / 2)
-    - (Math.max(...head.map(([, y]) => y)) + SOUL_HEAD.lw / 2);
-  return { shift, reach, clear, head: { y: SOUL_HEAD.y + shift[1] }, box: { lo: [lo[0] + shift[0], lo[1] + shift[1]], hi: [hi[0] + shift[0], hi[1] + shift[1]] } };
+  const clear = L.top - (Math.max(...head.map(([, y]) => y)) + SOUL_HEAD.lw / 2);
+  // rootR：拇指根部的外緣離圓心多遠（就是切口那一圈）。
+  const [rx, ry] = HAND.path[HAND.root];
+  const rootR = Math.hypot(HAND.x + rx * HAND.unit + HAND.lw / 2, HAND.y + ry * HAND.unit);
+  return {
+    hand: { x: HAND.x, y: HAND.y, tilt: HAND.tilt, clip: HAND.clip },
+    head: { x: SOUL_HEAD.x, y: SOUL_HEAD.y },
+    headReach, clear, rootR, top: L.headTop, bottom: L.bottom,
+  };
 })();
 
-/** 圖案的小畫布半邊多寬（r）：至少是鍵的半徑，交靈魂的圖案比它寬就照它的外框再留一點。 */
-const GLYPH_HALF = Math.max(1, ...GIVE.box.hi, ...GIVE.box.lo.map(Math.abs)) + 0.02;
+/** 圖案的小畫布半邊多寬（r）：至少是鍵的半徑，交靈魂的頭伸出去的話照它再留一點。 */
+const GLYPH_HALF = Math.max(1, GIVE.headReach) + 0.02;
 
 /* ── 跳躍鍵上的圖案 ─────────────────────────────────────────────
    每一個都以鍵的圓心為 (0, 0)、用 r（鍵的半徑）量，畫在 _glyph 給的那張小畫布上（筆的顏色、
@@ -316,21 +345,23 @@ const GLYPHS = {
   },
 
   /**
-   * 交靈魂：一隻從右下往左上伸進來（HAND）、掌心朝上托著的手，上面浮著一顆狗頭靈魂的側面剪影（SOUL_SIDE、
+   * 交靈魂：一隻從右下伸進來（HAND，在離圓心 0.9 的那一圈切掉）、掌心朝上托著的手，上面浮著一顆狗頭靈魂的側面剪影（SOUL_SIDE、
    * SOUL_HEAD，臉朝左）、叉叉眼挖空。手跟頭一樣是實心的：兩隻指頭——靠手腕立著的拇指、往左平平伸出去
-   * 的手指——拇指與掌心是一個托；兩個指尖都是圓角矩形（平的頭、圓的角），手腕接拇指、拇指接掌心、
+   * 的手指——拇指與掌心是一個托；拇指是上窄下寬的梯形，兩個指尖都是圓角矩形（平的頭、圓的角），手腕接拇指、拇指接掌心、
    * 手指接掌根、掌根接手臂，每一個轉折都倒圓角（roundPath），沒有一個尖角。
    */
   give(g, r) {
-    g.translate(GIVE.shift[0] * r, GIVE.shift[1] * r);              // 手與頭合起來置中
     g.lineWidth = r * HAND.lw;
     g.save();
+    g.beginPath();
+    g.arc(0, 0, HAND.clip * r, 0, TAU);                             // 鍵的邊緣留 0.1 的空白，手在這一圈切掉
+    g.clip();
     g.translate(HAND.x * r, HAND.y * r);
     g.rotate(HAND.tilt);
     g.fillStyle = g.strokeStyle;
     g.beginPath();
     roundPath(g, r * HAND.unit, HAND.path);
-    g.closePath();                                                  // 手腕那一頭接起來
+    g.closePath();                                                  // 手腕那一頭接起來（在圈外，切掉）
     g.fill();                                                       // 實心，跟頭一樣
     g.stroke();                                                     // 外面描一圈：外緣跟原本那條線的外緣一樣
     g.restore();
@@ -793,7 +824,7 @@ export class Pad {
   /**
    * 畫一個圖案：在離屏的小畫布上以 (0, 0) 為圓心、用不透明的 color 畫 draw(g)，再整張以
    * alpha 貼到 (cx, cy)。重疊的筆畫因此是同一個透明度。小畫布至少跳躍鍵那麼大（2r 見方），
-   * 交靈魂的圖案比鍵寬的話照它的外框（GIVE.box）放大，不切到筆畫；照 dpr 放大，不夠大才重新配。
+   * 交靈魂的頭伸出去的話照它（GIVE.headReach）放大，不切到筆畫；照 dpr 放大，不夠大才重新配。
    */
   _glyph(ctx, cx, cy, r, color, alpha, draw) {
     if (alpha <= 0.002) return;

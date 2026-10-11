@@ -2181,14 +2181,16 @@ head('手把');
   ok(jp.drops.length > 0, '按下噴出水花', `${jp.drops.length} 滴`);
   jp.up(9);
 
-  /* 交靈魂的圖案：手與頭合起來的外框（含線寬）置中在鍵的圓心上。 */
+  /* 交靈魂的圖案：掌心那一條線是水平的；手從右下伸進來，在離圓心 0.9 r 的那一圈切掉，切口剛好在
+     拇指根部的外緣；頭浮在手上面 0.08 r，整顆也在那一圈裡。 */
   {
-    const { lo, hi } = GIVE.box;
-    ok(Math.abs(lo[0] + hi[0]) < 1e-9 && Math.abs(lo[1] + hi[1]) < 1e-9 && hi[0] > 0.3 && hi[1] > 0.3,
-      '交靈魂的圖案（手＋頭）整個置中在跳躍鍵上',
-      `外框 x ${lo[0].toFixed(2)}～${hi[0].toFixed(2)}、y ${lo[1].toFixed(2)}～${hi[1].toFixed(2)}（r）`);
-    ok(Math.abs(GIVE.clear - 0.08) < 1e-9, '狗頭浮在手上面：最低的那一點比手最高的那一點高 0.08 r（都含線寬）',
-      `空 ${GIVE.clear.toFixed(3)} r、離圓心最遠 ${GIVE.reach.toFixed(3)} r`);
+    const { hand, head } = GIVE;
+    ok(hand.tilt === 0 && hand.clip === 0.9 && Math.abs(GIVE.rootR - 0.9) < 1e-9 && hand.x > 0 && hand.y > 0,
+      '交靈魂的手：掌心水平、從右下伸進來，在 0.9 r 那一圈切在拇指的根部（鍵的邊緣留 0.1 r）',
+      `手擺在 (${hand.x.toFixed(2)}, ${hand.y.toFixed(2)})、根部離圓心 ${GIVE.rootR.toFixed(3)} r`);
+    ok(Math.abs(GIVE.clear - 0.08) < 1e-9 && GIVE.headReach <= 0.9 + 1e-9 && GIVE.bottom <= 0.9 + 1e-9,
+      '狗頭浮在手上面 0.08 r（都含線寬），頭與露出來的手都在 0.9 r 那一圈裡',
+      `頭擺在 (${head.x.toFixed(2)}, ${head.y.toFixed(2)})、空 ${GIVE.clear.toFixed(3)} r、頭離圓心最遠 ${GIVE.headReach.toFixed(3)} r`);
   }
 
   /* 圖案一換，那顆水就晃一下，晃法跟長按一模一樣：一個換圖案（stir），一個真的按住 STIR 秒再放開，
