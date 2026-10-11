@@ -77,7 +77,7 @@ import { stone } from '../public/test/src/geom.js';
 import { CAM, makeCam, updateCam } from '../public/test/src/camera.js';
 import { readFileSync } from 'node:fs';
 import { loadZoo, TURN_RATE } from '../public/test/src/critter.js';
-import { Pad, STIR, GIVE } from '../public/test/src/pad.js';
+import { Pad, STIR, GIVE, SOUL_SIDE, craniumSpan } from '../public/test/src/pad.js';
 import { railTier } from '../public/test/src/hud.js';
 import { roomOf, signposts } from '../public/test/src/route.js';
 
@@ -2182,14 +2182,16 @@ head('手把');
   jp.up(9);
 
   /* 交靈魂的圖案：掌心那一條線是水平的；手從右下伸進來，在離圓心 0.9 r 的那一圈切掉，切口剛好在
-     拇指根部的外緣；頭浮在手上面 0.08 r、從對在手正中的位置往左挪 0.3 個頭寬，整顆也在那一圈裡。 */
+     拇指根部的外緣；頭浮在手上面 0.08 r、頭顱的正中對在鍵的直中線上，整顆也在那一圈裡。 */
   {
     const { hand, head } = GIVE;
     ok(hand.tilt === 0 && hand.clip === 0.9 && Math.abs(GIVE.rootR - 0.9) < 1e-9 && hand.x > 0 && hand.y > 0,
       '交靈魂的手：掌心水平、從右下伸進來，在 0.9 r 那一圈切在拇指的根部（鍵的邊緣留 0.1 r）',
       `手擺在 (${hand.x.toFixed(2)}, ${hand.y.toFixed(2)})、根部離圓心 ${GIVE.rootR.toFixed(3)} r`);
-    ok(Math.abs(head.x - (head.centred - 0.3 * head.width)) < 1e-9, '狗頭從對在手正中的位置往左挪 0.3 個頭寬',
-      `正中 ${head.centred.toFixed(3)} → ${head.x.toFixed(3)} r（頭寬 ${head.width.toFixed(3)}）`);
+    const [cl, cr] = craniumSpan(), ox = SOUL_SIDE.outline.filter((_, i) => i % 2 === 0);
+    ok(Math.abs(head.cranium[0] + head.cranium[1]) < 1e-9 && cl > Math.min(...ox) + 0.2 && cr === Math.max(...ox),
+      '狗頭的頭顱（眼睛那一條線上，額頭到後腦，不含往左凸的吻部）左右正中對在鍵的直中線上',
+      `頭顱 ${head.cranium[0].toFixed(3)}～${head.cranium[1].toFixed(3)} r、頭擺在 x ${head.x.toFixed(3)} r`);
     ok(Math.abs(GIVE.clear - 0.08) < 1e-9 && GIVE.headReach <= 0.9 + 1e-9 && GIVE.bottom <= 0.9 + 1e-9,
       '狗頭浮在手上面 0.08 r（都含線寬），頭與露出來的手都在 0.9 r 那一圈裡',
       `頭擺在 (${head.x.toFixed(2)}, ${head.y.toFixed(2)})、空 ${GIVE.clear.toFixed(3)} r、頭離圓心最遠 ${GIVE.headReach.toFixed(3)} r`);
