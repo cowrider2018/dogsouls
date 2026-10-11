@@ -169,7 +169,8 @@ function roundPath(g, u, pts) {
 
 /* ── 交靈魂的圖案的擺法（都以 r：鍵的半徑為單位）──────────────────────────
    HAND   那隻手擺在哪裡、斜多少（弧度，正的是指尖往上翹）：從右下往左上伸。點是以 0.92·r 為單位、
-          [x, y, 圓角半徑]，c 是指尖的圓角；線寬 HAND.lw·r。
+          [x, y, 圓角半徑]，c 是指尖的圓角；實心的手外面再描一圈 HAND.lw·r 寬（外緣
+          就是原本那條線的外緣）。
    SOUL_HEAD 狗頭：SOUL_SIDE 放大 k 倍（剪影長的那一邊半長 = k·r）、外框中心擺在 (x, y)。x 是原本那個
           位置（0.06）再往左挪 0.15 個頭寬（頭寬 = 2k）；y 往上擺到頭最低的那一點（含線寬）比手最高的
           那一點（含線寬）再高 gap，看起來是浮在手上面。
@@ -315,11 +316,10 @@ const GLYPHS = {
   },
 
   /**
-   * 交靈魂：一隻從右下往左上伸進來（HAND）、掌心朝上托著的手，左上浮著一顆狗頭靈魂的側面剪影（SOUL_SIDE、SOUL_HEAD，
-   * 臉朝左）、叉叉眼挖空。手跟箭頭、刀一樣是線，畫得粗胖：兩隻指頭——靠手腕立著的拇指、往左平平
-   * 伸出去的手指——拇指與掌心是一個托；兩個指尖都是圓角矩形（平的頭、圓的角），手腕接拇指、拇指接
-   * 掌心、手指接掌根、掌根接手臂，每一個轉折都倒圓角（roundPath），沒有一個尖角。頭是實心的剪影，
-   * 一眼看得出是「那一顆」，不是另一條線。
+   * 交靈魂：一隻從右下往左上伸進來（HAND）、掌心朝上托著的手，上面浮著一顆狗頭靈魂的側面剪影（SOUL_SIDE、
+   * SOUL_HEAD，臉朝左）、叉叉眼挖空。手跟頭一樣是實心的：兩隻指頭——靠手腕立著的拇指、往左平平伸出去
+   * 的手指——拇指與掌心是一個托；兩個指尖都是圓角矩形（平的頭、圓的角），手腕接拇指、拇指接掌心、
+   * 手指接掌根、掌根接手臂，每一個轉折都倒圓角（roundPath），沒有一個尖角。
    */
   give(g, r) {
     g.translate(GIVE.shift[0] * r, GIVE.shift[1] * r);              // 手與頭合起來置中
@@ -327,9 +327,12 @@ const GLYPHS = {
     g.save();
     g.translate(HAND.x * r, HAND.y * r);
     g.rotate(HAND.tilt);
+    g.fillStyle = g.strokeStyle;
     g.beginPath();
     roundPath(g, r * HAND.unit, HAND.path);
-    g.stroke();
+    g.closePath();                                                  // 手腕那一頭接起來
+    g.fill();                                                       // 實心，跟頭一樣
+    g.stroke();                                                     // 外面描一圈：外緣跟原本那條線的外緣一樣
     g.restore();
 
     const k = SOUL_HEAD.k * r, { outline: o, eye } = SOUL_SIDE;
@@ -344,8 +347,8 @@ const GLYPHS = {
     g.fill();
     g.stroke();
     g.globalCompositeOperation = 'destination-out';                         // 叉叉眼挖空
-    g.lineWidth = Math.max(1.2, r * 0.04) / k;
-    const e = 0.2;
+    g.lineWidth = Math.max(1.44, r * 0.048) / k;                           // 每一劃 0.048 r 粗
+    const e = 0.18;                                                         // 每一劃半長（剪影的單位）
     g.beginPath();
     g.moveTo(eye[0] - e, eye[1] - e); g.lineTo(eye[0] + e, eye[1] + e);
     g.moveTo(eye[0] + e, eye[1] - e); g.lineTo(eye[0] - e, eye[1] + e);
