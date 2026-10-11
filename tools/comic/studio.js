@@ -786,7 +786,137 @@ function pose(a, spec, cam) {
     a.shields.snap(spec.shields);
     a.shields.show(0, spec.shields, x, y0, z, height);
   }
+  if (a.shields) breakShields(a.shields, spec.shields && spec.shieldBreak);
 }
+
+/* ── 碎盾：國王的盾裂成幾塊，3D ──────────────────────────────────
+   shieldBreak: true 或 { pieces, gap, turn, tilt, seed }：每一面盾沿著鋸齒狀的裂縫裂成 pieces 塊（2 或 3，
+   預設 2），每一塊往外漂開 gap 公尺（預設 0.06，體型 1 的時候）、在盾面上各自轉開 turn 弳（預設 0.18）、
+   往前後翻 tilt 弳（預設 0.15）。裂縫從圓釘旁邊的一點往外放（2 塊是一上一下兩條、3 塊是 Y 字三條），
+   每一條是等步長、等幅度左右來回的折線（規則 10：規則的鋸齒），角度照 seed 與第幾面盾稍微錯開。
+   每一塊都是完整的一塊：金色的邊框、墨線殼（整塊外推一圈，裂開的那一邊也包到——規則 5）、
+   深藍的盾面（從裂縫往回縮一點，裂口露一道金邊），圓釘留在包住它的那一塊。
+   外形與材質直接從 shield.js 拍出來的那一面盾拿（邊框、墨線殼、盾面、圓釘，照它加進去的順序），
+   不另外抄一份；碎塊掛在那一面盾底下，盾照常繞、照常擺。沒給 shieldBreak 的格子，原本那一面照常顯示。 */
+const CRACK = { step: 0.055, amp: 0.02, reach: 0.6 };
+function breakShields(ring, opt) {
+  const key = opt ? JSON.stringify(opt === true ? {} : opt) : '';
+  ring.plates.forEach((p, i) => {
+    const kids = p.obj.children.filter((o) => !o.userData.broken);
+    if (key && p.brokenKey !== key) {
+      if (p.broken) p.obj.remove(p.broken);
+      p.broken = brokenPlate(kids, { ...(opt === true ? {} : opt), index: i });
+      p.broken.userData.broken = true;
+      p.obj.add(p.broken);
+      p.brokenKey = key;
+    }
+    if (!p.broken) return;
+    p.broken.visible = !!key;
+    for (const o of kids) o.visible = !key;
+  });
+}
+
+/** 一面盾的碎塊（一個 Group）：kids 是 shield.js 那一面的 [邊框, 墨線殼, 盾面, 圓釘, 圓釘的墨線]。 */
+function brokenPlate(kids, { pieces = 2, gap = 0.06, turn = 0.18, tilt = 0.15, seed = 1, index = 0 }) {
+  const [rim, ink, field, ...boss] = kids;
+  const box = (m) => { m.geometry.computeBoundingBox(); return m.geometry.boundingBox; };
+  const rb = box(rim), ib = box(ink), fb = box(field);
+  const out = ib.max.x - rb.max.x;
+  const outline = (m) => {
+    const { shapes, options } = m.geometry.parameters;
+    const pts = [shapes].flat()[0].extractPoints(options.curveSegments ?? 12).shape.map((v) => [v.x, v.y]);
+    return pts.filter((p, i) => { const q = pts[(i + 1) % pts.length]; return Math.hypot(q[0] - p[0], q[1] - p[1]) > 1e-6; });
+  };
+  const rimPoly = ccw(outline(rim)), fieldPoly = ccw(outline(field));
+  const rand = rng(seed * 101 + index * 37 + 7);
+  // 裂縫的起點在圓釘的右下（圓釘整顆留在一塊裡），幾條往外放的鋸齒線。
+  const c0 = [0.07, -0.05];
+  const base = pieces >= 3 ? [Math.PI * 0.55, Math.PI * 1.25, -Math.PI * 0.2] : [Math.PI * 0.45, -Math.PI * 0.55];
+  const rays = base.map((a0) => {
+    const a = a0 + (rand() - 0.5) * 0.35, ux = Math.cos(a), uy = Math.sin(a);
+    const pts = [];
+    for (let k = 1, n = Math.ceil(CRACK.reach / CRACK.step); k <= n; k++) {
+      const off = k === n ? 0 : (k % 2 ? 1 : -1) * CRACK.amp;
+      pts.push([c0[0] + ux * CRACK.step * k - uy * off, c0[1] + uy * CRACK.step * k + ux * off]);
+    }
+    return { a: Math.atan2(uy, ux), pts };
+  }).sort((p, q) => p.a - q.a);
+  const g = new THREE.Group();
+  rays.forEach((r, k) => {
+    const nx = rays[(k + 1) % rays.length];
+    // 這一塊的範圍：起點 → 這一條往外 → 外面繞一大段弧 → 下一條往回。
+    let a1 = nx.a; if (a1 <= r.a) a1 += 2 * Math.PI;
+    const arc = [];
+    for (let j = 0; j <= 8; j++) { const a = r.a + ((a1 - r.a) * j) / 8; arc.push([c0[0] + Math.cos(a) * 1.2, c0[1] + Math.sin(a) * 1.2]); }
+    const region = ccw([c0, ...r.pts, ...arc, ...[...nx.pts].reverse()]);
+    const piece = clip(region, rimPoly);
+    if (piece.length < 3) return;
+    const face = clip(offsetPoly(region, -0.012), fieldPoly);
+    const part = new THREE.Group();
+    const slabOf = (poly, z0, z1, mat) => {
+      const geo = new THREE.ExtrudeGeometry(new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x, y))), { depth: z1 - z0, bevelEnabled: false });
+      geo.translate(0, 0, z0);
+      const m = new THREE.Mesh(geo, mat);
+      m.frustumCulled = false;
+      part.add(m);
+    };
+    slabOf(piece, rb.min.z, rb.max.z, rim.material);
+    slabOf(offsetPoly(piece, out), ib.min.z, ib.max.z, ink.material);
+    if (face.length >= 3) slabOf(face, fb.min.z, fb.max.z, field.material);
+    if (inside([0, 0], piece)) for (const b of boss) { const m = b.clone(); m.frustumCulled = false; part.add(m); }
+    // 漂開：從裂縫的起點往這一塊的重心那一側推、繞重心轉開、往前後翻一點。
+    const [cx, cy] = centroid(piece), dx = cx - c0[0], dy = cy - c0[1], d = Math.hypot(dx, dy) || 1;
+    const side = k % 2 ? 1 : -1;
+    const pivot = new THREE.Group();
+    pivot.position.set(cx + (dx / d) * gap, cy + (dy / d) * gap, 0);
+    pivot.rotation.set(side * tilt * (dy / d), -side * tilt * (dx / d), side * turn);
+    part.position.set(-cx, -cy, 0);
+    pivot.add(part);
+    g.add(pivot);
+  });
+  return g;
+}
+
+/** 多邊形（[[x, y], …]）的有號面積的兩倍；正的是逆時針。 */
+const area2 = (P) => P.reduce((s, [x, y], i) => { const [u, v] = P[(i + 1) % P.length]; return s + x * v - u * y; }, 0);
+const ccw = (P) => (area2(P) < 0 ? [...P].reverse() : P);
+function centroid(P) {
+  let x = 0, y = 0, A = 0;
+  P.forEach(([x0, y0], i) => { const [x1, y1] = P[(i + 1) % P.length], k = x0 * y1 - x1 * y0; A += k; x += (x0 + x1) * k; y += (y0 + y1) * k; });
+  return [x / (3 * A), y / (3 * A)];
+}
+function inside([px, py], P) {
+  let hit = false;
+  P.forEach(([x0, y0], i) => { const [x1, y1] = P[(i + 1) % P.length]; if ((y0 > py) !== (y1 > py) && px < x0 + ((py - y0) * (x1 - x0)) / (y1 - y0)) hit = !hit; });
+  return hit;
+}
+/** Sutherland–Hodgman：任意的多邊形 P 裁進凸多邊形 K（兩個都是逆時針）。 */
+function clip(P, K) {
+  let out = P;
+  K.forEach(([ax, ay], i) => {
+    const [bx, by] = K[(i + 1) % K.length];
+    const side = ([x, y]) => (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+    const cut = (p, q) => { const s = side(p) / (side(p) - side(q)); return [p[0] + (q[0] - p[0]) * s, p[1] + (q[1] - p[1]) * s]; };
+    const src = out;
+    out = [];
+    src.forEach((q, j) => {
+      const p = src[(j + src.length - 1) % src.length];
+      if (side(q) >= 0) { if (side(p) < 0) out.push(cut(p, q)); out.push(q); } else if (side(p) >= 0) out.push(cut(p, q));
+    });
+  });
+  return out;
+}
+/** 逆時針的多邊形每一條邊往外推 d（負的往內縮），角照斜接（miter）接起來；太短的邊先併掉。 */
+function offsetPoly(P, d) {
+  const Q = P.filter((p, i) => { const q = P[(i + 1) % P.length]; return Math.hypot(q[0] - p[0], q[1] - p[1]) > 1e-5; });
+  return Q.map((p, i) => {
+    const a = Q[(i + Q.length - 1) % Q.length], b = Q[(i + 1) % Q.length];
+    const n1 = norm(p[1] - a[1], a[0] - p[0]), n2 = norm(b[1] - p[1], p[0] - b[0]);
+    const mx = n1[0] + n2[0], my = n1[1] + n2[1], dot = (mx * n1[0] + my * n1[1]) || 1;
+    return [p[0] + (mx * d) / dot, p[1] + (my * d) / dot];
+  });
+}
+const norm = (x, y) => { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; };
 
 /** 固定種子的亂數（mulberry32）：集中線每次重拍都一樣。 */
 function rng(seed) {
