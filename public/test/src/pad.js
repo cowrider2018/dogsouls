@@ -171,7 +171,8 @@ function roundPath(g, u, pts) {
    HAND   那隻手擺在哪裡、斜多少（弧度，正的是指尖往上翹）：從右下往左上伸。點是以 0.92·r 為單位、
           [x, y, 圓角半徑]，c 是指尖的圓角；線寬 HAND.lw·r。
    SOUL_HEAD 狗頭：SOUL_SIDE 放大 k 倍（剪影長的那一邊半長 = k·r）、外框中心擺在 (x, y)。x 是原本那個
-          位置（0.06）再往左挪 0.15 個頭寬（頭寬 = 2k）。
+          位置（0.06）再往左挪 0.15 個頭寬（頭寬 = 2k）；y 往上擺到頭最低的那一點（含線寬）比手最高的
+          那一點（含線寬）再高 gap，看起來是浮在手上面。
    GIVE   手與頭合起來的外框（含線寬）的中心挪到鍵的圓心：shift 是整個圖案要挪多少，box 是挪完之後
           的外框——模組載入時算一次（giveBox）。 */
 const HAND = {
@@ -189,7 +190,7 @@ const HAND = {
   ],
 };
 const SOUL_K = 0.34 * 1.3 * 1.3;
-const SOUL_HEAD = { k: SOUL_K, x: 0.06 - 0.15 * 2 * SOUL_K, y: -0.40, lw: 0.05 };
+const SOUL_HEAD = { k: SOUL_K, x: 0.06 - 0.15 * 2 * SOUL_K, lw: 0.05, gap: 0.08 };
 
 /**
  * roundPath 畫出來的那條線上的點（倒圓角的弧取樣），單位跟 pts 一樣。arcTo 的幾何：頂點 P 兩邊的
@@ -219,6 +220,21 @@ function filletPoints(pts, steps = 12) {
   return out;
 }
 
+/** 手畫出來的每一點（含倒圓角的弧，還沒置中），單位 r。 */
+function handPoints() {
+  const cs = Math.cos(HAND.tilt), sn = Math.sin(HAND.tilt);
+  return filletPoints(HAND.path).map(([px, py]) => {
+    const x = px * HAND.unit, y = py * HAND.unit;
+    return [HAND.x + x * cs - y * sn, HAND.y + x * sn + y * cs];
+  });
+}
+
+{
+  const handTop = Math.min(...handPoints().map(([, y]) => y)) - HAND.lw / 2;
+  const below = Math.max(...SOUL_SIDE.outline.filter((_, i) => i % 2 === 1)) * SOUL_HEAD.k + SOUL_HEAD.lw / 2;
+  SOUL_HEAD.y = handTop - SOUL_HEAD.gap - below;
+}
+
 /** 交靈魂的圖案還沒挪之前，手與頭合起來的外框（含線寬的一半），單位 r。 */
 function giveBox() {
   const lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
@@ -226,11 +242,7 @@ function giveBox() {
     lo[0] = Math.min(lo[0], x - pad); lo[1] = Math.min(lo[1], y - pad);
     hi[0] = Math.max(hi[0], x + pad); hi[1] = Math.max(hi[1], y + pad);
   };
-  const cs = Math.cos(HAND.tilt), sn = Math.sin(HAND.tilt);
-  for (const [px, py] of filletPoints(HAND.path)) {
-    const x = px * HAND.unit, y = py * HAND.unit;
-    add(HAND.x + x * cs - y * sn, HAND.y + x * sn + y * cs, HAND.lw / 2);
-  }
+  for (const [x, y] of handPoints()) add(x, y, HAND.lw / 2);
   const o = SOUL_SIDE.outline;
   for (let i = 0; i < o.length; i += 2) add(SOUL_HEAD.x + o[i] * SOUL_HEAD.k, SOUL_HEAD.y + o[i + 1] * SOUL_HEAD.k, SOUL_HEAD.lw / 2);
   return { lo, hi };
@@ -239,7 +251,15 @@ function giveBox() {
 export const GIVE = (() => {
   const { lo, hi } = giveBox();
   const shift = [-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2];
-  return { shift, box: { lo: [lo[0] + shift[0], lo[1] + shift[1]], hi: [hi[0] + shift[0], hi[1] + shift[1]] } };
+  // reach：整個圖案離鍵的圓心最遠的那一筆（含線寬），小於 1 就整個在鍵裡。
+  const o = SOUL_SIDE.outline, head = [];
+  for (let i = 0; i < o.length; i += 2) head.push([SOUL_HEAD.x + o[i] * SOUL_HEAD.k, SOUL_HEAD.y + o[i + 1] * SOUL_HEAD.k]);
+  const far = (pts, pad) => Math.max(...pts.map(([x, y]) => Math.hypot(x + shift[0], y + shift[1]) + pad));
+  const reach = Math.max(far(handPoints(), HAND.lw / 2), far(head, SOUL_HEAD.lw / 2));
+  // clear：頭最低的那一點與手最高的那一點之間空多少（都含線寬）。
+  const clear = (Math.min(...handPoints().map(([, y]) => y)) - HAND.lw / 2)
+    - (Math.max(...head.map(([, y]) => y)) + SOUL_HEAD.lw / 2);
+  return { shift, reach, clear, head: { y: SOUL_HEAD.y + shift[1] }, box: { lo: [lo[0] + shift[0], lo[1] + shift[1]], hi: [hi[0] + shift[0], hi[1] + shift[1]] } };
 })();
 
 /** 圖案的小畫布半邊多寬（r）：至少是鍵的半徑，交靈魂的圖案比它寬就照它的外框再留一點。 */

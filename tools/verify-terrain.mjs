@@ -2187,6 +2187,8 @@ head('手把');
     ok(Math.abs(lo[0] + hi[0]) < 1e-9 && Math.abs(lo[1] + hi[1]) < 1e-9 && hi[0] > 0.3 && hi[1] > 0.3,
       '交靈魂的圖案（手＋頭）整個置中在跳躍鍵上',
       `外框 x ${lo[0].toFixed(2)}～${hi[0].toFixed(2)}、y ${lo[1].toFixed(2)}～${hi[1].toFixed(2)}（r）`);
+    ok(Math.abs(GIVE.clear - 0.08) < 1e-9, '狗頭浮在手上面：最低的那一點比手最高的那一點高 0.08 r（都含線寬）',
+      `空 ${GIVE.clear.toFixed(3)} r、離圓心最遠 ${GIVE.reach.toFixed(3)} r`);
   }
 
   /* 圖案一換，那顆水就晃一下，晃法跟長按一模一樣：一個換圖案（stir），一個真的按住 STIR 秒再放開，
