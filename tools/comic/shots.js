@@ -912,14 +912,14 @@ export const SHOTS = [
     cast: [
       { who: 'king', at: [0.05, -4.1], y: 0.5, yaw: 0, move: SIT, face: 'calm', shadow: false, eyes: { lift: 0.25, spread: 0.2 } },
       { who: 'hero', at: [1.5, -3.2], yaw: -0.25, move: HEROIC, face: 'proud', blade: 'knife', eyes: { lift: 0.6, spread: 0.3 } },
-      // 復活的夥伴：騎士幽靈活過來了，站在主角身邊、離國王遠的那一側，跟主角朝同一個方向。
-      { who: 'comrade', at: [3.2, -3.25], yaw: -0.3, scale: 1.2, move: HEROIC, face: 'proud', blade: 'knight', eyes: { lift: 0.6, spread: 0.3 } },
       // 群眾每一隻都正對國王（王座上那一點），不是朝四面八方。
       ...[
         ['cat/orangin', -3.4, -1.0], ['dog-drop/cow', -2.0, 0.2], ['cat/tabby', -0.8, 1.2],
         ['dog-prick/grey', 0.7, 1.4], ['cat/calico', 2.1, 0.6], ['dog-drop/yellow', 3.4, -0.6],
-        ['dog-prick/cow', -4.4, 0.9], ['cat/orangin', 4.3, 1.0],
+        ['cat/orangin', 4.3, 1.0],
       ].map(([look, x, z]) => ({ who: 'folk', look, at: [x, z], yaw: Math.atan2(0.05 - x, -4.1 - z), move: { headPitch: -0.25, tailPitch: 0.5, w: 1 } })),
+      // 復活的夥伴是群眾裡的一隻（左前那一隻），跟大家一樣大、一樣看著國王；側一點，頭盔與咬著的劍才看得到。
+      { who: 'comrade', at: [-4.4, 0.9], yaw: 1.4, blade: 'knight', move: { headPitch: -0.25, tailPitch: 0.5, w: 1 } },
     ],
     cam: { pos: [0, 2.8, 7.5], look: [0, 0.9, -2.6], fov: 36 },
     light: [-3, 7, 6],
