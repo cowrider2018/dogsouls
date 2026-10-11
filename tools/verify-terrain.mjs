@@ -77,7 +77,7 @@ import { stone } from '../public/test/src/geom.js';
 import { CAM, makeCam, updateCam } from '../public/test/src/camera.js';
 import { readFileSync } from 'node:fs';
 import { loadZoo, TURN_RATE } from '../public/test/src/critter.js';
-import { Pad } from '../public/test/src/pad.js';
+import { Pad, STIR } from '../public/test/src/pad.js';
 import { railTier } from '../public/test/src/hud.js';
 import { roomOf, signposts } from '../public/test/src/route.js';
 
@@ -2180,6 +2180,41 @@ head('手把');
   ok(jp.takeJump() === false, '同一次按下不會跳兩次');
   ok(jp.drops.length > 0, '按下噴出水花', `${jp.drops.length} 滴`);
   jp.up(9);
+
+  /* 圖案一換，那顆水就晃一下，晃法跟長按一模一樣：一個換圖案（stir），一個真的按住 STIR 秒再放開，
+     兩顆的液化與按壓每一幀都一樣。只動外觀：不跳、不回報、不算按著。 */
+  {
+    let fired = 0;
+    const a = new Pad(fakeCanvas(), { onJump: () => { fired++; } });
+    const b = new Pad(fakeCanvas());
+    a.layout(1024, 576, 2); b.layout(1024, 576, 2);
+    for (let i = 0; i < 30; i++) { a.update(1 / 60); b.update(1 / 60); }
+    a.icon = 'arrow';
+    ok(a.stirT === 0 && a.bLiq < 1e-6, '給的圖案沒換：不晃');
+    a.icon = 'give';
+    b.down('jmp', 1, b.slotJmp.x, b.slotJmp.y);
+    ok(!a.bOn && fired === 0 && a.takeJump() === false && a.drops.length === 0, '換圖案不是按跳：不排跳、不叫 onJump、不算按著、不噴水花');
+    let diff = 0, peak = 0, held = 0;
+    for (let i = 0; i < 150; i++) {
+      if (a.stirT > 0) held++;
+      else if (b.bOn) b.up(1);
+      a.update(1 / 60); b.update(1 / 60);
+      a.icon = 'give';                                   // 模式每幀都給，同一個不再晃
+      diff = Math.max(diff, Math.abs(a.bLiq - b.bLiq), Math.abs(a.bPress - b.bPress));
+      peak = Math.max(peak, a.bLiq);
+    }
+    ok(diff < 1e-9 && Math.abs(held / 60 - STIR) <= 1 / 60 + 1e-9, `晃的那一下跟長按 ${STIR} 秒一模一樣（液化、按壓每一幀都對得上）`,
+      `差 ${diff.toExponential(1)}、按著 ${held} 幀`);
+    ok(peak > 0.9 && a.bLiq < 0.01 && Math.abs(a.bPress) < 0.01 && a.stirT === 0, '鼓成水滴、晃完收回去',
+      `最高 ${peak.toFixed(2)}、最後 ${a.bLiq.toFixed(3)}`);
+    let again = 0;
+    for (const k of ['sword', 'arrow', 'give', 'arrow']) {
+      a.icon = k;
+      if (a.stirT === STIR) again++;
+      for (let i = 0; i < 60; i++) { a.update(1 / 60); a.icon = k; }
+    }
+    ok(again === 4 && fired === 0, '每一次換（刀、箭頭、手、箭頭）都晃一次，都不跳');
+  }
 
   /* 畫一遍。假 context 與假 Path2D：畫出來對不對驗不到，但「畫的時候會
      不會爆」驗得到，而那是這種每幀跑的繪圖碼最常見的故障。 */

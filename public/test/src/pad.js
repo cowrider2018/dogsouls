@@ -70,6 +70,10 @@ const THROW = 0.86;
    甩、在對角之間閃；幀率回來之後還要一兩秒才收得回來。拆成小步積分，
    手感就跟幀率無關。 */
 const SPRING_DT = 1 / 120;
+/* 跳躍鍵的圖案一換（箭頭、刀、托著靈魂的手之間），那顆水就晃一下：跟長按的時候一模一樣——同一個
+   踢、同一條液化與按壓的彈簧、同一個擾動——像被按住 STIR 秒再放開，只是不經過指標：不排跳、不回報、
+   bOn 不變。一次換一次，晃完自己收回去。 */
+export const STIR = 0.45;
 
 function angDiff(a, b) {
   let d = a - b;
@@ -300,10 +304,12 @@ export class Pad {
     this.bPh = [0, 0, 0];
     this.drops = [];
     this._queued = false;
-    /** 跳躍鍵上畫什麼（ICONS 的一個，iconOf 挑），模式的主程式每幀給。 */
-    this.icon = 'arrow';
+    /** 跳躍鍵上畫什麼（ICONS 的一個，iconOf 挑）：見 icon 的 getter／setter。 */
+    this._icon = 'arrow';
     /** 每個圖案淡進來多少（0～1）：現在那一個往 1、其他的往 0，交叉淡換。 */
-    this.iconW = Object.fromEntries(ICONS.map((k) => [k, k === this.icon ? 1 : 0]));
+    this.iconW = Object.fromEntries(ICONS.map((k) => [k, k === this._icon ? 1 : 0]));
+    /** 圖案換了之後，那顆水還要當作被按著多久（秒，STIR 起算）。 */
+    this.stirT = 0;
 
     this.W = 0; this.H = 0; this.dpr = 1;
     this.portrait = false;
@@ -314,6 +320,23 @@ export class Pad {
     this.slotJmp = { x: 0, y: 0 };
     this.zoneJoy = { x: 0, y: 0, w: 0, h: 0 };
     this.zoneJmp = { x: 0, y: 0, w: 0, h: 0 };
+  }
+
+  /** 跳躍鍵上畫什麼。模式的主程式每幀給；跟上一次不一樣就讓那顆水晃一下（stir）。 */
+  get icon() { return this._icon; }
+  set icon(v) {
+    if (v === this._icon) return;
+    this._icon = v;
+    this.stir();
+  }
+
+  /**
+   * 讓跳躍鍵那顆水晃一下，晃法跟長按一模一樣：被按下去的那一下（_squeeze），接著當作按著 STIR 秒
+   * 再放開。手指本來就按著的話它已經是那個樣子，不再踢一次。只動外觀：不排跳、不叫 onJump、bOn 不變。
+   */
+  stir() {
+    if (!this.bOn) this._squeeze();
+    this.stirT = STIR;
   }
 
   /* ── 幾何 ──────────────────────────────────────────────────────
@@ -481,7 +504,9 @@ export class Pad {
     const jtx = this.jOn ? this.jTx : 0;
     const jty = this.jOn ? this.jTy : 0;
     const kS = this.jOn ? 900 : 420, kD = this.jOn ? 46 : 26;
-    const bt = this.bOn ? 1 : 0;
+    // 那顆水當作按著：手指按著，或圖案剛換、還在晃（stir）。
+    const bt = this.bOn || this.stirT > 0 ? 1 : 0;
+    this.stirT = Math.max(0, this.stirT - dt);
     const n = Math.max(1, Math.ceil(dt / SPRING_DT)), h = dt / n;
     for (let i = 0; i < n; i++) {
       this.jKvx += ((jtx - this.jKx) * kS - this.jKvx * kD) * h;
@@ -494,9 +519,9 @@ export class Pad {
 
     const liqK = 1 - Math.pow(0.0006, dt);
     this.jLiq += ((this.jOn ? 1 : 0) - this.jLiq) * liqK;
-    this.bLiq += ((this.bOn ? 1 : 0) - this.bLiq) * liqK;
+    this.bLiq += (bt - this.bLiq) * liqK;
     const fade = 1 - Math.exp(-14 * dt);
-    for (const k of ICONS) this.iconW[k] += ((this.icon === k ? 1 : 0) - this.iconW[k]) * fade;
+    for (const k of ICONS) this.iconW[k] += ((this._icon === k ? 1 : 0) - this.iconW[k]) * fade;
 
     const out = [];
     for (const d of this.drops) {
