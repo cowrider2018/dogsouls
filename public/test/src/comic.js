@@ -105,7 +105,7 @@ export const PAGES = [
       { src: 'comic/p14-4b.png', focus: '50% 50%' },
       { src: 'comic/p14-4c.png', focus: '50% 50%' },
     ] },
-    { note: '國王回到王座上，廳裡站滿了人，主角站在旁邊，復活的夥伴站在主角身邊', say: '旁白：完', src: 'comic/p14-5.png', focus: '52% 50%' },
+    { note: '國王回到王座上，廳裡站滿了人，主角站在旁邊，復活的夥伴站在主角身邊', say: '旁白：完', src: 'comic/p14-5.png', focus: '60% 50%' },
   ] },
 ];
 

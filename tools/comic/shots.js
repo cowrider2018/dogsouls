@@ -909,6 +909,8 @@ export const SHOTS = [
     cast: [
       { who: 'king', at: [0.05, -4.1], y: 0.5, yaw: 0, move: SIT, face: 'calm', shadow: false, eyes: { lift: 0.25, spread: 0.2 } },
       { who: 'hero', at: [1.5, -3.2], yaw: -0.25, move: HEROIC, face: 'proud', blade: 'knife', eyes: { lift: 0.6, spread: 0.3 } },
+      // 復活的夥伴：騎士幽靈活過來了，站在主角身邊、離國王遠的那一側，跟主角朝同一個方向。
+      { who: 'comrade', at: [3.2, -3.25], yaw: -0.3, scale: 1.2, move: HEROIC, face: 'proud', blade: 'knight', eyes: { lift: 0.6, spread: 0.3 } },
       // 群眾每一隻都正對國王（王座上那一點），不是朝四面八方。
       ...[
         ['cat/orangin', -3.4, -1.0], ['dog-drop/cow', -2.0, 0.2], ['cat/tabby', -0.8, 1.2],
