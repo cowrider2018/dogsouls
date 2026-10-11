@@ -26,7 +26,7 @@ export const PAGES = [
   { title: '兵營', panels: [
     { note: '回憶：王座廳裡主角單膝跪在國王面前受封', say: '旁白：王國最強的戰士。', src: 'comic/p1-1.png', memory: true, focus: '67% 48%' },
     { note: '主角在帳篷裡猛然彈起來', say: '睡過頭了！', src: 'comic/p1-2.png', capAt: 'bottom', focus: '50% 40%' },
-    { note: '帳篷外太陽已經很高，兵器架上的武器全不見了，只剩粗虛線的輪廓', src: 'comic/p1-3.png', focus: '55% 50%' },
+    { note: '帳篷外太陽已經很高，兵器架上的武器全不見了，只剩粗虛線的輪廓', src: 'comic/p1-3.png', focus: '78% 50%' },
     { note: '整片兵營空蕩蕩，主角小小一隻站在中間', say: '大家都去哪了？', src: 'comic/p1-4.png', focus: '60% 35%' },
   ] },
   { title: '兵營', panels: [

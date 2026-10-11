@@ -130,7 +130,7 @@
     - `dash: true`：這一件整個只畫虛線。
     - `dash: { ...參數 }`：這一件照常畫剪影，再把同一件零件換上這些參數重砌一次、只畫虛線，疊在剪影上，同一個位置、同一個比例。
     - `dash: [{ ... }, { ... }]`：好幾層，寫在後面的在前面，前面那一層蓋住的地方，後面那幾層的虛線擦掉（盾擋在長槍前面，槍桿的虛線停在盾外面）。
-    - 例：兵器空了（第 1 頁第 3 格）：`{ piece: 'weaponRack', spears: false, shields: false, dash: [{ rack: false, spears: true }, { rack: false, shields: true }] }`。`weaponRack` 的 `rack`、`spears`、`shields` 給 `false` 就不砌架子、長槍、盾（預設都有，遊戲裡照舊）；`spears`、`shields` 給數字就是幾支、幾面（長槍平均排在原本那一段，一面盾放正中間），少放幾件、每一件的虛線才讀得出是兵器；`spearScale` 把槍桿與槍頭加粗幾倍（長度不變，預設 1），槍桿兩邊的虛線才不會擠成兩條平行線。
+    - 例：兵器空了（第 1 頁第 3 格）：`{ piece: 'weaponRack', spears: false, shields: false, dash: [{ rack: false, spears: 3, spearScale: 2.2 }, { rack: false, shields: 1 }] }`。`weaponRack` 的 `rack`、`spears`、`shields` 給 `false` 就不砌架子、長槍、盾（預設都有，遊戲裡照舊）；`spears`、`shields` 給數字就是幾支、幾面（長槍平均排在原本那一段，一面盾放正中間），少放幾件、每一件的虛線才讀得出是兵器；`spearScale` 把槍桿與槍頭加粗幾倍（長度不變，預設 1），槍桿兩邊的虛線才不會擠成兩條平行線。
     - 不能跟 `vanish` 一起用。
 - **角色 `who`**：都是遊戲裡那幾隻本人，怪物是 `monster.js` 的 `makeMonsterCritter`（同一件毛、同樣大、幽靈一樣半透明），頭盔、王冠、盾照 `fight.js` 戴。同一種角色一格裡可以有好幾隻。
   - `hero` 主角（立耳犬黃、漁夫帽、高 1）、`king` 活著的國王（垂耳犬灰、王冠、高 1.4）。

@@ -146,11 +146,14 @@ export const SHOTS = [
     // 原本靠著的長槍、擋在前面的盾只剩粗虛線的輪廓（沒有實體）——與隔壁的營帳。
     id: 'p1-3', size: [1200, 720], ink: 4,
     // 構圖：臉佔左邊，右邊是空了的兵器架（架子是剪影，長槍與盾是 dash 的虛線），後面露出一角營帳。
+    // 兵器少放幾件、放粗：三支長槍（槍桿加粗，兩邊的虛線才分得開）、一面盾；架子壓低，三個槍頭都在
+    // 帽簷底下露出來。架子上面三條黃色的強調記號（marks）往外放，把眼睛帶到空了的兵器。
     horizon: 0.8,
     bg: [
-      { piece: 'pavilion', R: 1.9, h: 1.45, roof: 1.25, x: 0.98, y: 0.82, size: 0.46 },
-      { piece: 'weaponRack', spears: false, shields: false, dash: [{ rack: false, spears: true }, { rack: false, shields: true }], x: 0.79, y: 0.87, size: 0.56 },
+      { piece: 'pavilion', R: 1.9, h: 1.45, roof: 1.25, x: 1.06, y: 0.82, size: 0.46 },
+      { piece: 'weaponRack', spears: false, shields: false, dash: [{ rack: false, spears: 3, spearScale: 2.2 }, { rack: false, shields: 1 }], x: 0.86, y: 1.012, size: 0.6 },
     ],
+    marks: { at: [0.86, 0.43], angle: -1.3, spread: 0.55, inner: 0.1, len: 0.11, width: 0.035 },
     cast: [{ who: 'hero', at: [0, 0], yaw: -0.45, move: DROWSY, face: 'tired' }],
     cam: { focus: 'hero', yaw: -0.8, pitch: -0.08, dist: 1.0, fov: 32, frame: [-0.12, 0.08] },
     light: [-3, 6, 6],
