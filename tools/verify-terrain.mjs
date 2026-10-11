@@ -77,7 +77,7 @@ import { stone } from '../public/test/src/geom.js';
 import { CAM, makeCam, updateCam } from '../public/test/src/camera.js';
 import { readFileSync } from 'node:fs';
 import { loadZoo, TURN_RATE } from '../public/test/src/critter.js';
-import { Pad, STIR, GIVE, SOUL_SHAPE, SOUL_OUTLINE, bodySpan } from '../public/test/src/pad.js';
+import { Pad, REST_ICON, GIVE, SOUL_SHAPE, SOUL_OUTLINE, bodySpan } from '../public/test/src/pad.js';
 import { railTier } from '../public/test/src/hud.js';
 import { roomOf, signposts } from '../public/test/src/route.js';
 
@@ -2217,39 +2217,43 @@ head('手把');
       `空 ${GIVE.clear.toFixed(3)} r、靈魂離圓心最遠 ${GIVE.soulReach.toFixed(4)} r、露出來的手 x ${hand.seen[0].toFixed(3)}～${hand.seen[2].toFixed(3)}、y ${hand.seen[1].toFixed(3)}～${hand.seen[3].toFixed(3)} r`);
   }
 
-  /* 圖案一換，那顆水就晃一下，晃法跟長按一模一樣：一個換圖案（stir），一個真的按住 STIR 秒再放開，
-     兩顆的液化與按壓每一幀都一樣。只動外觀：不跳、不回報、不算按著。 */
+  /* 圖案一離開箭頭，那顆水就一直晃到換回箭頭為止，晃法跟長按一模一樣：一個換圖案（stir）、隔一段
+     換回箭頭，一個真的在同一幀按下、同一幀放開，兩顆的液化與按壓每一幀都一樣。不限時：換多久晃多久。
+     只動外觀：不跳、不回報、不算按著。 */
   {
     let fired = 0;
     const a = new Pad(fakeCanvas(), { onJump: () => { fired++; } });
     const b = new Pad(fakeCanvas());
     a.layout(1024, 576, 2); b.layout(1024, 576, 2);
     for (let i = 0; i < 30; i++) { a.update(1 / 60); b.update(1 / 60); }
-    a.icon = 'arrow';
-    ok(a.stirT === 0 && a.bLiq < 1e-6, '給的圖案沒換：不晃');
+    a.icon = REST_ICON;
+    ok(!a.stirred && a.bLiq < 1e-6, '給的圖案沒換：不晃');
     a.icon = 'give';
     b.down('jmp', 1, b.slotJmp.x, b.slotJmp.y);
     ok(!a.bOn && fired === 0 && a.takeJump() === false && a.drops.length === 0, '換圖案不是按跳：不排跳、不叫 onJump、不算按著、不噴水花');
-    let diff = 0, peak = 0, held = 0;
-    for (let i = 0; i < 150; i++) {
-      if (a.stirT > 0) held++;
-      else if (b.bOn) b.up(1);
+    const HOLD = 300;                                    // 5 秒，比原本那一下 0.45 秒長得多
+    let diff = 0, low = 1, peak = 0;
+    for (let i = 0; i < HOLD + 150; i++) {
+      if (i === HOLD) { a.icon = REST_ICON; b.up(1); }
       a.update(1 / 60); b.update(1 / 60);
-      a.icon = 'give';                                   // 模式每幀都給，同一個不再晃
+      if (i < HOLD) a.icon = 'give';                     // 模式每幀都給，同一個不再踢
       diff = Math.max(diff, Math.abs(a.bLiq - b.bLiq), Math.abs(a.bPress - b.bPress));
       peak = Math.max(peak, a.bLiq);
+      if (i >= 60 && i < HOLD) low = Math.min(low, a.bLiq);
     }
-    ok(diff < 1e-9 && Math.abs(held / 60 - STIR) <= 1 / 60 + 1e-9, `晃的那一下跟長按 ${STIR} 秒一模一樣（液化、按壓每一幀都對得上）`,
-      `差 ${diff.toExponential(1)}、按著 ${held} 幀`);
-    ok(peak > 0.9 && a.bLiq < 0.01 && Math.abs(a.bPress) < 0.01 && a.stirT === 0, '鼓成水滴、晃完收回去',
+    ok(diff < 1e-9, '晃法跟長按一模一樣（液化、按壓每一幀都對得上）', `差 ${diff.toExponential(1)}`);
+    ok(low > 0.99, `不限時：圖案還是手的那 ${HOLD / 60} 秒一直鼓成水滴`, `最低 ${low.toFixed(3)}`);
+    ok(peak > 0.9 && a.bLiq < 0.01 && Math.abs(a.bPress) < 0.01 && !a.stirred, '換回箭頭才收回去',
       `最高 ${peak.toFixed(2)}、最後 ${a.bLiq.toFixed(3)}`);
-    let again = 0;
-    for (const k of ['sword', 'arrow', 'give', 'arrow']) {
+    let kicks = 0;
+    for (const k of ['sword', 'give', REST_ICON, 'give', REST_ICON]) {
+      a.bPressv = 0;
       a.icon = k;
-      if (a.stirT === STIR) again++;
+      if (a.bPressv > 0) kicks++;
       for (let i = 0; i < 60; i++) { a.update(1 / 60); a.icon = k; }
+      if (a.stirred !== (k !== REST_ICON)) kicks = -99;
     }
-    ok(again === 4 && fired === 0, '每一次換（刀、箭頭、手、箭頭）都晃一次，都不跳');
+    ok(kicks === 3 && fired === 0, '換成刀、手各踢一下並一直晃，換回箭頭就停，都不跳');
   }
 
   /* 畫一遍。假 context 與假 Path2D：畫出來對不對驗不到，但「畫的時候會

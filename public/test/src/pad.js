@@ -70,10 +70,10 @@ const THROW = 0.86;
    甩、在對角之間閃；幀率回來之後還要一兩秒才收得回來。拆成小步積分，
    手感就跟幀率無關。 */
 const SPRING_DT = 1 / 120;
-/* 跳躍鍵的圖案一換（箭頭、刀、托著靈魂的手之間），那顆水就晃一下：跟長按的時候一模一樣——同一個
-   踢、同一條液化與按壓的彈簧、同一個擾動——像被按住 STIR 秒再放開，只是不經過指標：不排跳、不回報、
-   bOn 不變。一次換一次，晃完自己收回去。 */
-export const STIR = 0.45;
+/* 跳躍鍵的圖案一離開箭頭（換成刀、托著靈魂的手），那顆水就一直晃到換回箭頭為止：跟長按的時候
+   一模一樣——同一個踢、同一條液化與按壓的彈簧、同一個擾動——像一直被按著，換回箭頭才放開，只是不經過
+   指標：不排跳、不回報、bOn 不變。不限時，變化多久就晃多久。 */
+export const REST_ICON = 'arrow';
 
 function angDiff(a, b) {
   let d = a - b;
@@ -474,8 +474,6 @@ export class Pad {
     this._icon = 'arrow';
     /** 每個圖案淡進來多少（0～1）：現在那一個往 1、其他的往 0，交叉淡換。 */
     this.iconW = Object.fromEntries(ICONS.map((k) => [k, k === this._icon ? 1 : 0]));
-    /** 圖案換了之後，那顆水還要當作被按著多久（秒，STIR 起算）。 */
-    this.stirT = 0;
 
     this.W = 0; this.H = 0; this.dpr = 1;
     this.portrait = false;
@@ -488,21 +486,23 @@ export class Pad {
     this.zoneJmp = { x: 0, y: 0, w: 0, h: 0 };
   }
 
-  /** 跳躍鍵上畫什麼。模式的主程式每幀給；跟上一次不一樣就讓那顆水晃一下（stir）。 */
+  /** 跳躍鍵上畫什麼。模式的主程式每幀給；換成箭頭以外的圖案就讓那顆水晃起來（stir），換回箭頭才停。 */
   get icon() { return this._icon; }
   set icon(v) {
     if (v === this._icon) return;
     this._icon = v;
-    this.stir();
+    if (this.stirred) this.stir();
   }
 
+  /** 圖案不在箭頭：那顆水當作一直被按著，直到換回箭頭。 */
+  get stirred() { return this._icon !== REST_ICON; }
+
   /**
-   * 讓跳躍鍵那顆水晃一下，晃法跟長按一模一樣：被按下去的那一下（_squeeze），接著當作按著 STIR 秒
-   * 再放開。手指本來就按著的話它已經是那個樣子，不再踢一次。只動外觀：不排跳、不叫 onJump、bOn 不變。
+   * 讓跳躍鍵那顆水晃起來，晃法跟長按一模一樣：被按下去的那一下（_squeeze），之後只要 stirred 就當作
+   * 按著。手指本來就按著的話它已經是那個樣子，不再踢一次。只動外觀：不排跳、不叫 onJump、bOn 不變。
    */
   stir() {
     if (!this.bOn) this._squeeze();
-    this.stirT = STIR;
   }
 
   /* ── 幾何 ──────────────────────────────────────────────────────
@@ -670,9 +670,8 @@ export class Pad {
     const jtx = this.jOn ? this.jTx : 0;
     const jty = this.jOn ? this.jTy : 0;
     const kS = this.jOn ? 900 : 420, kD = this.jOn ? 46 : 26;
-    // 那顆水當作按著：手指按著，或圖案剛換、還在晃（stir）。
-    const bt = this.bOn || this.stirT > 0 ? 1 : 0;
-    this.stirT = Math.max(0, this.stirT - dt);
+    // 那顆水當作按著：手指按著，或圖案還不是箭頭（stirred）。
+    const bt = this.bOn || this.stirred ? 1 : 0;
     const n = Math.max(1, Math.ceil(dt / SPRING_DT)), h = dt / n;
     for (let i = 0; i < n; i++) {
       this.jKvx += ((jtx - this.jKx) * kS - this.jKvx * kD) * h;
