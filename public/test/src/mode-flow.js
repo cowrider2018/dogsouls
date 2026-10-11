@@ -31,6 +31,7 @@
                          就停，再按重新等 0.5 秒。一輪掉得出幾顆就要交幾顆（route.js 的 SOULS），
                          交出去的只有撿來的那幾顆（最大血量最少剩一開始的 3 顆）；還沒交滿就交
                          不出去的話提示需要更多，自己回去撿（offer.js）。在國王身邊按跳不跳。
+                         在國王身邊的時候跳躍鍵上畫的是一隻托著狗頭靈魂的手（pad.js 的 iconOf）。
                          王座廳打完翻第 14 頁（打倒國王、看著身邊的靈魂、看著倒下的國王），書頁走了國王還躺著，
                          這時才走過去交。交滿之後不慢：最後一顆靈魂落到國王身上的那一刻，
                          國王復甦（fight.js 的 REVIVE）——屍體炸成一團幽靈血，血慢下來再加速聚攏，
@@ -65,7 +66,7 @@
 
 import * as THREE from '../vendor/three.module.js';
 import { loadZoo } from './critter.js';
-import { Pad } from './pad.js';
+import { Pad, iconOf } from './pad.js';
 import { Hud } from './hud.js';
 import { portalAt } from './walk.js';
 import { makeCam, snapCam, updateCam } from './camera.js';
@@ -504,7 +505,9 @@ function frame(now) {
     crowd: king ? [...folk.here(player.block), king] : folk.here(player.block),
   });
   light.render();
-  pad.icon = fight.striking ? 'sword' : 'arrow';
+  // 跳躍鍵的圖案：長按會交靈魂的時候（在國王身邊、還沒交滿、操作沒收起來）是托著靈魂的手。
+  // 這一幀交滿了的話這裡已經不在國王身邊（nearAltar 重問），圖案當場換回來。
+  pad.icon = iconOf({ give: fight.nearAltar(player) && !still, striking: fight.striking });
   pad.draw();
 
   fpsAcc += real; fpsN++; hudAcc += real;

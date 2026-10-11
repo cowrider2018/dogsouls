@@ -165,7 +165,9 @@ import { TRAILS, PIECE, BANDS, sweepAt, fadeAt, sideAt, qiAt, along, hullOf } fr
 import { bladeAt } from '../public/test/src/trail.js';
 import { BLEED, LUMP, SPLAT, STYLE, dropSize, dropCount, volumeOf, sizeRange, speedOf, hitFrame, burstFrame, lumpFrame, hurtFrame, spurtOf, floorUnder, splatScale, bleedStep, GATHER } from '../public/test/src/bleed.js';
 import { taken } from '../public/test/src/combat.js';
-import { OFFER, makeOffer, offerStep, offerDone, blinkOf, throwSoul, flySoul } from '../public/test/src/offer.js';
+import { OFFER, makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, flySoul } from '../public/test/src/offer.js';
+import { iconOf, ICONS, SOUL_SIDE } from '../public/test/src/pad.js';
+import { headParts } from '../public/test/src/soul.js';
 import { readFileSync } from 'node:fs';
 import * as THREE from '../public/test/vendor/three.module.js';
 import { loadZoo } from '../public/test/src/critter.js';
@@ -2952,6 +2954,87 @@ console.log('34. 獻靈魂');
   while (!landed && t < 2) { landed = flySoul(s, DT); t += DT; top = Math.max(top, s.y); }
   ok(near(t, OFFER.flight, DT + 1e-9) && near(s.x, 2, 1e-9) && near(s.y, 0.5, 1e-9) && top > 1 + OFFER.arc * 0.75,
     `拋出去的靈魂 ${t.toFixed(2)} 秒落到國王身上，中間拱到 ${top.toFixed(2)} 公尺`);
+
+  /* 跳躍鍵的圖案（pad.js 的 iconOf）：模式給的是 give = nearOffer && 操作沒收起來——就是「這時候長按
+     會交靈魂」的那一個條件（fight.js 的 give 也只在 nearOffer 的時候把按著算進去）。從國王身邊
+     走開、走回來、交滿，圖案跟著那個條件換，一幀都不差。 */
+  {
+    const altar = { x: 0, y: 0.5, z: 0 };
+    const icon = (o, a, pl, still = false, striking = false) => iconOf({ give: nearOffer(o, a, pl) && !still, striking });
+    ok(ICONS.includes('give') && ICONS.includes('sword') && ICONS.includes('arrow'), `跳躍鍵畫得出 ${ICONS.join('、')}`);
+    o = makeOffer(need); p = full();
+    let bad = 0;
+    for (let d = 0; d <= 4; d += 0.05) {
+      const pl = { ...p, x: d, z: 0 };
+      if ((icon(o, altar, pl) === 'give') !== (d < OFFER.near)) bad++;
+      // 那個距離長按，交得出去（按著有算）就是 give 的那幾個距離
+      const probe = makeOffer(need);
+      offerStep(probe, OFFER.wait + 0.01, nearOffer(probe, altar, pl), { ...pl });
+      if ((probe.held > 0) !== (icon(o, altar, pl) === 'give')) bad++;
+    }
+    ok(bad === 0, `走近國王（水平 ${OFFER.near} 公尺以內）圖案換成托著靈魂的手，走開換回箭頭；長按算數的距離跟它一樣`);
+    ok(icon(o, null, { ...p, x: 0, z: 0 }) === 'arrow', '國王還沒躺下：站在那裡也是箭頭');
+    ok(icon(o, altar, { ...p, x: 0.5, z: 0 }, true) === 'arrow', '操作收起來的時候（劇情、送走、倒下）不畫，長按也不算');
+    ok(icon(o, altar, { ...p, x: 0.5, z: 0 }, false, true) === 'give' && icon(o, altar, { ...p, x: 9, z: 0 }, false, true) === 'sword',
+      '跟刀同時成立的話交靈魂優先（那時候按跳不出招），離開國王身邊才是刀');
+    const pl = { ...p, x: 0.5, z: 0 };
+    const seen = [];
+    for (let t = 0; t < 4 && !offerDone(o); t += DT) {
+      seen.push(icon(o, altar, pl));
+      offerStep(o, DT, nearOffer(o, altar, pl), pl);
+    }
+    seen.push(icon(o, altar, pl));
+    ok(offerDone(o) && seen.slice(0, -1).every((k) => k === 'give') && seen[seen.length - 1] === 'arrow',
+      `一直按著交到滿：交的那一段都是托著靈魂的手，交滿的那一幀起換回箭頭（${seen.length} 幀）`);
+    ok(icon(makeOffer(), altar, pl) === 'arrow', '沒有要收的（戰鬥模式）：國王身邊也是箭頭');
+  }
+
+  /* 托著的那一顆是靈魂本人的側面：把 soul.js 從立耳犬挑出來的頭（皮＋臉）投影到側面、臉朝左
+     （x = −z、y = −y），照剪影的外框擺到跟 SOUL_SIDE 同一個座標，逐格比「在模型的剪影裡」與
+     「在 SOUL_SIDE 的外框裡」，兩塊要幾乎疊在一起；眼睛也要在近側那隻眼睛上。 */
+  {
+    const buf = readFileSync('public/assets/cat.bin');
+    const zoo = await loadZoo({ buffer: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) });
+    const h = headParts(zoo.critters.get('dog-prick'));
+    const tris = [];
+    for (const g of [h.skin, h.face]) {
+      const P = g.attributes.position.array, I = g.index.array;
+      for (let k = 0; k < I.length; k += 3) tris.push([0, 1, 2].map((j) => [-P[I[k + j] * 3 + 2], -P[I[k + j] * 3 + 1]]));
+    }
+    let lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
+    for (const t of tris) for (const [x, y] of t) { lo = [Math.min(lo[0], x), Math.min(lo[1], y)]; hi = [Math.max(hi[0], x), Math.max(hi[1], y)]; }
+    const mid = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2], half = Math.max(hi[0] - lo[0], hi[1] - lo[1]) / 2;
+    const norm = ([x, y]) => [(x - mid[0]) / half, (y - mid[1]) / half];
+    const T = tris.map((t) => t.map(norm));
+    const side = (a, b, x, y) => (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
+    const inModel = (x, y) => T.some(([a, b, c]) => {
+      const w0 = side(a, b, x, y), w1 = side(b, c, x, y), w2 = side(c, a, x, y);
+      return (w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0);
+    });
+    const O = SOUL_SIDE.outline;
+    const inIcon = (x, y) => {
+      let inside = false;
+      for (let i = 0, j = O.length - 2; i < O.length; j = i, i += 2) {
+        const [xi, yi, xj, yj] = [O[i], O[i + 1], O[j], O[j + 1]];
+        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+      }
+      return inside;
+    };
+    let both = 0, either = 0;
+    for (let y = -1.05; y <= 1.05; y += 0.025) for (let x = -1.05; x <= 1.05; x += 0.025) {
+      const m = inModel(x, y), c = inIcon(x, y);
+      if (m && c) both++;
+      if (m || c) either++;
+    }
+    const iou = both / either;
+    // 螢幕右邊是 −z、上面是 +y，鏡頭就在 +x 那一側：近側是 +x 那一隻眼睛。
+    const nearEye = h.eyes.reduce((a, e) => (e[0] > a[0] ? e : a));
+    const eye = norm([-nearEye[2], -nearEye[1]]);
+    ok(iou > 0.92 && Math.hypot(eye[0] - SOUL_SIDE.eye[0], eye[1] - SOUL_SIDE.eye[1]) < 0.06,
+      `交靈魂的圖案上那顆頭是模型的側面剪影（臉朝左）：跟模型投影疊在一起 ${(iou * 100).toFixed(1)}%，眼睛對在近側那一隻上`);
+    ok(Math.min(...O.filter((_, i) => i % 2 === 0)) < -0.9 && T.flat().filter(([x]) => x < -0.9).every(([, y]) => y > 0),
+      '吻部在左邊（臉朝左），在頭的下半');
+  }
 }
 
 /* ── 35. 幽靈騎士 ────────────────────────────────────────────── */

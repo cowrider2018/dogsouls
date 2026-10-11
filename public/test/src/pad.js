@@ -134,6 +134,151 @@ function fillLiquid(ctx, p, cx, cy, r, tn, glow, col = SOUL) {
   ctx.shadowBlur = 0;
 }
 
+/**
+ * 靈魂狗頭的側面剪影，臉朝左：soul.js 的 headParts 從立耳犬模型挑出來的那一份（皮＋臉，頭骨座標、
+ * 靜置姿勢），投影到側面（螢幕 x = −z、y = −y），描出外框、簡化成這幾個點；剪影外框的中心在 (0, 0)、
+ * 長的那一邊半長是 1（y 朝下）。eye 是近側那隻眼睛的中心，同一個座標。verify-combat 的「獻靈魂」
+ * 拿模型重投影一次，對得上才算數——模型改了這裡要重描。
+ */
+export const SOUL_SIDE = {
+  outline: [
+    0.14, -0.82, 0.44, -0.66, 0.64, -0.49, 0.85, -0.45, 0.96, -0.36, 1, -0.2, 1, 0.59, 0.93, 0.72,
+    0.77, 0.81, -0.17, 0.83, -0.45, 0.8, -0.6, 0.71, -0.94, 0.7, -0.99, 0.63, -1, 0.26, -0.93, 0.16,
+    -0.66, 0.14, -0.66, -0.23, -0.6, -0.38, -0.55, -0.43, -0.36, -0.49, -0.03, -0.5, 0, -0.58, 0.05, -0.59,
+  ],
+  eye: [-0.49, 0.08],
+};
+
+/**
+ * 一條折線，中間每一個頂點都倒成圓角：pts 是 [x, y, 圓角半徑]（以 u 為單位），頭尾兩點不用半徑。
+ * 接在目前的路徑上（先 beginPath）。
+ */
+function roundPath(g, u, pts) {
+  g.moveTo(pts[0][0] * u, pts[0][1] * u);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [x, y, rad] = pts[i], [nx, ny] = pts[i + 1];
+    g.arcTo(x * u, y * u, nx * u, ny * u, rad * u);
+  }
+  const [lx, ly] = pts[pts.length - 1];
+  g.lineTo(lx * u, ly * u);
+}
+
+/* ── 跳躍鍵上的圖案 ─────────────────────────────────────────────
+   每一個都以鍵的圓心為 (0, 0)、用 r（鍵的半徑）量，畫在 _glyph 給的那張小畫布上（筆的顏色、
+   圓頭圓角已經設好）。 */
+const GLYPHS = {
+  /** 向上的箭頭：跳。 */
+  arrow(g, r) {
+    const q = r * 0.30;
+    g.lineWidth = Math.max(2, r * 0.09);
+    g.beginPath();
+    g.moveTo(-q, q * 0.45);
+    g.lineTo(0, q * 0.45 - q * 0.95);
+    g.lineTo(q, q * 0.45);
+    g.moveTo(0, q * 0.45 - q * 0.8);
+    g.lineTo(0, q * 0.45 + q * 0.62);
+    g.stroke();
+  },
+
+  /** 往右上斜指的刀：第二、三段攻擊。 */
+  sword(g, r) {
+    /* 刀的座標：u 沿著刀身（往刀尖），v 橫過刀身；整把轉 −45°，刀尖朝右上。斜擺的刀比箭頭
+       細，放大一點才跟箭頭一樣搶眼。v 是對稱的；u 從柄頭的外緣到刀尖，取那一段的中點對在
+       圓心上，整把刀的外框就置中。 */
+    const q = r * 0.42;
+    const thin = Math.max(1.6, r * 0.07), thick = Math.max(2, r * 0.09);
+    const w = q * 0.17, guard = -q * 0.35, tip = q * 1.08, pommel = -q * 0.93, knob = q * 0.1;
+    const mid = (tip + thin / 2 + pommel - knob - thick / 2) / 2;
+    g.rotate(-Math.PI / 4);
+    g.translate(-mid, 0);
+    g.lineWidth = thin;
+    g.beginPath();                                     // 刀身：兩條刃、斜切的刀尖
+    g.moveTo(guard, -w);
+    g.lineTo(q * 0.78, -w);
+    g.lineTo(tip, 0);
+    g.lineTo(q * 0.78, w);
+    g.lineTo(guard, w);
+    g.closePath();
+    g.stroke();
+    g.lineWidth = thick;
+    g.beginPath();
+    g.moveTo(guard, -q * 0.46);                        // 護手
+    g.lineTo(guard, q * 0.46);
+    g.moveTo(guard, 0);                                // 刀柄
+    g.lineTo(pommel + knob, 0);
+    g.stroke();
+    g.beginPath();                                     // 柄頭
+    g.arc(pommel, 0, knob, 0, TAU);
+    g.stroke();
+  },
+
+  /**
+   * 交靈魂：一隻從左下伸進來、掌心朝上托著的手，上面隔一點空浮著一顆狗頭靈魂的側面剪影（SOUL_SIDE，
+   * 臉朝左）、叉叉眼挖空。手跟箭頭、刀一樣是線，畫得粗胖：拇指立著、三根手指一根比一根短地疊著，
+   * 拇指與每一根手指的尖端都是圓角矩形（平的頭、圓的角），手腕接拇指、拇指接掌心、手指接手指、
+   * 掌根接手臂，每一個轉折都倒圓角（roundPath），沒有一個尖角。頭是實心的剪影，一眼看得出是
+   * 「那一顆」，不是另一條線。
+   */
+  give(g, r) {
+    const u = r * 0.92;
+    const c = 0.035, fh = 0.13, f0 = 0.14, f1 = f0 + fh, f2 = f1 + fh, f3 = f2 + fh;   // 手指的圓角、粗、上下緣
+    const [e0, e1, e2] = [0.44, 0.38, 0.32];                                          // 三根手指的指尖
+    g.lineWidth = Math.max(2, r * 0.09);
+    g.save();
+    g.translate(0, -0.04 * u);
+    g.beginPath();
+    roundPath(g, u, [
+      [-0.52, 0.30],                    // 手臂上緣
+      [-0.31, 0.21, 0.08],              // 手腕接拇指
+      [-0.31, -0.02, c],                // 拇指的尖：圓角矩形
+      [-0.15, -0.02, c],
+      [-0.15, f0, 0.05],                // 拇指接掌心
+      [e0, f0, c],                      // 第一根手指的尖
+      [e0, f1, c],
+      [e1, f1, 0.025],                  // 接第二根
+      [e1, f2, c],
+      [e2, f2, 0.025],                  // 接第三根
+      [e2, f3, c],
+      [-0.10, f3, 0.12],                // 掌根接手臂
+      [-0.52, f3 + 0.14],               // 手臂下緣
+    ]);
+    g.moveTo((e1 - 0.01) * u, f1 * u); g.lineTo(0.12 * u, f1 * u);                   // 手指之間的縫
+    g.moveTo((e2 - 0.01) * u, f2 * u); g.lineTo(0.10 * u, f2 * u);
+    g.stroke();
+    g.restore();
+
+    const k = 0.26 * r, { outline: o, eye } = SOUL_SIDE;
+    g.save();
+    g.translate(0.07 * r, -0.40 * r);
+    g.scale(k, k);
+    g.fillStyle = g.strokeStyle;
+    g.lineWidth = Math.max(1.6, r * 0.05) / k;                              // 描一圈，剪影的角圓一點
+    g.beginPath();
+    for (let i = 0; i < o.length; i += 2) g.lineTo(o[i], o[i + 1]);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    g.globalCompositeOperation = 'destination-out';                         // 叉叉眼挖空
+    g.lineWidth = Math.max(1.2, r * 0.04) / k;
+    const e = 0.2;
+    g.beginPath();
+    g.moveTo(eye[0] - e, eye[1] - e); g.lineTo(eye[0] + e, eye[1] + e);
+    g.moveTo(eye[0] + e, eye[1] - e); g.lineTo(eye[0] - e, eye[1] + e);
+    g.stroke();
+    g.restore();
+  },
+};
+
+/** 跳躍鍵畫得出來的圖案。 */
+export const ICONS = Object.keys(GLYPHS);
+
+/**
+ * 跳躍鍵這一幀畫哪一個：在倒下的國王身邊（give：長按就是交靈魂）是托著靈魂的手，第二、三段攻擊
+ * 的那一段（striking）是刀，其餘是箭頭。國王倒下之後才交得了，兩個本來就不會同時成立；真的同時
+ * 的話交靈魂優先——那時候按跳不出招（模式不交給連段）。
+ */
+export const iconOf = ({ give = false, striking = false } = {}) => (give ? 'give' : striking ? 'sword' : 'arrow');
+
 export class Pad {
   /**
    * @param {HTMLCanvasElement} canvas 操作層那張 2D 畫布
@@ -164,10 +309,10 @@ export class Pad {
     this.bPh = [0, 0, 0];
     this.drops = [];
     this._queued = false;
-    /** 跳躍鍵上畫什麼：'arrow'（跳）或 'sword'（第二、三段攻擊），模式的主程式每幀給。 */
+    /** 跳躍鍵上畫什麼（ICONS 的一個，iconOf 挑），模式的主程式每幀給。 */
     this.icon = 'arrow';
-    /** 刀淡進來多少（0 = 箭頭，1 = 刀）。 */
-    this.iconK = 0;
+    /** 每個圖案淡進來多少（0～1）：現在那一個往 1、其他的往 0，交叉淡換。 */
+    this.iconW = Object.fromEntries(ICONS.map((k) => [k, k === this.icon ? 1 : 0]));
 
     this.W = 0; this.H = 0; this.dpr = 1;
     this.portrait = false;
@@ -354,7 +499,8 @@ export class Pad {
     const liqK = 1 - Math.pow(0.0006, dt);
     this.jLiq += ((this.jOn ? 1 : 0) - this.jLiq) * liqK;
     this.bLiq += ((this.bOn ? 1 : 0) - this.bLiq) * liqK;
-    this.iconK += ((this.icon === 'sword' ? 1 : 0) - this.iconK) * (1 - Math.exp(-14 * dt));
+    const fade = 1 - Math.exp(-14 * dt);
+    for (const k of ICONS) this.iconW[k] += ((this.icon === k ? 1 : 0) - this.iconW[k]) * fade;
 
     const out = [];
     for (const d of this.drops) {
@@ -512,57 +658,20 @@ export class Pad {
     }
 
     /* 圖案：這顆鍵在說什麼，一眼就懂。平常是向上的箭頭（跳）；第二、三段攻擊的那一段是一把
-       往右上斜指的刀（按下去是出招）。兩個交叉淡換（iconK）。
+       往右上斜指的刀（按下去是出招）；在倒下的國王身邊是一隻往上托的手、上面浮著一顆狗頭
+       靈魂（長按是交靈魂）。幾個交叉淡換（iconW）。
 
        每個圖案先用不透明的顏色畫進一張離屏的小畫布（_glyph），再整張用一個透明度貼上來：
        直接用半透明的線畫的話，刀身、護手、刀柄疊在一起的地方會疊出比較濃的一塊，剪影的
        透明度就不一致。 */
-    const k = this.iconK;
     const lit = liq > 0.02;
     const rgb = lit ? tint(0.4 + 0.6 * liq, 1) : solid(SOUL_PALE, 1);
     const alpha = (0.55 + 0.45 * liq) * (lit ? 0.95 : 0.62);
     const lift = press * r * 0.06;
-    if (k < 0.99) this._glyph(ctx, cx, cy - lift, r, rgb, alpha * (1 - k), (g) => {
-      const q = r * 0.30;
-      g.lineWidth = Math.max(2, r * 0.09);
-      g.beginPath();
-      g.moveTo(-q, q * 0.45);
-      g.lineTo(0, q * 0.45 - q * 0.95);
-      g.lineTo(q, q * 0.45);
-      g.moveTo(0, q * 0.45 - q * 0.8);
-      g.lineTo(0, q * 0.45 + q * 0.62);
-      g.stroke();
-    });
-    if (k > 0.01) this._glyph(ctx, cx, cy - lift, r, rgb, alpha * k, (g) => {
-      /* 刀的座標：u 沿著刀身（往刀尖），v 橫過刀身；整把轉 −45°，刀尖朝右上。斜擺的刀比箭頭
-         細，放大一點才跟箭頭一樣搶眼。v 是對稱的；u 從柄頭的外緣到刀尖，取那一段的中點對在
-         圓心上，整把刀的外框就置中。 */
-      const q = r * 0.42;
-      const thin = Math.max(1.6, r * 0.07), thick = Math.max(2, r * 0.09);
-      const w = q * 0.17, guard = -q * 0.35, tip = q * 1.08, pommel = -q * 0.93, knob = q * 0.1;
-      const mid = (tip + thin / 2 + pommel - knob - thick / 2) / 2;
-      g.rotate(-Math.PI / 4);
-      g.translate(-mid, 0);
-      g.lineWidth = thin;
-      g.beginPath();                                     // 刀身：兩條刃、斜切的刀尖
-      g.moveTo(guard, -w);
-      g.lineTo(q * 0.78, -w);
-      g.lineTo(tip, 0);
-      g.lineTo(q * 0.78, w);
-      g.lineTo(guard, w);
-      g.closePath();
-      g.stroke();
-      g.lineWidth = thick;
-      g.beginPath();
-      g.moveTo(guard, -q * 0.46);                        // 護手
-      g.lineTo(guard, q * 0.46);
-      g.moveTo(guard, 0);                                // 刀柄
-      g.lineTo(pommel + knob, 0);
-      g.stroke();
-      g.beginPath();                                     // 柄頭
-      g.arc(pommel, 0, knob, 0, TAU);
-      g.stroke();
-    });
+    for (const k of ICONS) {
+      const w = this.iconW[k];
+      if (w > 0.01) this._glyph(ctx, cx, cy - lift, r, rgb, alpha * w, (g) => GLYPHS[k](g, r));
+    }
 
     this._drawDrops(ctx, cx, cy);
   }

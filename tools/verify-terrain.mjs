@@ -2210,6 +2210,7 @@ head('手把');
     dr.down('joy', 1, dr.slotJoy.x + 20, dr.slotJoy.y - 14);
     dr.update(1 / 60); dr.draw();                            // 液化、推著
     dr.down('jmp', 2, dr.slotJmp.x, dr.slotJmp.y);
+    dr.icon = 'give';                                        // 換成交靈魂的圖案（交叉淡換著）
     dr.update(1 / 60); dr.draw();                            // 加上按著跳
     dr.up(1); dr.up(2);
     dr.update(1 / 60); dr.draw();                            // 放開，彈回

@@ -26,7 +26,7 @@ import * as THREE from '../vendor/three.module.js';
 import { toon } from './palette.js';
 import { SURF, surfaceTextures } from './surface.js';
 import { loadZoo } from './critter.js';
-import { Pad } from './pad.js';
+import { Pad, iconOf } from './pad.js';
 import { Hud } from './hud.js';
 import { PHYS, solveXZ, supportInfo, steer } from './walk.js';
 import { makeCam, snapCam, updateCam } from './camera.js';
@@ -197,7 +197,7 @@ function frame(now) {
   fight.draw(dt, camera, player);
   light.update({ dt, now, player, block: ARENA.id, foes: fight.foes.map((f) => f.m) });
   light.render();
-  pad.icon = fight.striking ? 'sword' : 'arrow';
+  pad.icon = iconOf({ striking: fight.striking });
   pad.draw();
 
   fpsAcc += dt; fpsN++; hudAcc += dt;
