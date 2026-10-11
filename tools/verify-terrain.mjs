@@ -77,7 +77,7 @@ import { stone } from '../public/test/src/geom.js';
 import { CAM, makeCam, updateCam } from '../public/test/src/camera.js';
 import { readFileSync } from 'node:fs';
 import { loadZoo, TURN_RATE } from '../public/test/src/critter.js';
-import { Pad, STIR, GIVE, SOUL_OUTLINE, bodySpan } from '../public/test/src/pad.js';
+import { Pad, STIR, GIVE, SOUL_SHAPE, SOUL_OUTLINE, bodySpan } from '../public/test/src/pad.js';
 import { railTier } from '../public/test/src/hud.js';
 import { roomOf, signposts } from '../public/test/src/route.js';
 
@@ -2182,18 +2182,26 @@ head('手把');
   jp.up(9);
 
   /* 交靈魂的圖案：掌心那一條線是水平的；手從右下伸進來，在離圓心 0.9 r 的那一圈切掉，切口剛好在
-     拇指根部的外緣；靈魂浮在手上面 0.08 r、身體的正中對在鍵的直中線上，整顆也在那一圈裡。 */
+     拇指根部的外緣；手釘在原本那一版（托著狗頭）挑出來的位置，換了靈魂也不動。靈魂浮在手上面 0.08 r、
+     身體的正中對在鍵的直中線上，放到最大、整顆剛好還在那一圈裡。 */
   {
     const { hand, soul } = GIVE;
     ok(hand.tilt === 0 && hand.clip === 0.9 && Math.abs(GIVE.rootR - 0.9) < 1e-9 && hand.x > 0 && hand.y > 0,
       '交靈魂的手：掌心水平、從右下伸進來，在 0.9 r 那一圈切在拇指的根部（鍵的邊緣留 0.1 r）',
       `手擺在 (${hand.x.toFixed(2)}, ${hand.y.toFixed(2)})、根部離圓心 ${GIVE.rootR.toFixed(3)} r`);
-    const [bl, br] = bodySpan(), ox = SOUL_OUTLINE.filter((_, i) => i % 2 === 0);
-    ok(Math.abs(soul.body[0] + soul.body[1]) < 1e-9 && bl < Math.min(...ox) + 0.05 && br < Math.max(...ox) - 0.3,
-      '靈魂的身體（往右上拖的尾巴不算）左右正中對在鍵的直中線上',
-      `身體 ${soul.body[0].toFixed(3)}～${soul.body[1].toFixed(3)} r、靈魂擺在 x ${soul.x.toFixed(3)} r`);
-    ok(Math.abs(GIVE.clear - 0.08) < 1e-9 && GIVE.soulReach <= 0.9 + 1e-9 && GIVE.bottom <= 0.9 + 1e-9,
-      '靈魂浮在手上面 0.08 r（都含線寬），靈魂與露出來的手都在 0.9 r 那一圈裡',
+    ok(Math.abs(hand.x - 0.3078217753689113) < 1e-12 && Math.abs(hand.y - 0.42386165518237606) < 1e-12,
+      '交靈魂的手還在原本那個位置（托著狗頭那一版挑出來的），靈魂怎麼換都不動它',
+      `手擺在 (${hand.x}, ${hand.y})`);
+    // 身體那一條水平線只碰到外框兩次（左緣、右緣：只有身體），尾巴整條在它上面。
+    const [bl, br] = bodySpan(), O = SOUL_OUTLINE, oy = O.filter((_, i) => i % 2 === 1);
+    const by = SOUL_SHAPE.body;
+    let cuts = 0;
+    for (let i = 0, j = O.length - 2; i < O.length; j = i, i += 2) if ((O[i + 1] > by) !== (O[j + 1] > by)) cuts++;
+    ok(Math.abs(soul.body[0] + soul.body[1]) < 1e-9 && cuts === 2 && bl < 0 && br > 0 && Math.min(...oy) < by - 1.5,
+      '靈魂的身體（上面的尾巴不算）左右正中對在鍵的直中線上',
+      `身體 ${soul.body[0].toFixed(3)}～${soul.body[1].toFixed(3)} r、靈魂擺在 x ${soul.x.toFixed(3)} r、放大 ${soul.k.toFixed(3)} 倍`);
+    ok(Math.abs(GIVE.clear - 0.08) < 1e-9 && GIVE.soulReach <= 0.9 + 1e-9 && GIVE.soulReach > 0.9 - 1e-6 && GIVE.bottom <= 0.9 + 1e-9,
+      '靈魂浮在手上面 0.08 r（都含線寬），放到最大、剛好整顆在 0.9 r 那一圈裡，露出來的手也在',
       `靈魂擺在 (${soul.x.toFixed(2)}, ${soul.y.toFixed(2)})、空 ${GIVE.clear.toFixed(3)} r、靈魂離圓心最遠 ${GIVE.soulReach.toFixed(3)} r`);
   }
 

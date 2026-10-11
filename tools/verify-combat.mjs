@@ -166,7 +166,7 @@ import { bladeAt } from '../public/test/src/trail.js';
 import { BLEED, LUMP, SPLAT, STYLE, dropSize, dropCount, volumeOf, sizeRange, speedOf, hitFrame, burstFrame, lumpFrame, hurtFrame, spurtOf, floorUnder, splatScale, bleedStep, GATHER } from '../public/test/src/bleed.js';
 import { taken } from '../public/test/src/combat.js';
 import { OFFER, makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, flySoul } from '../public/test/src/offer.js';
-import { iconOf, ICONS, SOUL_SHAPE } from '../public/test/src/pad.js';
+import { iconOf, ICONS, SOUL_SHAPE, bodySpan } from '../public/test/src/pad.js';
 import { readFileSync } from 'node:fs';
 import * as THREE from '../public/test/vendor/three.module.js';
 import { loadZoo } from '../public/test/src/critter.js';
@@ -2988,8 +2988,10 @@ console.log('34. 獻靈魂');
     ok(icon(makeOffer(), altar, pl) === 'arrow', '沒有要收的（戰鬥模式）：國王身邊也是箭頭');
   }
 
-  /* 托著的那一顆是靈魂：實心、一條尾巴，直邊加圓角轉折。外框是一圈（頭尾同一點），中間每一個轉折都
-     倒圓角；只有一個轉折是尖的（圓角最小、夾角最窄）——那一條尾巴的尖，在右上（尾巴往右上拖）。 */
+  /* 托著的那一顆是靈魂：實心、一條尾巴，直直立著，直邊加圓角轉折。外框是一圈（頭尾同一點），中間每一個
+     轉折都倒圓角，而且相鄰兩個圓角不搶同一段直邊（切點離頂點 rad / tan(夾角/2)，兩頭加起來不超過那一段）；
+     只有一個轉折是尖的（夾角不到 45°）——那一條尾巴的尖：整圈最高的那一點，高過身體一大截，左右落在
+     身體那一段裡（尾巴往上衝，不往旁邊拖）。 */
   {
     const P = SOUL_SHAPE.path, mid = P.slice(1, -1);
     const turn = (i) => {
@@ -2998,12 +3000,19 @@ console.log('34. 獻靈魂');
       return Math.acos((u[0] * v[0] + u[1] * v[1]) / Math.hypot(...u) / Math.hypot(...v));
     };
     const angles = mid.map((_, k) => turn(k + 1));
+    const reach = (i) => (i === 0 || i === P.length - 1 ? 0 : P[i][2] / Math.tan(angles[i - 1] / 2));
+    let fits = true;
+    for (let i = 0; i < P.length - 1; i++) {
+      if (reach(i) + reach(i + 1) > Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]) + 1e-9) fits = false;
+    }
     const sharp = angles.filter((a) => a < Math.PI / 4).length;
     const tip = mid[angles.indexOf(Math.min(...angles))];
-    ok(P[0][0] === P[P.length - 1][0] && P[0][1] === P[P.length - 1][1] && mid.every((p) => p[2] > 0)
-      && sharp === 1 && tip[2] === Math.min(...mid.map((p) => p[2])) && tip[0] > 0.5 && tip[1] < -0.5,
-      '交靈魂的圖案上那顆是靈魂：一圈直邊、每個轉折都倒圓角，只有一個尖（一條尾巴，往右上拖）',
-      `${mid.length} 個轉折、尾巴尖在 (${tip[0]}, ${tip[1]})`);
+    const [bl, br] = bodySpan();
+    ok(P[0][0] === P[P.length - 1][0] && P[0][1] === P[P.length - 1][1] && mid.every((p) => p[2] > 0) && fits
+      && sharp === 1 && tip[1] === Math.min(...mid.map((p) => p[1])) && tip[1] < SOUL_SHAPE.body - 1.5
+      && tip[0] > bl && tip[0] < br,
+      '交靈魂的圖案上那顆是靈魂：一圈直邊、每個轉折都倒圓角，只有一個尖（一條尾巴，在最上面、往上衝）',
+      `${mid.length} 個轉折、尾巴尖在 (${tip[0]}, ${tip[1]})、身體 ${bl.toFixed(2)}～${br.toFixed(2)}`);
   }
 }
 
