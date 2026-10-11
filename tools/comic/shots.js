@@ -151,11 +151,11 @@ export const SHOTS = [
     horizon: 0.8,
     bg: [
       { piece: 'pavilion', R: 1.9, h: 1.45, roof: 1.25, x: 1.06, y: 0.82, size: 0.46 },
-      { piece: 'weaponRack', spears: false, shields: false, dash: [{ rack: false, spears: 3, spearScale: 2.2 }, { rack: false, shields: 1 }], x: 0.86, y: 1.012, size: 0.6 },
+      { piece: 'weaponRack', spears: false, shields: false, dash: [{ rack: false, spears: 3, spearScale: 2.2 }, { rack: false, shields: 1 }], x: 0.83, y: 1.055, size: 0.65 },
     ],
-    marks: { at: [0.86, 0.43], angle: -1.3, spread: 0.55, inner: 0.1, len: 0.11, width: 0.035 },
+    marks: { at: [0.83, 0.44], angle: -1.3, spread: 0.55, inner: 0.1, len: 0.11, width: 0.035 },
     cast: [{ who: 'hero', at: [0, 0], yaw: -0.45, move: DROWSY, face: 'tired' }],
-    cam: { focus: 'hero', yaw: -0.8, pitch: -0.08, dist: 1.0, fov: 32, frame: [-0.12, 0.08] },
+    cam: { focus: 'hero', yaw: -0.8, pitch: -0.08, dist: 1.0, fov: 32, frame: [-0.1825, 0.08] },
     light: [-3, 6, 6],
   },
   {
