@@ -51,6 +51,7 @@ import { Crown } from '/test/src/crown.js';
 import { Helm } from '/test/src/helm.js';
 import { ShieldRing } from '/test/src/shield.js';
 import { SoulLook } from '/test/src/soul.js';
+import { Blood } from '/test/src/blood.js';
 import { makeMonsterCritter, sizeOf, GHOST_ALPHA } from '/test/src/monster.js';
 import { Blade } from '/test/src/blade.js';
 import * as Pieces from '/test/src/pieces.js';
@@ -315,6 +316,23 @@ function placeSouls(list) {
       Math.random = keep;
     }
   });
+}
+
+/* ── 幽靈血：靈質的血滴（blood.js 的 ecto），3D ──────────────────────
+   [{ at: [x, y, z], r, v: [vx, vy, vz] }]：一滴一滴擺好，不讓它飛——跟遊戲同一種畫法（融在一起的半透明白、
+   墨線），r 是半徑（公尺），v 是那一滴在飛的方向與快慢，只拿來照遊戲那樣順著它拉長一點（沒給就是一顆圓的）。
+   場那一步要先照這一格的鏡頭畫，所以在 aim 之後、拍之前擺。 */
+let blood = null;
+const OPEN = { arena: { shape: 'circle', x: 0, z: 0, r: Infinity }, cols: [] };
+function placeEcto(list, ink, h) {
+  if (!list?.length) { blood?.clear(); return; }
+  blood ??= new Blood(scene, renderer);
+  blood.clear();
+  blood.setInkPx(ink, h);
+  blood.spurt(list.map(({ at: [x, y, z], r, v = [0, 0, 0] }) => ({
+    x, y, z, r, vx: v[0], vy: v[1], vz: v[2], style: 'ecto',
+  })), OPEN);
+  blood.step(0, camera);
 }
 
 /* ── 背景：照構圖拼貼的剪影，2D ───────────────────────────────────
@@ -1076,9 +1094,9 @@ const sheetG = sheet.getContext('2d');
 
 /**
  * 拍一組角色：擺好 view.cast、照 view.cam 對好鏡頭、用 view.light 打光，拍下來過一次網點，
- * 回傳那一張（透明的離屏畫布）與要畫上去的表情。props、souls 只有主畫面有。
+ * 回傳那一張（透明的離屏畫布）與要畫上去的表情。props、souls、ecto 只有主畫面有。
  */
-function shoot(view, w, h, ink, { props, souls } = {}) {
+function shoot(view, w, h, ink, { props, souls, ecto } = {}) {
   renderer.setSize(w, h, false);
   camera.fov = view.cam.fov;
   camera.aspect = w / h;
@@ -1103,6 +1121,7 @@ function shoot(view, w, h, ink, { props, souls } = {}) {
   aim(view.cam, w, h, (name) => cast.find(([s]) => (s.name ?? s.who) === name)?.[1]);
   placeSouls(souls);
   scene.updateMatrixWorld(true);
+  placeEcto(ecto, ink, h);
   const faces = [];
   for (const [spec, a] of cast) {
     if (spec.face) faces.push([spec.face, eyeAnchors(a.c, w, h, spec.eyes)]);
@@ -1133,7 +1152,7 @@ function render(id) {
      成立的視角（四個角落各一個俯視）在漫畫裡拼在一起，製造張力。每一組 { cast, cam, light, front }，
      預設疊在主畫面底下，front 的疊在上面。 */
   const collage = (shot.collage || []).map((v) => ({ ...shoot(v, w, h, shot.ink), front: !!v.front }));
-  const main = shoot(shot, w, h, shot.ink, { props: shot.props, souls: shot.souls });
+  const main = shoot(shot, w, h, shot.ink, { props: shot.props, souls: shot.souls, ecto: shot.ecto });
   sheet.width = w;
   sheet.height = h;
   sheetG.clearRect(0, 0, w, h);
