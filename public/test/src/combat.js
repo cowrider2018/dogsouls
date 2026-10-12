@@ -654,8 +654,8 @@ export const attacking = (m) => !busy(m)
  */
 export const armored = (m) => attacking(m) && (m.cast ? !m.cast.frail : !!kindOf(m).steady);
 
-/** 這一下打在牠身上實際扣幾點：放招倒數中（armored）減半、無條件捨去。hurt 扣的就是這一份。 */
-export const taken = (m, dmg) => (armored(m) ? Math.floor(dmg / 2) : dmg);
+/** 這一下打在牠身上實際扣幾點：放招倒數中（armored）減半、無條件進位。hurt 扣的就是這一份。 */
+export const taken = (m, dmg) => (armored(m) ? Math.ceil(dmg / 2) : dmg);
 
 /**
  * 扣血，並累積破防。扣到 0 就死：記一次，當場回到牠自己的重生點重生——
@@ -667,8 +667,8 @@ export const taken = (m, dmg) => (armored(m) ? Math.floor(dmg / 2) : dmg);
  *
  * 破防窗口開著的時候不累積——門檻已經到了，窗口用掉或錯過之後才從 0 重算。
  *
- * 放招倒數中（armored）傷害減半、無條件捨去（血是整數）：1 → 0、2 → 1、3 → 1、
- * 5 → 2。破防累積的是**實際扣掉**的那一份。
+ * 放招倒數中（armored）傷害減半、無條件進位（血是整數）：1 → 1、2 → 1、3 → 2、
+ * 5 → 3——減半的那一下也一定扣得到血。破防累積的是**實際扣掉**的那一份。
  *
  * 還有下一條命的（KINDS 的 `lives`）扣到 0 不算死：開始站起來（RALLY），回 false。站起來的時候
  * （spared）什麼都不扣。

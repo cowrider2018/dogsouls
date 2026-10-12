@@ -44,7 +44,7 @@
                     倒數裡橫移一步就躲得掉。跳砸：倒數 1.5 秒、最後 0.6 秒起跳、
                     落在鎖定的點上打半徑 2.5 狗高的一圈，走出圈外或跳起來就躲得過。
                     扇形：倒數 1 秒、朝鎖定的方向打 60°、4 狗高長的一片。三招都
-                    挑得到；球不限距離，跳砸 6.9 公尺、扇形 3.68 公尺以內才放。倒數中打不退、傷害減半無條件捨去，破防攻擊打斷得了。
+                    挑得到；球不限距離，跳砸 6.9 公尺、扇形 3.68 公尺以內才放。倒數中打不退、傷害減半無條件進位，破防攻擊打斷得了。
                     出招後僵直 0.5 秒：站著不動、打得退、傷害照算。
     16. 衝刺        碰到不再有事，傷害是一次一次的衝刺：追到 1.8 公尺以內停下來
                     蓄力 0.25 秒，朝那時鎖定的方向衝（16 → 0，0.25 秒，2.0 公尺，
@@ -645,8 +645,8 @@ console.log('12. 破防攻擊');
   // 接在連段後面：牠身上已經累積了一些（上一輪打的），牠衝完僵直在面前、第一段自動、
   // 視窗裡按第二段——累積到 8、破防發生在第二段的空中，窗口裡再按一次跳，在空中
   // 發動破防攻擊。第一段把牠挑開之後牠落地就再衝過來，第二段打在牠衝刺中（不可打斷），
-  // 傷害減半：3 → 1。
-  const RISE_TAKEN = Math.floor(DAMAGE.rise / 2);
+  // 傷害減半、無條件進位：3 → 2。
+  const RISE_TAKEN = Math.ceil(DAMAGE.rise / 2);
   {
     const q = { x: 0, y: 0, z: SPAWN.player.z, vx: 0, vy: 0, vz: 0, grounded: true, aimX: 0, aimZ: -1 };
     const n = recovering(q);
@@ -847,13 +847,13 @@ console.log('15. 殭屍王放招');
   ok(armored(bi) && !bi.air && bi.vx === 0 && bi.vz === 0 && bi.vy === 0 && bi.hits === 1, '倒數中被打：算打中，但打不退');
   for (let i = 0; i < 90; i++) { bossStep(bi, DT, p, wi, () => 0); if (wi.shots.length) break; monsterStep(bi, DT, p); }
   ok(wi.shots.length === 1 && near(bi.x, bx) && near(bi.z, bz), '倒數照走，球照樣射出去，牠沒挪一步');
-  // 倒數中的傷害：減半、無條件捨去；破防累積的是實際扣掉的。
+  // 倒數中的傷害：減半、無條件進位；破防累積的是實際扣掉的。
   const ba = bossAt(0, -4);
   ba.castT = 0;
   bossStep(ba, DT, p, makeWorld(), () => 0.5);
   const hp1 = ba.hp;
   const took = [DAMAGE.slash, DAMAGE.slam, DAMAGE.rise, DAMAGE.break].map((d) => { const h = ba.hp; hurt(ba, d); return h - ba.hp; });
-  ok(took.join() === '0,1,1,2' && hp1 - ba.hp === 4 && ba.gauge === 4, `倒數中挨 1、2、3、5：實際扣 ${took.join('、')}，破防累積 ${ba.gauge}`);
+  ok(took.join() === '1,1,2,3' && hp1 - ba.hp === 7 && ba.gauge === 7, `倒數中挨 1、2、3、5：實際扣 ${took.join('、')}，破防累積 ${ba.gauge}`);
   // 破防攻擊打斷得了：被定住的那一刻起這一招就取消。
   const wh = makeWorld();
   const bh = bossAt(0, -4);
@@ -1088,7 +1088,7 @@ console.log('16. 衝刺');
       const h = m.hp; knock(m, 0, 0, 0, -1); hurt(m, DAMAGE.rise); hurtTook = h - m.hp;
     }
   });
-  ok(firm.dashAt > 0 && !firm.m.air && hurtTook === 1, '殭屍王蓄力的時候被打：打不退、第二段的 3 只扣 1，照樣衝');
+  ok(firm.dashAt > 0 && !firm.m.air && hurtTook === 2, '殭屍王蓄力的時候被打：打不退、第二段的 3 只扣 2，照樣衝');
   // 殭屍王衝完之後的發呆不是蓄力：打得退、傷害照算。
   const loose = makeMonster({ kind: 'boss', x: 0, z: -4, yaw: 0 });
   loose.lunge = { t: LUNGE.windup + LUNGE.time + 0.1, dirX: 0, dirZ: 1 };
@@ -1775,11 +1775,11 @@ console.log('23. 噴血');
   ok(Math.abs(heroDrops.reduce((x, o) => x + o.r ** 3, 0) / volumeOf(1) - 1) < 1e-9 && heroDrops.every((o) => o.style === 'blood'),
     '主角跟狗一樣大（體型 1），噴的是血');
 
-  // 蓄力中扣 0 點：不噴。
+  // 蓄力中減半、無條件進位：每一下都扣得到，都噴。
   const armoredBoss = makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 });
   armoredBoss.cast = { skill: 'orb', t: 0 };
-  ok(taken(armoredBoss, DAMAGE.slash) === 0 && taken(armoredBoss, DAMAGE.rise) === 1 && taken(makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 }), DAMAGE.slash) === 1,
-    '實際扣幾點（taken）：蓄力中第一段扣 0——不噴');
+  ok(taken(armoredBoss, DAMAGE.slash) === 1 && taken(armoredBoss, DAMAGE.rise) === 2 && taken(makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 }), DAMAGE.slash) === 1,
+    '實際扣幾點（taken）：蓄力中第一段也扣 1——減半進位，不會是 0');
 
   // 落地：點的地板；落到盒頂變一灘；撞進盒子側面就沒了。
   const field = { arena: { shape: 'circle', x: 0, z: 0, r: 20 }, cols: [{ kind: 'block', min: [2, 0, -1], max: [3, 0.5, 1], base: 0 }] };
