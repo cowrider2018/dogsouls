@@ -1229,10 +1229,11 @@ export const breaking = (c) => BREAKING.has(c.phase);
 export const invulnerable = (c) => c.phase === 'leap' || breaking(c);
 
 /**
- * 玩家現在打不中：無敵的招式（invulnerable），或剛挨過一下、guard 還開著。
+ * 玩家現在打不中：無敵的招式（invulnerable），或剛挨過一下、guard 還開著，或開了
+ * 無敵開關（`p.god`，完整流程模式左邊面板那一顆）。
  * 「碰到算不算」（fight.js）與畫面上的金色墨線都從這一個來，所以不會對不上。
  */
-export const untouchable = (c, p) => invulnerable(c) || p.guard > 0;
+export const untouchable = (c, p) => invulnerable(c) || p.guard > 0 || !!p.god;
 
 /** 現在按跳會不會接下一段（給畫面提示用）。 */
 export const cueing = (c) => (c.phase === 'rest' && c.t >= WINDOW[0] && c.t <= WINDOW[1]) || c.phase === 'air';

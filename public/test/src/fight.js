@@ -842,8 +842,8 @@ export class Fight {
       this._stomps.push(st);
       if (st.shape === 'circle') this._quiet.add(m);
     }
-    // 國王瞪下去（skills.js 的 glare）：主角靈魂出竅（combat.js 的 daze，不扣血）。無敵的時候（第三段、破防攻擊）瞪不到。
-    for (const st of strikes) if (st.shape === 'glare' && !invulnerable(combo)) daze(player, st.x, st.z);
+    // 國王瞪下去（skills.js 的 glare）：主角靈魂出竅（combat.js 的 daze，不扣血）。無敵的時候（第三段、破防攻擊、無敵開關）瞪不到。
+    for (const st of strikes) if (st.shape === 'glare' && !invulnerable(combo) && !player.god) daze(player, st.x, st.z);
     wavesStep(this.world, dt);
     this._rumble(dt);
     // 召喚：倒數完的上場（這一幀起就追人）；剛開始倒數的借外觀，準備從地底升上來。

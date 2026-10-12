@@ -395,6 +395,13 @@ const SILENT = { flash() {}, paint() {}, tick() {}, fit() {} };
 const hud = GAME ? SILENT : new Hud({
   zoo, blocks: STAGES, onLook: looks.setLook, onHat: looks.toggleHat,
   onBlock: (id) => startFrom(STAGES.findIndex((s) => s.id === id)),
+  /* 無敵開關（combat.js 的 untouchable）：記在 player 上，重玩、倒下都不動它。 */
+  god: () => !!player.god,
+  onGod: () => {
+    player.god = !player.god;
+    hud.flash(player.god ? '主角無敵' : '主角恢復正常');
+    hud.paint();
+  },
 });
 const pad = new Pad(document.getElementById('pad'));
 const controls = new Controls(canvas, pad, cam, (k, e) => {

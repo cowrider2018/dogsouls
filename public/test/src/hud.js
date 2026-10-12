@@ -40,6 +40,10 @@
    一部分——伺服器不認得服裝，`looks.js` 也不管它，所以它在表格外面、
    自己一行。
 
+   帽子底下可以再一行「無敵」（給了 `onGod` 才有，完整流程模式用）：開著的時候主角
+   什麼都打不到（combat.js 的 untouchable）。它不是外觀，但開發時跟換裝一樣是「調主角」
+   的事，所以跟帽子放在同一塊。
+
    ── 這支只碰 DOM ─────────────────────────────────────────────────
    選了什麼由 callback 往外送，面板不知道場景長什麼樣，也不碰 zoo 以外
    的任何東西。狀態的唯一來源是 zoo 與模式的主程式，`paint()` 只是把那個狀態
@@ -66,6 +70,8 @@ export class Hud {
    *   onLook   選了某個 look
    *   onBlock  選了某個區塊 id
    *   onHat    切帽子
+   *   onGod    切主角無敵（可省；沒給就沒有那一顆）
+   *   god      () => 主角現在是不是無敵（給了 onGod 才要）
    */
   constructor(o) {
     this.o = o;
@@ -137,6 +143,12 @@ export class Hud {
     this.hatBtn.className = 'wide';
     this.hatBtn.onclick = () => this.o.onHat();
     this.el.hat.appendChild(this.hatBtn);
+    if (this.o.onGod) {
+      this.godBtn = document.createElement('button');
+      this.godBtn.className = 'wide';
+      this.godBtn.onclick = () => this.o.onGod();
+      this.el.hat.appendChild(this.godBtn);
+    }
 
     /* ── 地形 ── */
     this.blockBtns = new Map();
@@ -172,6 +184,11 @@ export class Hud {
     if (this.el.lookName) this.el.lookName.textContent = lookInfo(this.zoo.look).name;
     this.hatBtn.textContent = this.zoo.hatOn ? '帽子：戴著' : '帽子：脫掉';
     this.hatBtn.classList.toggle('on', this.zoo.hatOn);
+    if (this.godBtn) {
+      const god = this.o.god();
+      this.godBtn.textContent = god ? '無敵：開' : '無敵：關';
+      this.godBtn.classList.toggle('on', god);
+    }
     if (state.block) {
       for (const [id, b] of this.blockBtns) b.classList.toggle('on', id === state.block);
       const blk = this.o.blocks.find((x) => x.id === state.block);

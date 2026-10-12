@@ -245,6 +245,8 @@
   }
   /* 標題、帽子、地形的提示都固定；會捲的只有表格與統計。 */
   .panel h2, #hat-row, #terrain, #terrain-hint, #keys, #stats { flex: 0 0 auto; }
+  /* 帽子底下可能還有一顆無敵（完整流程模式）：一顆一行。 */
+  #hat-row { display: flex; flex-direction: column; gap: 3px; }
   /* 規則說明很長，面板裝不下的時候只有它自己捲。 */
   #rules { flex: 1 1 auto; min-height: 0; overflow-y: auto; touch-action: pan-y;
     font-size: 9px; color: var(--muted); line-height: 1.4; }
