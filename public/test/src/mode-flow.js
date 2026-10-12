@@ -245,6 +245,7 @@ function place(at) {
   player.x = at.x; player.y = at.y + 0.2; player.z = at.z;
   player.vx = player.vy = player.vz = 0;
   player.grounded = false;
+  player.daze = null;
   player.aimX = Math.sin(at.yaw); player.aimZ = Math.cos(at.yaw);
   player.block = at.block;
   cam.yaw = at.yaw;
@@ -450,8 +451,9 @@ function frame(now) {
   if (hint && !byAltar) hud.flash('長按跳，把靈魂交給國王');
   byAltar = hint;
   if (!death.busy) fight.lead(dt, player, pressed && !sliding && !altar);
-  // 被擊退的那一段（combat.js 的 knockHero）也不操控：照那一下的速度飛，落地才還回來。
-  if (!fight.breaking && !player.knocked) steerHero(player, dt, controls, input);
+  // 被擊退的那一段（combat.js 的 knockHero）也不操控：照那一下的速度飛，落地才還回來。被國王瞪得
+  // 靈魂出竅（daze）也是：照被吸過去的速度走，時間到才還回來。
+  if (!fight.breaking && !player.knocked && !player.daze) steerHero(player, dt, controls, input);
   const portals = passable;
   const speed = fight.spinning ? 0 : moveHero(player, dt, COLS, portals, doors);
 

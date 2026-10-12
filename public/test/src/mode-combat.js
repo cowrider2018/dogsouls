@@ -98,6 +98,7 @@ function resetStance() {
   player.x = s.x; player.y = 0; player.z = s.z;
   player.vx = player.vy = player.vz = 0;
   player.grounded = true;
+  player.daze = null;
   player.aimX = Math.sin(s.yaw); player.aimZ = Math.cos(s.yaw);
   cam.yaw = s.yaw;
   snapCam(cam, player.x, player.z);
@@ -143,8 +144,9 @@ function frame(now) {
 
   /* 操控。破防攻擊裡不操控：突進與跳離是拋物線，迴旋的位置由 spinStep 擺——
      steer 會把速度投影到搖桿的方向上，那一投影就把突進的速度吃掉了。被擊退的那一段
-     （combat.js 的 knockHero）也一樣：照那一下的速度飛，落地才還回來。 */
-  if (!fight.breaking && !player.knocked) {
+     （combat.js 的 knockHero）也一樣：照那一下的速度飛，落地才還回來。被國王瞪得靈魂出竅（daze）
+     也是：照被吸過去的速度走，時間到才還回來。 */
+  if (!fight.breaking && !player.knocked && !player.daze) {
     const aim = controls.aim(input);
     if (aim) [player.aimX, player.aimZ] = aim;
     [player.vx, player.vz] = steer(player.vx, player.vz, player.aimX, player.aimZ, speedFor(input), dt);

@@ -68,7 +68,7 @@
               reapGround  對地：落地 gap 秒後在地上轉，轉完緊接著上挑、升到頂點。
             三下之間沒有僵直，最後一下打完才僵直 0.75 秒（甩頭），停在半空中。
 
-   國王的招（第二條命不再召喚，KINDS 的 `rage`）：
+   國王的招（第二條命不再召喚、多了瞪視，KINDS 的 `rage`）：
 
      hew    直線劈砍（不限距離）。牠腳下出現一條往鎖定方向一直延伸到黑牆的紅色長條
             （寬 0.8 個狗高），倒數 0.5 秒；然後站在原地往前劈：劍長（跟騎士跳砍劈的那一條
@@ -96,6 +96,10 @@
             不擋）的那一段停在那裡，其他的照走，一直到黑牆。哪一段會被什麼擋下，挑這一招的那一刻就
             算好了（occlude.js 的 shadeOf，精確的）：預告的淡紅照它挖掉擋住的地方，留下斬痕也照它。
             一招只打得到一次：被轉的那一下打到的，熱氣流就不再算。出招後僵直 0.5 秒（甩頭）。
+     glare  瞪視（只有第二條命，不限距離）。蓄力 0.75 秒：一直轉向主角瞪著（眼睛發光，fight.js）；
+            蓄力完的那一刻瞪下去，主角靈魂出竅 0.5 秒（combat.js 的 DAZE）：操作全部停下，被往國王那一邊
+            吸過去半個狗高。這 0.5 秒國王還是一直瞪著、不放別的招，瞪完才僵直（SKILL.recover）。不扣血；
+            主角無敵的時候（第三段、破防攻擊）瞪不到。
 
    範圍攻擊照畫面上看得到的東西判，不是一次打完貼地的一片：
 
@@ -119,7 +123,7 @@
    ------------------------------------------------------------------ */
 
 import { PHYS, arenaGap, supportInfo, overlapXZ, roundTop, clampArena } from './walk.js';
-import { FIELD, DOG_H, REACH, SWING, STILL, kindOf, busy, walkTo, inFan } from './combat.js';
+import { FIELD, DOG_H, REACH, SWING, STILL, DAZE, kindOf, busy, walkTo, inFan } from './combat.js';
 import { QUAKE, quakeTop } from './dust.js';
 import { hullOf, TRAILS } from './trail.js';
 import { shadeOf, reachAt, farthestOf } from './occlude.js';
@@ -182,6 +186,9 @@ export const SKILL = {
     windup: 1, radius: 2.2 * DOG_H, waist: 0.7 * DOG_H, spin: TRAILS.slam.t1, swing: SWING, damage: 5, recover: STILL.before + 0.25 + STILL.after,
     wave: { speed: 20, damage: 2, half: 0.1 * DOG_H },
   },
+  /* 國王第二條命的瞪視：蓄力 windup 秒（一直轉向主角瞪著），瞪下去的那一刻主角靈魂出竅 hold 秒
+     （combat.js 的 DAZE：操作停下、被吸過來），這段時間牠一直瞪著，瞪完才收招。不扣血。 */
+  glare: { windup: 0.75, hold: DAZE.time },
   /** 出招後僵直幾秒（那一招沒有自己的 `recover` 的話）。 */
   recover: 0.5,
 };
@@ -479,6 +486,19 @@ const CAST = {
     }
     if (s > S.swing) return null;
     return { shape: 'capsule', x: m.x, y: m.y, z: m.z, x1: m.x, z1: m.z, r: S.radius, waist: m.y + S.waist, dmg: S.damage, wave: c.wave };
+  },
+
+  /* 一直轉向主角瞪著（身體跟著主角現在的位置轉）。蓄力完的那一幀瞪下去：回傳 glare（fight.js 讓主角
+     靈魂出竅，combat.js 的 daze），只這一幀；之後再瞪 hold 秒才收招，這段時間不放別的招。 */
+  glare(m, world, target) {
+    const c = m.cast, S = SKILL.glare;
+    const dx = target.x - m.x, dz = target.z - m.z, d = Math.hypot(dx, dz);
+    if (d > 1e-6) { m.aimX = c.dirX = dx / d; m.aimZ = c.dirZ = dz / d; }
+    if (c.t < S.windup) return null;
+    if (c.t >= S.windup + S.hold) { m.cast = null; return null; }
+    if (c.stared) return null;
+    c.stared = true;
+    return { shape: 'glare', x: m.x, y: m.y, z: m.z, dmg: 0 };
   },
 
   /* 倒數的時候站著；倒數完每一個點上場一隻（面向玩家被鎖定的那一點），交給呼叫端接上場。

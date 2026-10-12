@@ -34,7 +34,7 @@ import {
   FIELD, REACH, KNOCK_SCALE, DAMAGE, KINDS, BREAK_WINDOW, hurt, makeMonster, harm, lifeStep, gainHeart,
   dropSoul, soulStep, grabs, bankSouls,
   breaking, broken, breakTarget, startBreak, breakContact, contact, parry, spinStep, separate, placeMonster, monsterStep, bites, knock,
-  knockHero, knockLand,
+  knockHero, knockLand, daze, dazeStep,
   inSlash, inFan, inRing, slashTip, makeCombo, comboStep, invulnerable, untouchable, cueing, attacking, taken, spared, rallied,
 } from './combat.js';
 import { makeMonsterCritter, sizeOf, bloodOf, swordOf, helmOf, crownOf, riseLift, Motion, ATTACK_INK, CHOP_LEAD } from './monster.js';
@@ -756,7 +756,8 @@ export class Fight {
    */
   lead(dt, player, pressed) {
     const combo = this.combo;
-    if (player.knocked) pressed = false;   // 被擊退、還在空中：不能跳（combat.js 的 knockHero）
+    // 被擊退、還在空中（combat.js 的 knockHero）、被國王瞪得靈魂出竅（daze）：不能跳。
+    if (player.knocked || player.daze) pressed = false;
     const target = breakTarget(player, this.foes.map((f) => f.m));
     const act = comboStep(combo, dt, {
       pressed, grounded: player.grounded, near: this.foes.some((f) => inSlash(this.body(player), f.m)),
@@ -793,6 +794,7 @@ export class Fight {
     const open = new Set(foes.filter(({ m }) => broken(m)).map(({ m }) => m));
     lifeStep(player, dt);
     knockLand(player);
+    dazeStep(player, dt);
     // 每一隻召喚出來、還在場上的有幾隻（召喚挑不挑得到、召幾隻看它，skills.js）。
     for (const { m } of foes) m.brood = 0;
     for (const { m } of foes) if (m.by) m.by.brood++;
@@ -824,6 +826,8 @@ export class Fight {
       this._stomps.push(st);
       if (st.shape === 'circle') this._quiet.add(m);
     }
+    // 國王瞪下去（skills.js 的 glare）：主角靈魂出竅（combat.js 的 daze，不扣血）。無敵的時候（第三段、破防攻擊）瞪不到。
+    for (const st of strikes) if (st.shape === 'glare' && !invulnerable(combo)) daze(player, st.x, st.z);
     wavesStep(this.world, dt);
     this._rumble(dt);
     // 召喚：倒數完的上場（這一幀起就追人）；剛開始倒數的借外觀，準備從地底升上來。

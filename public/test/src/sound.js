@@ -55,6 +55,7 @@ export const CUES = {
   strip: ['slash', 0.75, 0.9],     // 跳砍劈下去、國王的直劈
   fan: ['slash', 1.1, 0.9],        // 跳砍之後的上挑
   capsule: ['whirl', 0.9, 0.9],    // 劍迴旋衝刺
+  glare: ['sparkle', 0.55, 0.9],   // 國王瞪下去（主角靈魂出竅）
 };
 
 /** 總音量。 */

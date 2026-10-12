@@ -156,6 +156,8 @@
                     落地（球底貼地），停一幀才炸掉；站著不動三顆都中，吐出去之後走開就躲得掉；吐完第三顆才僵直。
     40. 國王的第二條命  不再召喚（第一條命照樣召喚）。劈砍是下劈後上挑：劈下去那一刻才瞄第二刀，0.25 秒後
                     原地起跳、受重力落回，扇形半徑是劍長、跳起來躲不掉，起跳推出第二道氣流；落地才僵直。
+                    瞪視（只有第二條命）：蓄力 0.75 秒一直轉向主角，瞪下去一次（不扣血），再瞪 0.5 秒才收招；
+                    主角操作停 0.5 秒、被往國王吸過去半個狗高。
    ------------------------------------------------------------------ */
 
 import { PHYS } from '../public/test/src/walk.js';
@@ -165,7 +167,7 @@ import {
   FLY, BREAK_ATK, breaking, breakTarget, startBreak, breakContact, latch, contact, parry, spinStep, separate, armored, attacking,
   makeMonster, monsterStep, touching, bites, knock, inSlash, inFan, inRing, slashTip, fanFrame,
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
-  SOUL, dropSoul, soulStep, grabs, bankSouls,
+  SOUL, dropSoul, soulStep, grabs, bankSouls, DAZE, daze, dazeStep, knockHero,
 } from '../public/test/src/combat.js';
 import { SKILL, RAGE, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill } from '../public/test/src/skills.js';
 import { steer } from '../public/test/src/walk.js';
@@ -3360,6 +3362,44 @@ console.log('40. 國王的第二條命');
     const k1 = king(1), w1 = makeWorld();
     for (let i = 0; i < 60; i++) bossStep(k1, DT, body(0, 2), w1, () => 0);
     ok(w1.gusts.length === 1 && !k1.cast, '第一條命：劈一刀就收');
+  }
+
+  // 瞪視：只有第二條命；蓄力 0.75 秒一直轉向主角，瞪下去一次，再瞪 0.5 秒才收招。
+  {
+    const S = SKILL.glare;
+    ok(skillsOf(king(2)).includes('glare') && !skillsOf(king(1)).includes('glare') && picked(2).includes('glare'), '瞪視只有第二條命挑得到');
+    ok(S.windup === 0.75 && S.hold === DAZE.time && DAZE.time === 0.5 && near(DAZE.pull, 0.5 * DOG_H), '蓄力 0.75 秒，靈魂出竅 0.5 秒、吸過去半個狗高');
+    const w = makeWorld(), m = king(2, 0, -4), q = body(0, 2), mo = new Motion();
+    const looks = [], stares = [], stages = new Set();
+    let t = 0, stunAt = -1, other = false;
+    while (t < 3 && stunAt < 0) {
+      q.x = 2 * Math.sin(t * 3);                             // 主角一直左右跑
+      const st = bossStep(m, DT, q, w, () => 0.99);           // 0.99：glare（rage 的最後一招）
+      if (m.cast && m.cast.skill !== 'glare') other = true;
+      if (st) stares.push({ st, t });
+      if (m.cast) looks.push(Math.abs(Math.atan2(m.aimX, m.aimZ) - Math.atan2(q.x - m.x, q.z - m.z)));
+      monsterStep(m, DT, q);
+      stages.add(mo._stage(m)[0]);
+      if (stunAt < 0 && !m.cast && m.stun > 0) stunAt = t;
+      t += DT;
+    }
+    ok(stares.length === 1 && stares[0].st.shape === 'glare' && stares[0].st.dmg === 0 && Math.abs(stares[0].t - S.windup) < 2 * DT,
+      `蓄力 ${stares[0]?.t.toFixed(2)} 秒之後瞪下去一次，不扣血`);
+    ok(Math.max(...looks) < 1e-9, '蓄力與瞪著的時候一直轉向主角現在的位置');
+    ok(!other && Math.abs(stunAt - S.windup - S.hold) < 2 * DT && near(m.stun, SKILL.recover - DT, 1e-6), '瞪完 0.5 秒才收招、才僵直，這段時間不放別的招');
+    ok(['glareWind', 'glareRec'].every((s) => stages.has(s)), '動作是 glareWind → glareRec');
+    // 主角被瞪：照模式的順序（操作停下、照速度走、再推進 DAZE），往國王那一邊吸過去半個狗高，0.5 秒後還回來。
+    const p = { x: 0, y: 0, z: 2, vx: 3, vy: 0, vz: 0, aimX: 0, aimZ: 1 };
+    daze(p, 0, -4);
+    let u = 0;
+    while (p.daze && u < 2) { p.x += p.vx * DT; p.z += p.vz * DT; dazeStep(p, DT); u += DT; }
+    ok(Math.abs(2 - p.z - DAZE.pull) < 0.005 && near(p.x, 0) && Math.abs(u - DAZE.time) < 2 * DT && p.vx === 0 && p.vz === 0,
+      `往國王吸過去 ${(2 - p.z).toFixed(3)} 公尺（原本的速度丟掉），${u.toFixed(2)} 秒後停下、操作還回來`);
+    const k = { x: 0, y: 0, z: 2, vx: 0, vy: 0, vz: 0, aimX: 0, aimZ: 1 };
+    daze(k, 0, -4);
+    knockHero(k, 1, 0);
+    dazeStep(k, DT);
+    ok(k.daze && k.vx > 0 && k.vz === 0, '中途被打飛：照擊退飛，不再吸，操作一樣停著');
   }
 }
 

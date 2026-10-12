@@ -106,6 +106,8 @@
             起來那一下縮成一團、往右擰到底（照 1 秒拉長）；轉的時候是主角落地那一下整隻往左轉一圈，
             劍水平伸在外面掃過去（galeSpin，0.4 秒轉完）；0.5 秒的僵直是甩頭（衝刺僵直那一套甩，
             不先低頭）：停在轉完的那個姿勢 STILL.before 秒，然後一邊甩一邊回到原本的樣子，再 STILL.after 秒沒有動作。劍光是主角第三擊那一道（fight.js）。
+     glare  瞪視（第二條命）：低頭、壓低身子、尾巴垂下去，從眉毛底下往上瞪著主角（頭跟著主角轉，LOOK），
+            越蓄越低；瞪下去的那一刻頭往前一頂，之後停在那裡一直瞪到收招，僵直裡慢慢回到原本的樣子。
 
    ── 會飛的漂 ──────────────────────────────────────────────────────
    會飛的（幽靈）一直是空中姿勢、不走路，所以移動的時候另外常駐一套漂（DRIFT）：
@@ -359,6 +361,13 @@ const SPIN_END = (() => {
   return { ...pose, yaw: pose.yaw - 2 * Math.PI };
 })();
 
+/* ── 瞪視 ── 蓄力壓低到 GLARE，瞪下去的那一刻頭往前一頂（GLARE_HIT）。 */
+const GLARE = {
+  pitch: 0.10, headPitch: 0.32, drop: 0.06, tailPitch: -0.35,
+  front: -0.12, hind: -0.18, knee: -0.30, legs: 0.6, w: 1,
+};
+const GLARE_HIT = { ...GLARE, pitch: 0.18, headPitch: 0.18, drop: 0.03 };
+
 /** 跳砸站著蓄力的那一段有多長（之後 SKILL.leap.air 秒在飛）。 */
 const LEAP_WIND = SKILL.leap.windup - SKILL.leap.air;
 
@@ -390,7 +399,7 @@ const retime = (mv, T) => {
 /**
  * 頭跟著主角轉：哪幾段要盯（值是盯多用力）、多快轉過去與放掉（秒）、最多轉多少（弳）。
  */
-const LOOK = { stages: { coneWind: 1, leapWind: 1 }, tau: 0.12, max: 1.0 };
+const LOOK = { stages: { coneWind: 1, leapWind: 1, glareWind: 1 }, tau: 0.12, max: 1.0 };
 
 /**
  * 怪物的每一套動作（moves.js 的 MOVES 那一種寫法），鍵就是 Motion 挑的那一段：
@@ -474,6 +483,15 @@ export const MOVES = {
   galeWind: retime(HERO.leap, SKILL.gale.windup),
   galeSpin: HERO.slam,
   galeRec: { blend: 0.02, keys: shakeKeys(recoverOf('gale'), SPIN_END, [[0, SPIN_END]]) },
+  /* 國王的瞪視：倒數壓低身子瞪著，瞪下去那一刻頭往前一頂，停在那裡瞪到收招（hold），僵直裡回來。 */
+  glareWind: {
+    blend: 0.08,
+    keys: [
+      [0, {}], [0.3, GLARE, 'out'], [SKILL.glare.windup, { ...GLARE, drop: 0.09, knee: -0.4 }, 'inOut'],
+      [SKILL.glare.windup + 0.06, GLARE_HIT, 'out'], [SKILL.glare.windup + SKILL.glare.hold, GLARE_HIT, 'lin'],
+    ],
+  },
+  glareRec: { blend: 0.02, keys: [[0, GLARE_HIT], [recoverOf('glare'), {}, 'inOut']] },
 };
 
 /**

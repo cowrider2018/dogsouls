@@ -192,7 +192,7 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  *           在空中原地轉一圈；reapGround：下劈、在地上原地轉一圈、上挑。三下連著），每次各一半。
  *           衝刺咬人照常。
  *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3.8，走路、
- *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（不再召喚，skills.js）。`lunges`：一次衝刺衝兩下才僵直（見 LUNGE）。`shields`：身邊幾面盾，
+ *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（不再召喚、多了瞪視，skills.js）。`lunges`：一次衝刺衝兩下才僵直（見 LUNGE）。`shields`：身邊幾面盾，
  *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。衝刺跟小怪一樣一打就取消。每 `every`
  *           秒從 `skills` 裡挑一招（skills.js）。
  *
@@ -210,7 +210,7 @@ export const KINDS = {
   ghost: { name: '幽靈', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1, fly: true },
   knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], every: 3 },
   wraith: { name: '幽靈騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
-  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, skills: ['hew', 'summon', 'gale'], rage: ['hew', 'gale'], every: 3 },
+  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, skills: ['hew', 'summon', 'gale'], rage: ['hew', 'gale', 'glare'], every: 3 },
 };
 
 /**
@@ -1008,6 +1008,43 @@ export function knockLand(p) {
   p.knocked = false;
   p.vx = 0;
   p.vz = 0;
+}
+
+/**
+ * 被國王瞪（skills.js 的 glare）：靈魂出竅的那 time 秒。操作全部停下——模式不操控、Fight.lead 不收跳——
+ * 身體被往國王那一邊吸過去 pull 公尺（半個狗高）：水平速度從 2·pull/time 線性減到 0，積起來剛好 pull。
+ * 狀態記在 p.daze：{ t 過了幾秒, dirX, dirZ 往哪邊吸（水平的單位向量） }，沒有是 null。
+ * 中途被打飛（knocked）的話照擊退飛，不再吸，操作一樣停到時間到。
+ */
+export const DAZE = { time: 0.5, pull: 0.5 * DOG_H };
+
+/** 主角被站在 (fromX, fromZ) 的國王瞪了：開始 DAZE，速度換成往牠那一邊吸的初速。 */
+export function daze(p, fromX, fromZ) {
+  const dx = fromX - p.x, dz = fromZ - p.z, d = Math.hypot(dx, dz);
+  const [dirX, dirZ] = d > 1e-6 ? [dx / d, dz / d] : [p.aimX, p.aimZ];
+  p.daze = { t: 0, dirX, dirZ };
+  if (!p.knocked) { p.vx = dirX * dazeSpeed(0); p.vz = dirZ * dazeSpeed(0); }
+}
+
+/** 被吸了 t 秒的時候水平多快（公尺每秒）。 */
+const dazeSpeed = (t) => ((2 * DAZE.pull) / DAZE.time) * Math.max(0, 1 - t / DAZE.time);
+
+/**
+ * DAZE 的一幀（Fight.resolve 一開始叫）：寫下一幀移動要用的速度——取那一幀中間的那一刻（下一幀當作跟這一幀
+ * 一樣長），積起來才是 pull；時間到就結束，水平停掉。
+ */
+export function dazeStep(p, dt) {
+  const D = p.daze;
+  if (!D) return;
+  D.t += dt;
+  if (D.t >= DAZE.time) {
+    p.daze = null;
+    if (!p.knocked) { p.vx = 0; p.vz = 0; }
+    return;
+  }
+  if (p.knocked) return;
+  p.vx = D.dirX * dazeSpeed(D.t + dt / 2);
+  p.vz = D.dirZ * dazeSpeed(D.t + dt / 2);
 }
 
 /* ── 攻擊範圍 ────────────────────────────────────────────────────
