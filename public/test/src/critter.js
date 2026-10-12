@@ -834,6 +834,25 @@ function surfaceNormals(pos, index, nv, fallback) {
   return N;
 }
 
+/**
+ * 一份索引去掉「三個角都掛在 drop 那幾根骨頭上」的三角形，其餘的照原本的順序留著。
+ * groups 是要留的那幾段（{ start, count }，索引的位置），回傳去掉之後每一段的新位置。
+ */
+function dropBones(index, groups, bone, drop) {
+  const out = new index.constructor(index.length);
+  let n = 0;
+  const ranges = groups.map((q) => {
+    const start = n;
+    for (let i = q.start; i < q.start + q.count; i += 3) {
+      const a = index[i], b = index[i + 1], c = index[i + 2];
+      if (drop.has(bone[a]) && drop.has(bone[b]) && drop.has(bone[c])) continue;
+      out[n++] = a; out[n++] = b; out[n++] = c;
+    }
+    return { start, count: n - start };
+  });
+  return { index: out.slice(0, n), groups: ranges };
+}
+
 export class Critter {
   constructor(data, modelId, opts = {}) {
     this.data = data;
@@ -861,7 +880,10 @@ export class Critter {
     this._mvYawPrev = 0;
     this._mvTail = 0;
     this._mvPitch = 0;
-    this._hat = true;
+    /* `opts.hat === false`：這一隻永遠不戴帽子（怪物、國王、路人）。帽子的三角形
+       建幾何的時候就不放進索引，見 _buildGeometry；setHat 也戴不回去。 */
+    this._bare = opts.hat === false;
+    this._hat = !this._bare;
 
     /* 帽子的骨頭。dress() 讓每件服裝都「穿著」到場（彎折要量得到它的
        矩形），所以沒穿的那幾件是被縮到零的——這一頁只有一件，脫帽就是
@@ -933,14 +955,23 @@ export class Critter {
     g.setAttribute('aBone', new THREE.Float32BufferAttribute(bone, 1));
     g.setAttribute('aSway', new THREE.Float32BufferAttribute(swayG, 1));
 
-    g.setIndex(new THREE.BufferAttribute(d.index.slice(), 1));
     const G = {};
     for (const q of d.header.groups) G[q.name] = q;
     /* 材質的順序就是這裡的順序：0 = 有光的皮毛、1 = 不吃光的臉、
        2 = 翻面的墨線外殼。 */
-    g.addGroup(G.lit.start, G.lit.count, 0);
-    g.addGroup(G.unlit.start, G.unlit.count, 1);
-    g.addGroup(G.outline.start, G.outline.count, 2);
+    const order = [G.lit, G.unlit, G.outline];
+    /* 永遠不戴帽子的那幾隻（_bare）：帽子的三角形不進索引。縮到零的帽子照樣每幀過頂點著色、
+       建三角形——一隻立耳犬 46,280 個三角形裡 4,480 個是它，半透明的怪物還畫兩趟。量過
+       （tools/verify-hatless.mjs）：帽子的三角形三個角都在帽子的骨頭上，沒有一個跨到別的骨頭，
+       所以拿掉的就只有它，其餘的照原本的順序留著，畫出來一模一樣。
+       d.index 是 Zoo 那幾隻共用的，不動它；這裡動的是這一隻自己的那份。烘焙、量高度、包圍球
+       照舊看全部的頂點（連帽子），所以大小、站的位置、裁切也都跟以前一樣。 */
+    const kept = this._bare ? dropBones(d.index, order, bone, new Set(this._hatBones)) : null;
+    g.setIndex(new THREE.BufferAttribute(kept ? kept.index : d.index.slice(), 1));
+    order.forEach((q, m) => {
+      const r = kept ? kept.groups[m] : q;
+      g.addGroup(r.start, r.count, m);
+    });
     this.geometry = g;
     this._colorAttr = new THREE.Float32BufferAttribute(new Float32Array(nv * 3), 3);
     g.setAttribute('color', this._colorAttr);
@@ -1365,8 +1396,8 @@ export class Critter {
     for (const m of this._inkMats) if (!m.color.equals(c)) m.color.copy(c);
   }
 
-  /** 戴不戴帽子。脫帽＝把帽子那幾根骨頭縮到零。 */
-  setHat(on) { this._hat = !!on; }
+  /** 戴不戴帽子。脫帽＝把帽子那幾根骨頭縮到零。永遠不戴的那幾隻（opts.hat === false）沒有帽子可戴。 */
+  setHat(on) { this._hat = !!on && !this._bare; }
   get hatOn() { return this._hat; }
 
   /** 想面對哪個方向（世界 yaw）。模型的前進軸是 +Z，見遊戲那邊的量測。 */

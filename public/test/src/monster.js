@@ -188,8 +188,8 @@ const SEE_THROUGH_ORDER = 5;
 export function makeMonsterCritter(zoo, kind) {
   const look = LOOKS[kind];
   const model = look.model || 'dog-prick';
-  const c = new Critter(zoo.critters.get(model).data, model, { height: look.height });
-  c.setHat(false);
+  // 怪物從來不戴帽子：帽子的三角形一開始就不畫（critter.js 的 opts.hat）。
+  const c = new Critter(zoo.critters.get(model).data, model, { height: look.height, hat: false });
   paint(c, look.coat);
   if (look.alpha < 1) seeThrough(c, look.alpha);
   return c;
@@ -206,6 +206,7 @@ export function makeMonsterCritter(zoo, kind) {
  */
 export function makeGhostCritter(zoo, model) {
   const own = zoo.critters.get(model);
+  // 帽子留著：death.js 與 glare.js 照玩家戴不戴（zoo.hatOn）給它戴。
   const c = new Critter(own.data, model, { height: own.height });
   paint(c, GHOST, GHOST.face);
   seeThrough(c, GHOST_ALPHA);
@@ -220,8 +221,7 @@ export function makeGhostCritter(zoo, model) {
  * @returns {Critter}
  */
 export function makeLivingKing(zoo) {
-  const c = new Critter(zoo.critters.get(LOOKS.king.model).data, LOOKS.king.model, { height: LOOKS.king.height, skin: 'grey' });
-  c.setHat(false);
+  const c = new Critter(zoo.critters.get(LOOKS.king.model).data, LOOKS.king.model, { height: LOOKS.king.height, skin: 'grey', hat: false });
   return c;
 }
 

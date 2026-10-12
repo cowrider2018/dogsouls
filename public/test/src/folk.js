@@ -163,8 +163,8 @@ export class Folk {
       for (const s of plan(walkCells(cols, arena, { x: sx, y: sy, z: sz }, doors), rng, ok)) {
         const [model, skin] = s.look.split('/');
         const own = this.zoo.critters.get(model);
-        const critter = new Critter(own.data, model, { height: own.height, skin });
-        critter.setHat(false);
+        // 路人不戴帽子，帽子的三角形一開始就不畫（critter.js 的 opts.hat）。
+        const critter = new Critter(own.data, model, { height: own.height, skin, hat: false });
         critter._yaw = critter._yawGoal = s.yaw;
         critter.root.position.set(s.x, s.y, s.z);
         critter.root.visible = false;
