@@ -244,7 +244,9 @@ function seeThrough(c, alpha) {
   const mesh = new THREE.Mesh(c.geometry, tint);
   mesh.position.copy(depth.position);
   mesh.scale.copy(depth.scale);
-  mesh.frustumCulled = false;
+  /* 同一份幾何（包圍球掛在上面，critter.js 的 _bound）、同一個位置與縮放、掛在同一個節點上：
+     裁的結果跟只寫深度的那一個一樣，不會只剩一半。 */
+  mesh.frustumCulled = depth.frustumCulled;
   depth.renderOrder = mesh.renderOrder = SEE_THROUGH_ORDER;
   depth.parent.add(mesh);
 }

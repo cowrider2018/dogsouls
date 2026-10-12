@@ -190,6 +190,10 @@ const ASSET_SHELL = 0.05;
    狗如果連線都跟著縮小，那個造型在遠處就消失了。 */
 const INK_PX = 2.0;
 
+/* 視錐裁切的包圍球：半徑是待機姿勢方盒半對角線的幾倍（理由與量法見 _buildMesh 最後那一段）。
+   量到的最遠是 1.33 倍，這裡多給將近一倍。 */
+const BOUND = 2.5;
+
 /* 一個步幅跨多遠（公尺）。遊戲那邊是 2.67 個碰撞箱高，換算到這一頁的
    尺度會得到一隻慢動作的狗：遊戲裡的狗每秒跑 9.6 個身高，這裡只有 3 個
    （場景是照建築的尺度做的，不是照跑酷的速度）。所以步幅照這個世界重新
@@ -1202,8 +1206,7 @@ export class Critter {
        換墨色時全部一起換。 */
     this._inkMats = [ink];
     this.mesh = new THREE.Mesh(this.geometry, [fur, face, ink]);
-    // 骨頭在著色器裡才動，three 算不出正確的邊界球，所以別讓它裁掉。
-    this.mesh.frustumCulled = false;
+    // 骨頭在著色器裡才動，three 算不出正確的邊界球——包圍球自己給（_buildMesh 最後），照常裁。
 
     /* 大小與腳的位置。兩個都是量出來的：先擺一次待機姿勢，量整隻的
        高度與最低點，再算縮放與要抬多少。這樣以後改服裝或改耳朵，
@@ -1230,6 +1233,46 @@ export class Critter {
     A.position.array.set(b.pos);
     A.aBakeN.array.set(b.nrm);
     A.aInkW.array.set(b.inkW);
+    this.geometry.boundingSphere = this._bound(b.pos);
+  }
+
+  /**
+   * 視錐裁切用的包圍球（模型單位，掛在幾何上，three 裁的時候乘上 mesh 的世界矩陣）。
+   *
+   * 骨頭與尾巴的彈簧在著色器裡才動，three 自己從頂點算的那一顆是沒擺姿勢的，不能用——以前
+   * 因此整個不裁，鏡頭外的每一隻也照畫（一隻連墨線殼將近四萬個三角形）。這裡給一顆任何姿勢
+   * 都裝得下的：待機姿勢下烘焙後頂點的方盒，中心就是球心，半徑是方盒半對角線的 BOUND 倍。
+   * 量過每一種動物與怪物（含國王、半透明的那幾隻）：兩套招式的每一個關鍵影格、再加幾百個每個
+   * 欄位都比那些誇張的亂數姿勢（整隻轉、扭、倒、仰俯、頭、尾巴、沉、腿，跑、跳、落地的一沉，
+   * 連尾巴的擺一起算），頂點離球心最遠到 1.33 倍。多出來的那一截也蓋過臉往鏡頭推的那一點
+   * （_faceLift）與墨線在螢幕上往外推的那兩個像素。寧可大：大了只是剛出畫面的還在畫，小了是
+   * 畫面邊上的角色突然不見。
+   *
+   * 整隻的縮放（怪物的身高、國王從 0 長大）、站在哪、轉向、倒下的那一轉都在 mesh 與它上面的
+   * 節點，three 裁的時候自己會乘上去，不必算在這裡。半透明的怪物另一個上色的網格（monster.js
+   * 的 seeThrough）是同一份幾何、同一個位置，裁的結果跟這一個一樣。
+   */
+  _bound(pos) {
+    this.rig.reset();
+    applyPose(this.rig, this.drv.pose);
+    const M = this.rig.update();
+    const bone = this._boneId;
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let v = 0; v < bone.length; v++) {
+      const o = bone[v] * 16;
+      const x = pos[v * 3], y = pos[v * 3 + 1], z = pos[v * 3 + 2];
+      for (let k = 0; k < 3; k++) {
+        const w = M[o + k] * x + M[o + 4 + k] * y + M[o + 8 + k] * z + M[o + 12 + k];
+        if (w < lo[k]) lo[k] = w;
+        if (w > hi[k]) hi[k] = w;
+      }
+    }
+    // 骨架放回烘焙完的樣子（沒擺姿勢），建構完之後讀它的人看到的跟以前一樣。
+    this.rig.reset();
+    this.rig.update();
+    const half = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2;
+    return new THREE.Sphere(
+      new THREE.Vector3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2), half * BOUND);
   }
 
   /**
