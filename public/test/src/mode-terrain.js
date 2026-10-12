@@ -45,6 +45,7 @@ import { makeCam, snapCam, updateCam } from './camera.js';
 import { Controls, fitView, wardrobe } from './controls.js';
 import { buildStage } from './stage.js';
 import { createLight } from './light.js';
+import { pixelRatio } from './pace.js';
 import { makeHero, steerHero, moveHero } from './hero.js';
 import { Transit } from './transit.js';
 import { roomOf, signposts } from './route.js';
@@ -52,7 +53,7 @@ import { Signpost } from './signpost.js';
 
 const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(pixelRatio());       // 裝置的、最多 2；`?dpr=` 指定（pace.js）
 renderer.setClearColor(0x000000);
 
 const scene = new THREE.Scene();

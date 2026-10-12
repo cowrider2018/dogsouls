@@ -33,6 +33,7 @@ import { makeCam, snapCam, updateCam } from './camera.js';
 import { buildVeil } from './veil.js';
 import { hazeMesh } from './stage.js';
 import { createLight } from './light.js';
+import { pixelRatio } from './pace.js';
 import { Controls, speedFor, fitView, wardrobe } from './controls.js';
 import { ARENA, COLS, SPAWN, MODES, DEFAULT_MODE, KINDS, resetLife, refill } from './combat.js';
 import { Fight, DEATH_TEXT } from './fight.js';
@@ -40,7 +41,7 @@ import { Sound } from './sound.js';
 
 const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(pixelRatio());       // 裝置的、最多 2；`?dpr=` 指定（pace.js）
 renderer.setClearColor(0x000000);
 
 const scene = new THREE.Scene();
