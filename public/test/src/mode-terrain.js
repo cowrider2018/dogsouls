@@ -45,7 +45,7 @@ import { makeCam, snapCam, updateCam } from './camera.js';
 import { Controls, fitView, wardrobe } from './controls.js';
 import { buildStage } from './stage.js';
 import { createLight } from './light.js';
-import { pixelRatio } from './pace.js';
+import { pixelRatio, Cost } from './pace.js';
 import { makeHero, steerHero, moveHero } from './hero.js';
 import { Transit } from './transit.js';
 import { roomOf, signposts } from './route.js';
@@ -159,8 +159,11 @@ const controls = new Controls(canvas, pad, cam, (k, e) => {
 const critterTris = zoo.active.data.header.groups.reduce((n, g) => n + g.count, 0) / 3;
 let last = performance.now();
 let fpsAcc = 0, fpsN = 0, fpsShown = 0, hudAcc = 0;
+/** 每幀的 CPU 花在算與畫各多少（pace.js），接在 fps 後面。 */
+const cost = new Cost();
 
 function frame(now) {
+  cost.begin();
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   pad.update(dt);
@@ -223,7 +226,9 @@ function frame(now) {
   signpost.show(signposts(ruins.portals, roomOf(player.block, player.y)), doors, player, camera, dt);
 
   light.update({ dt, now, player, block: player.block });
+  cost.split();
   light.render();
+  cost.end();
   pad.draw();
 
   fpsAcc += dt; fpsN++; hudAcc += dt;
@@ -231,7 +236,7 @@ function frame(now) {
   if (hudAcc > 0.25) {
     fpsShown = Math.round(fpsN / fpsAcc);
     fpsAcc = 0; fpsN = 0; hudAcc = 0;
-    line = `${fpsShown} fps${stage.surf ? '' : '（無紋路）'} ・ 關卡 ${(ruins.tris / 1000).toFixed(0)}k tri ・ `
+    line = `${fpsShown} fps${cost.text()}${stage.surf ? '' : '（無紋路）'} ・ 關卡 ${(ruins.tris / 1000).toFixed(0)}k tri ・ `
       + `${(ruins.inkLines / 1000).toFixed(0)}k 墨線 ・ 動物 ${(critterTris / 1000).toFixed(0)}k ・ `
       + `x ${player.x.toFixed(1)} y ${player.y.toFixed(1)} z ${player.z.toFixed(1)}`
       + (player.slip ? `・${player.slip === 'fall' ? '滑落' : '緩滑'}` : '');

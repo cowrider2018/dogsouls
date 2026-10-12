@@ -76,7 +76,7 @@ import { makeCam, snapCam, updateCam } from './camera.js';
 import { Controls, fitView, wardrobe } from './controls.js';
 import { buildStage } from './stage.js';
 import { createLight } from './light.js';
-import { pixelRatio } from './pace.js';
+import { pixelRatio, Cost } from './pace.js';
 import { makeHero, steerHero, moveHero } from './hero.js';
 import { Transit } from './transit.js';
 import { Death } from './death.js';
@@ -418,8 +418,11 @@ let last = performance.now();
 /** 世界的時鐘（毫秒）：跟著慢動作走、書頁蓋住的時候停住。火光、旗子這些照它動。 */
 let clock = last;
 let fpsAcc = 0, fpsN = 0, hudAcc = 0;
+/** 每幀的 CPU 花在算與畫各多少（pace.js），接在 fps 後面。 */
+const cost = new Cost();
 
 function frame(now) {
+  cost.begin();
   // 第一幀的時間戳可能比 `last`（載入完的那一刻）早：夾在 0 以上，不然劇情的鐘會倒退。
   const real = Math.max(0, Math.min(0.05, (now - last) / 1000));
   last = now;
@@ -537,7 +540,9 @@ function frame(now) {
     dt, now: clock, player, block: player.block, foes: fight.foes.map((f) => f.m),
     crowd: king ? [...folk.here(player.block), king] : folk.here(player.block),
   });
+  cost.split();
   light.render();
+  cost.end();
   // 跳躍鍵的圖案：長按會交靈魂的時候（在國王身邊、還沒交滿、操作沒收起來）是托著靈魂的手。
   // 這一幀交滿了的話這裡已經不在國王身邊（nearAltar 重問），圖案當場換回來。
   pad.icon = iconOf({ give: fight.nearAltar(player) && !still, striking: fight.striking });
@@ -549,7 +554,7 @@ function frame(now) {
     const st = fight.status();
     const where = run.next >= STAGES.length ? '全部打完'
       : `第 ${run.next + 1} 場 ${stageName(run.next)}・${run.active ? (spawnIn > 0 ? '開打' : '戰鬥中') : '還沒進去'}`;
-    line = `${Math.round(fpsN / fpsAcc)} fps ・ ${where} ・ 血 ${player.hp}/${player.max} ・ 倒下 ${deaths} 次`
+    line = `${Math.round(fpsN / fpsAcc)} fps${cost.text()} ・ ${where} ・ 血 ${player.hp}/${player.max} ・ 倒下 ${deaths} 次`
       + `${st.foeLine ? ` ・ ${st.foeLine}` : ''} ・ ${st.phase} ・ `
       + `${fight.altar() ? `靈魂 ${fight.offer.given}/${fight.offer.need}${fight.offer.held > 0 ? `（按著 ${fight.offer.held.toFixed(1)} 秒）` : ''} ・ ` : ''}`
       + `x ${player.x.toFixed(1)} y ${player.y.toFixed(1)} z ${player.z.toFixed(1)}`;

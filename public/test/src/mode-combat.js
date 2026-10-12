@@ -33,7 +33,7 @@ import { makeCam, snapCam, updateCam } from './camera.js';
 import { buildVeil } from './veil.js';
 import { hazeMesh } from './stage.js';
 import { createLight } from './light.js';
-import { pixelRatio } from './pace.js';
+import { pixelRatio, Cost } from './pace.js';
 import { Controls, speedFor, fitView, wardrobe } from './controls.js';
 import { ARENA, COLS, SPAWN, MODES, DEFAULT_MODE, KINDS, resetLife, refill } from './combat.js';
 import { Fight, DEATH_TEXT } from './fight.js';
@@ -134,8 +134,11 @@ const controls = new Controls(canvas, pad, cam, (k, e) => {
 /* ── 主迴圈 ──────────────────────────────────────────────────── */
 let last = performance.now();
 let fpsAcc = 0, fpsN = 0, hudAcc = 0;
+/** 每幀的 CPU 花在算與畫各多少（pace.js），接在 fps 後面。 */
+const cost = new Cost();
 
 function frame(now) {
+  cost.begin();
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   pad.update(dt);
@@ -199,7 +202,9 @@ function frame(now) {
 
   fight.draw(dt, camera, player);
   light.update({ dt, now, player, block: ARENA.id, foes: fight.foes.map((f) => f.m) });
+  cost.split();
   light.render();
+  cost.end();
   pad.icon = iconOf({ striking: fight.striking });
   pad.draw();
 
@@ -207,7 +212,7 @@ function frame(now) {
   let line = null;
   if (hudAcc > 0.25) {
     const st = fight.status();
-    line = `${Math.round(fpsN / fpsAcc)} fps ・ 血 ${player.hp}/${player.max} ・ 倒下 ${deaths} 次 ・ ${st.foeLine} ・ ${st.phase} ・ `
+    line = `${Math.round(fpsN / fpsAcc)} fps${cost.text()} ・ 血 ${player.hp}/${player.max} ・ 倒下 ${deaths} 次 ・ ${st.foeLine} ・ ${st.phase} ・ `
       + `x ${player.x.toFixed(1)} y ${player.y.toFixed(1)} z ${player.z.toFixed(1)}`;
     fpsAcc = 0; fpsN = 0; hudAcc = 0;
   }
