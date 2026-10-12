@@ -35,6 +35,9 @@ import * as post from './light/post.js';
 
 const PARTS = [mood, shadow, flame, air, contact, post];
 
+/** 後製會不會接手最後那一筆（light/post.js）。會的話畫布自己的 MSAA 是白做的，各模式建 renderer 時關掉。 */
+export const POST_ON = post.ACTIVE;
+
 /** 所有 shade 接成一份：palette.js 的 banded 在 onBeforeCompile 裡叫。 */
 export function lightShade() {
   const out = { uniforms: {}, decl: '', pre: '', post: '' };

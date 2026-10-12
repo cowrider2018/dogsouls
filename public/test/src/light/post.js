@@ -16,7 +16,10 @@
        合成那一筆讀到的就是畫布上會出現的那個值，原封不動寫出去。
      · 反鋸齒。畫布本來有 MSAA，畫進一張沒有 samples 的圖就沒了，墨線全部
        變成鋸齒。所以 rt 帶 4 個 samples（WebGL2 的多重取樣 renderbuffer），
-       畫完 three 自己解析到貼圖上。
+       畫完 three 自己解析到貼圖上。反過來，畫布自己的 MSAA 就白做了：畫上畫布
+       的只有那一個蓋滿畫面的三角形，每個像素的每個取樣都是同一個值，解析完跟
+       沒有取樣一模一樣，卻要多一份四倍大的緩衝與一次解析。所以後製開著的時候
+       各模式建 renderer 就不開 antialias（看 `ACTIVE`）；`?post=0` 的時候照舊開。
 
    ── 多重取樣圖與「拷一份畫面」────────────────────────────────────
    grab.js 在畫到一半的時候用 copyTexSubImage2D 拷這一幀已經畫好的畫面（給
@@ -59,6 +62,8 @@ const Q = typeof location !== 'undefined' ? new URLSearchParams(location.search)
 const ON = Q.get('post') !== '0';
 const BLOOM_ON = ON && Q.get('bloom') !== '0';
 const VIG_ON = ON && Q.get('vignette') !== '0';
+/** 後製會不會接手最後那一筆（setup 交得出東西）。只看網址：模組一載入就定了，renderer 建之前就讀得到。 */
+export const ACTIVE = ON && (BLOOM_ON || VIG_ON);
 
 /** 暗角。半徑以畫面高為 1，從 r0 開始暗、到 r1 暗到 `max`。 */
 const VIG = {
@@ -182,7 +187,7 @@ const _p = new THREE.Vector3();
 
 /** @param {object} ctx 見 ../light.js */
 export function setup(ctx) {
-  if (!ON || (!BLOOM_ON && !VIG_ON)) return null;
+  if (!ACTIVE) return null;              // 只有這一個理由交不出東西：各模式照 ACTIVE 決定畫布要不要 antialias
   const { renderer, camera } = ctx;
   const gl = renderer.getContext();
 

@@ -32,7 +32,7 @@ import { PHYS, solveXZ, supportInfo, steer } from './walk.js';
 import { makeCam, snapCam, updateCam } from './camera.js';
 import { buildVeil } from './veil.js';
 import { hazeMesh } from './stage.js';
-import { createLight } from './light.js';
+import { createLight, POST_ON } from './light.js';
 import { pixelRatio, Cost } from './pace.js';
 import { Controls, speedFor, fitView, wardrobe } from './controls.js';
 import { ARENA, COLS, SPAWN, MODES, DEFAULT_MODE, KINDS, resetLife, refill } from './combat.js';
@@ -40,7 +40,9 @@ import { Fight, DEATH_TEXT } from './fight.js';
 import { Sound } from './sound.js';
 
 const canvas = document.getElementById('view');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+/* 後製開著的時候畫面是畫進它那一張多重取樣的圖、再一筆貼上畫布的，畫布自己不必再反鋸齒
+   （light/post.js 的檔頭）；`?post=0` 直接畫上畫布，才要畫布的 MSAA。 */
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !POST_ON });
 renderer.setPixelRatio(pixelRatio());       // 裝置的、最多 2；`?dpr=` 指定（pace.js）
 renderer.setClearColor(0x000000);
 
