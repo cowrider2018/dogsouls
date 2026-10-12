@@ -41,6 +41,7 @@
 import * as THREE from '../../vendor/three.module.js';
 /* palette.js 反過來 import 這一頁（見 ../light.js），所以它的值只在 setup 之後讀。 */
 import { U_KEYDIR } from '../palette.js';
+import { TOUCH } from '../pace.js';
 
 const Q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('shadow') : null;
 const ON = Q !== '0';
@@ -147,8 +148,7 @@ export function setup(ctx) {
   const idle = !casters.length || !arenas || !arenas.length;
 
   /* ── 深度圖 ── */
-  const coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
-  const want = idle ? 1 : Number(Q) >= 256 ? Number(Q) : coarse ? 1024 : 2048;
+  const want = idle ? 1 : Number(Q) >= 256 ? Number(Q) : TOUCH ? 1024 : 2048;
   const S = Math.min(want, renderer.capabilities.maxTextureSize);
   const depth = new THREE.DepthTexture(S, S);
   depth.minFilter = depth.magFilter = THREE.LinearFilter;

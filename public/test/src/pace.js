@@ -1,6 +1,7 @@
 /* ── test/src/pace.js ────────────────────────────────────────────────
-   畫面的成本：畫多細、一幀的 CPU 花在哪。三個模式（mode-flow／combat／terrain）
-   共用這一份，開始畫面（lobby.js）有自己的那一個 renderer，不歸這裡管。
+   畫面的成本：畫多細、一幀的 CPU 花在哪，以及是不是觸控裝置（手機省著畫的那幾樣照它挑）。
+   三個模式（mode-flow／combat／terrain）共用這一份，開始畫面（lobby.js）有自己的那一個
+   renderer，不歸這裡管。
 
    ── 解析度 ──────────────────────────────────────────────────────
    預設是裝置的像素比、最多 2（再細手機也看不出來，像素卻是四倍）。`?dpr=1`、
@@ -10,6 +11,9 @@
    ------------------------------------------------------------------ */
 
 const Q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+
+/** 觸控裝置（主要的指標是手指）：手機、平板。比較省的那幾樣（陰影圖小一號……）照這個挑。 */
+export const TOUCH = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
 /** `?dpr=` 給的像素比（夾在 0.25～4）；沒給或給錯就是 null。 */
 const DPR = (() => {
