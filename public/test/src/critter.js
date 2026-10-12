@@ -978,6 +978,14 @@ export class Critter {
     const d = this.data;
     const nv = d.header.vertexCount;
     const g = new THREE.BufferGeometry();
+    const G = {};
+    for (const q of d.header.groups) G[q.name] = q;
+    /* 材質的順序就是這裡的順序：0 = 有光的皮毛、1 = 不吃光的臉、
+       2 = 翻面的墨線外殼。 */
+    const order = [G.lit, G.unlit, G.outline];
+    this._unlitGroup = G.unlit;
+    this._litGroup = G.lit;
+    this._outlineGroup = G.outline;
 
     this._posRaw = d.position.slice();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this._posRaw.slice(), 3));
@@ -1014,30 +1022,27 @@ export class Critter {
     g.setAttribute('aBone', new THREE.Float32BufferAttribute(bone, 1));
     g.setAttribute('aSway', new THREE.Float32BufferAttribute(swayG, 1));
 
-    const G = {};
-    for (const q of d.header.groups) G[q.name] = q;
-    /* 材質的順序就是這裡的順序：0 = 有光的皮毛、1 = 不吃光的臉、
-       2 = 翻面的墨線外殼。 */
-    const order = [G.lit, G.unlit, G.outline];
+    this._index(g, order);
+    this.geometry = g;
+    this._colorAttr = new THREE.Float32BufferAttribute(new Float32Array(nv * 3), 3);
+    g.setAttribute('color', this._colorAttr);
+    this.setCoat(this.coatId);
+  }
+
+  /** 索引與三個群組（材質照 order 的順序）。 */
+  _index(g, order) {
+    const d = this.data;
     /* 永遠不戴帽子的那幾隻（_bare）：帽子的三角形不進索引。縮到零的帽子照樣每幀過頂點著色、
        建三角形——一隻立耳犬 46,280 個三角形裡 4,480 個是它，半透明的怪物還畫兩趟。量過
        （tools/verify-hatless.mjs）：帽子的三角形三個角都在帽子的骨頭上，沒有一個跨到別的骨頭，
        所以拿掉的就只有它，其餘的照原本的順序留著，畫出來一模一樣。
        d.index 是 Zoo 那幾隻共用的，不動它；這裡動的是這一隻自己的那份。烘焙、量高度、包圍球
        照舊看全部的頂點（連帽子），所以大小、站的位置、裁切也都跟以前一樣。 */
-    const kept = this._bare ? dropBones(d.index, order, bone, new Set(this._hatBones)) : null;
-    g.setIndex(new THREE.BufferAttribute(kept ? kept.index : d.index.slice(), 1));
-    order.forEach((q, m) => {
-      const r = kept ? kept.groups[m] : q;
-      g.addGroup(r.start, r.count, m);
-    });
-    this.geometry = g;
-    this._colorAttr = new THREE.Float32BufferAttribute(new Float32Array(nv * 3), 3);
-    g.setAttribute('color', this._colorAttr);
-    this.setCoat(this.coatId);
-    this._unlitGroup = G.unlit;
-    this._litGroup = G.lit;
-    this._outlineGroup = G.outline;
+    const ix = this._bare
+      ? dropBones(d.index, order, this._boneId, new Set(this._hatBones))
+      : { index: d.index.slice(), groups: order.map((q) => ({ start: q.start, count: q.count })) };
+    g.setIndex(new THREE.BufferAttribute(ix.index, 1));
+    ix.groups.forEach((r, m) => g.addGroup(r.start, r.count, m));
   }
 
   /* ── 烘進幾何 ─────────────────────────────────────────────────────
