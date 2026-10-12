@@ -207,8 +207,8 @@ function cross(at, mat) {
   return g;
 }
 
-/** 光暈的貼圖：中間亮、往外平滑淡到 0 的一個圓。 */
-function glowTexture(n = 64) {
+/** 光暈的貼圖：中間亮、往外平滑淡到 0 的一個圓。國王瞪視的眼睛（glare.js）也用它。 */
+export function glowTexture(n = 64) {
   const px = new Uint8Array(n * n * 4);
   for (let y = 0; y < n; y++) {
     for (let x = 0; x < n; x++) {
