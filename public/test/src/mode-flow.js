@@ -431,15 +431,23 @@ function frame(now) {
     requestAnimationFrame(frame);
     return;
   }
-  cost.begin();
   // 第一幀的時間戳可能比 `last`（載入完的那一刻）早：夾在 0 以上，不然劇情的鐘會倒退。
   const real = Math.max(0, Math.min(0.05, (now - last) / 1000));
   last = now;
+  step(real);
+  requestAnimationFrame(frame);
+}
+
+/**
+ * 一幀：真實時間過了 `real` 秒。世界走一步、畫一張。`draw` 是假的話世界照走、只是不畫
+ * （light.render 那一下，一幀裡最貴的）——其餘的照樣跑，因為它們也會動到世界的狀態與亂數。
+ */
+function step(real, draw = true) {
+  cost.begin();
   pad.update(real);
 
   if (lobby) {
     lobbyFrame(real);
-    requestAnimationFrame(frame);
     return;
   }
 
@@ -452,7 +460,6 @@ function frame(now) {
     hud.tick(real, null);
     bossBar.update(real);
     signpost.hide();
-    requestAnimationFrame(frame);
     return;
   }
   clock += dt * 1000;
@@ -550,7 +557,7 @@ function frame(now) {
     crowd: king ? [...folk.here(player.block), king] : folk.here(player.block),
   });
   cost.split();
-  light.render();
+  if (draw) light.render();
   cost.end();
   // 跳躍鍵的圖案：長按會交靈魂的時候（在國王身邊、還沒交滿、操作沒收起來）是托著靈魂的手。
   // 這一幀交滿了的話這裡已經不在國王身邊（nearAltar 重問），圖案當場換回來。
@@ -570,7 +577,6 @@ function frame(now) {
     fpsAcc = 0; fpsN = 0; hudAcc = 0;
   }
   hud.tick(real, line);
-  requestAnimationFrame(frame);
 }
 
 /* ── 開始畫面（完整遊戲）────────────────────────────────────────────
