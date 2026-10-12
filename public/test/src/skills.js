@@ -131,6 +131,7 @@ import { FIELD, DOG_H, REACH, SWING, STILL, DAZE, kindOf, busy, walkTo, inFan } 
 import { QUAKE, quakeTop } from './dust.js';
 import { hullOf, TRAILS } from './trail.js';
 import { shadeOf, reachAt, farthestOf } from './occlude.js';
+import { random } from './chance.js';
 
 /**
  * 幽靈騎士的兩套連斬（SKILL.reapAir、reapGround 都是這一份）：劈與上挑照 SKILL.cleave（倒數、弧線、
@@ -767,7 +768,7 @@ function waveHits(st, p) {
  * @param {() => number} rng 挑招用的亂數（離線驗證給固定的）
  * @returns {object|null} 這一幀打下來的範圍攻擊（給 strikeHits），沒有就是 null
  */
-export function bossStep(m, dt, target, world, rng = Math.random) {
+export function bossStep(m, dt, target, world, rng = random) {
   const k = kindOf(m);
   const list = skillsOf(m);
   if (!list.length || m.rally) return null;   // 站起來的時候（combat.js 的 RALLY）不放招

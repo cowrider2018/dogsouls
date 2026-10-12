@@ -68,6 +68,7 @@ import { SHADE_N, bakeShade } from './occlude.js';
 import { dustOf, dustFade, DUST_LOOK, PUSH_TIME, QUAKE, quakeBands, quakeFade, PLOW, plowPieces, plowClump } from './dust.js';
 import { MUTE } from './sound.js';
 import { EyeGlow, Spirit, dazeView } from './glare.js';
+import { random } from './chance.js';
 
 /** _compile 記下原本的 scissor 用。 */
 const _scissor = new THREE.Vector4();
@@ -1464,7 +1465,7 @@ export class Fight {
   /** 揚一團塵：借一格流體、一片煙，平貼在落地那一點的地上（之後不動）。 */
   _startPuff(b, d) {
     const sheet = this._sheet();
-    const pf = { d, tau: 0, sheet, x: b.x, y: b.y, z: b.z, seed: Math.random() * 2 * Math.PI };
+    const pf = { d, tau: 0, sheet, x: b.x, y: b.y, z: b.z, seed: random() * 2 * Math.PI };
     pf.tile = this.fluid.acquire(pf);
     sheet.place([b.x, b.y + 0.03, b.z], [1, 0, 0], [0, 0, -1], d.half, { ...DUST_LOOK, thick: d.thick });
     return pf;

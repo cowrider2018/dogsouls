@@ -19,6 +19,7 @@ import { facet } from './geom.js';
 import { arenaGap } from './walk.js';
 import { buildVeil } from './veil.js';
 import { AO, buildAO } from './ao.js';
+import { random } from './chance.js';
 
 /** 黑牆與黑霧的 mesh：veil.js 吐的那一份，或門洞裡的那幾層（同一種資料）。 */
 export function hazeMesh(v) {
@@ -248,7 +249,7 @@ export function buildStage(scene, renderer) {
     g.position.set(f.x, f.y + 0.32 * f.s, f.z);
     g.scale.setScalar(f.s);
     scene.add(g);
-    return { node: g, outer, base: f.s, phase: Math.random() * 9 };
+    return { node: g, outer, base: f.s, phase: random() * 9 };
   });
 
   /** 每幀：火焰抖。 */

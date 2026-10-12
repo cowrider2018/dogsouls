@@ -84,6 +84,7 @@
 import { PHYS, nearXZ, roundTop, arenaGap } from './walk.js';
 import { fanFrame } from './combat.js';
 import { TRAILS, bladeAt } from './trail.js';
+import { random } from './chance.js';
 
 /**
  * 噴血的數值（體型 1 的那一份；體型 s 照檔頭的比例放大）。
@@ -267,7 +268,7 @@ function radiiOf(s, rng) {
  * @param {() => number} rng
  * @returns {{x,y,z,vx,vy,vz,r,style}[]}
  */
-export function spurtOf(frame, m, s, style = 'blood', rng = Math.random) {
+export function spurtOf(frame, m, s, style = 'blood', rng = random) {
   const { d, t } = frame;
   const radii = radiiOf(s, rng), n = radii.length, y = waistOf(m, s);
   // 打散：補足總量的那一滴不固定在傷口的哪一頭。

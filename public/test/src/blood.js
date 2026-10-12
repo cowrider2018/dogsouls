@@ -56,6 +56,7 @@ import * as THREE from '../vendor/three.module.js';
 import { KEY_DIR } from './palette.js';
 import { INK_TONED } from './critter.js';
 import { bleedStep, splatScale, dropSize } from './bleed.js';
+import { random } from './chance.js';
 
 /** 最多同時幾滴、幾灘。滴滿了新的不噴；灘滿了先收最舊的。 */
 const MAX_DROPS = 320;
@@ -305,7 +306,7 @@ export class Blood {
   step(dt, camera) {
     const before = this.splats.length;
     bleedStep(this.drops, this.splats, dt);
-    for (let i = before; i < this.splats.length; i++) this.splats[i].seed = Math.random() * 6.283;
+    for (let i = before; i < this.splats.length; i++) this.splats[i].seed = random() * 6.283;
     if (this.splats.length > MAX_SPLATS) this.splats.splice(0, this.splats.length - MAX_SPLATS);
 
     const D = this._d.a;

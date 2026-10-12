@@ -55,6 +55,7 @@ import * as THREE from '../vendor/three.module.js';
 import { Rig } from '../../src/cat/rig.js';
 import { toon, KEY_DIR } from './palette.js';
 import { GHOST, GHOST_ALPHA } from './monster.js';
+import { random } from './chance.js';
 
 /** 一個模型單位多少公尺。頭寬約 2.4 單位，畫出來約 0.6 公尺——跟撿得到的那顆球（SOUL.r）一樣寬。 */
 const SCALE = 0.25;
@@ -314,11 +315,11 @@ class Bubbles {
 
   /** 這一幀：以 (x, y, z)（頭的正中）為中心冒新的、讓舊的上飄與老去。 */
   step(dt, x, y, z) {
-    const B = BUBBLE, rnd = (a, b) => a + Math.random() * (b - a);
+    const B = BUBBLE, rnd = (a, b) => a + random() * (b - a);
     this._due += dt * B.rate;
     while (this._due >= 1 && this.balls.length < B.max) {
       this._due -= 1;
-      const a = Math.random() * 2 * Math.PI, rr = B.spread.xz * Math.sqrt(Math.random());
+      const a = random() * 2 * Math.PI, rr = B.spread.xz * Math.sqrt(random());
       this.balls.push({
         x: x + Math.cos(a) * rr, y: y + rnd(-B.spread.y, B.spread.y), z: z + Math.sin(a) * rr,
         r: rnd(B.r[0], B.r[1]), life: rnd(B.life[0], B.life[1]), age: 0,

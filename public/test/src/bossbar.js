@@ -25,6 +25,8 @@
    （#fade）與書頁底下。血條在的時候 body 帶 `boss`，toast 往下讓（index.html）。
    ------------------------------------------------------------------ */
 
+import { random } from './chance.js';
+
 /** 從中間長開幾秒。 */
 const OPEN = 0.6;
 /** 挨打：黃色那一段幾秒縮到底，白色幾秒縮到剩下的血。 */
@@ -259,9 +261,9 @@ export class BossBar {
         const base = clamp01((x - left) / span) * DUST.sweep;
         motes.push({
           x, y, a: data[i + 3] / 255, rgb: `rgb(${data[i]}, ${data[i + 1]}, ${data[i + 2]})`,
-          t0: base + Math.random() * DUST.jitter,
-          vx: 10 + Math.random() * 40, vy: -(5 + Math.random() * 25),
-          life: DUST.life[0] + Math.random() * (DUST.life[1] - DUST.life[0]), seed: Math.random() * 6.28,
+          t0: base + random() * DUST.jitter,
+          vx: 10 + random() * 40, vy: -(5 + random() * 25),
+          life: DUST.life[0] + random() * (DUST.life[1] - DUST.life[0]), seed: random() * 6.28,
         });
       }
     }

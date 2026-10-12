@@ -79,6 +79,7 @@
 
 import * as THREE from '../vendor/three.module.js';
 import { INK_TONED } from './critter.js';
+import { random } from './chance.js';
 
 /** 球切幾圈、繞一圈切幾片。 */
 const U_BALL = 48;
@@ -153,7 +154,7 @@ const smooth = (a, b, x) => {
   return t * t * (3 - 2 * t);
 };
 const lerp = (a, b, t) => a + (b - a) * t;
-const pick = ([a, b]) => lerp(a, b, Math.random());
+const pick = ([a, b]) => lerp(a, b, random());
 /** 一段 cos² 的鼓包：x 是離中心幾個半寬。 */
 const bell = (x) => {
   if (Math.abs(x) >= 1) return 0;
@@ -444,7 +445,7 @@ export class Fireballs {
 
   /** 一個火舌噴口換方向：抽方向、噴多久、多密。 */
   _aim(t) {
-    t.ang = Math.random() * Math.PI * 2;
+    t.ang = random() * Math.PI * 2;
     t.left = pick(TONGUE.dur);
     t.rate = pick(TONGUE.rate);
     t.acc = 0;
@@ -454,10 +455,10 @@ export class Fireballs {
   /** 這一幀球 s 噴幾顆：芯照固定的密度，火舌照各自噴口的方向與密度，噴完換方向。 */
   _emit(s, st, dt) {
     st.core += CORE.rate * dt;
-    for (; st.core >= 1; st.core--) this._spawn(s, CORE, Math.random() * Math.PI * 2, 0);
+    for (; st.core >= 1; st.core--) this._spawn(s, CORE, random() * Math.PI * 2, 0);
     for (const t of st.tongues) {
       t.acc += t.rate * dt;
-      for (; t.acc >= 1; t.acc--) this._spawn(s, TONGUE, t.ang + (Math.random() - 0.5) * 0.3, 1);
+      for (; t.acc >= 1; t.acc--) this._spawn(s, TONGUE, t.ang + (random() - 0.5) * 0.3, 1);
       t.left -= dt;
       if (t.left <= 0) this._aim(t);
     }
@@ -497,7 +498,7 @@ export class Fireballs {
     add({ ...still, r0: BOOM.flash.r * R, life: BOOM.flash.life });
     for (let i = 0; i < BOOM.n; i++) {
       // 球面上均勻的方向。
-      const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, h = Math.sqrt(1 - u * u);
+      const u = random() * 2 - 1, a = random() * Math.PI * 2, h = Math.sqrt(1 - u * u);
       const v = pick(BOOM.speed) * R;
       add({
         ...still, vx: Math.cos(a) * h * v, vy: u * v, vz: Math.sin(a) * h * v,

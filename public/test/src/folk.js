@@ -23,6 +23,7 @@
 import { Critter } from './critter.js';
 import { solveXZ, supportInfo, arenaGap, portalGap, colsNear, PHYS } from './walk.js';
 import { Gaze, aimHead, GAZE } from './gaze.js';
+import { random } from './chance.js';
 
 /**
  * looks     撒哪幾種（第 15 頁第 5 格那幾隻）
@@ -154,7 +155,7 @@ export class Folk {
    * @param {(x: number, z: number) => boolean} away 模式要排掉的地方（true = 不撒）
    * @param {() => number} rng
    */
-  spawn(ruins, cols, doors, away = () => false, rng = Math.random) {
+  spawn(ruins, cols, doors, away = () => false, rng = random) {
     this.clear();
     for (const arena of ruins.arenas) {
       const [sx, sy, sz] = ruins.spawns[arena.id];
