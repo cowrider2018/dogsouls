@@ -52,7 +52,10 @@
      R                   重玩：回到起點，六場全部重來。
      1–6                 從第幾場開始（前面的當作打完了），在那一場的入口外面。
 
-   音樂：開打（門關上）到清完或倒下放戰鬥那一首，其餘的時候放探索那一首（music.js）。
+   音樂：開打（門關上）到清完或倒下放戰鬥那一首，其餘的時候放探索那一首（music.js）。這一場的
+   BOSS 第一次死掉、還有下一條命（combat.js 的 RALLY）的時候：音樂 HUSH 秒淡出，靜到牠開始站起來，
+   再照牠站起來那 RALLY.rise 秒把 BATTLE.rally（music.js，之後可以換成第二首戰鬥曲）從頭淡入，
+   放到這一場打完（tune）。
 
    這一頁跟其他模式一樣不存檔：重新整理就是重玩。
 
@@ -81,8 +84,8 @@ import { SCRIPT, pagesOf, preloadComic } from './comic.js';
 import { Fight, DEATH_TEXT } from './fight.js';
 import { Folk } from './folk.js';
 import { Sound } from './sound.js';
-import { Music } from './music.js';
-import { resetLife, refill, regen, KINDS } from './combat.js';
+import { Music, BATTLE } from './music.js';
+import { resetLife, refill, regen, KINDS, RALLY } from './combat.js';
 import { BLOCKS, THRONE } from './blocks.js';
 import { thronePath, pathGap } from './king.js';
 import { STAGES, START, SOULS, roomOf, signposts, foesOf, entranceOf, inStage, makeRun, doorsFor, openPortals, restAt } from './route.js';
@@ -143,6 +146,26 @@ const folk = new Folk(scene, zoo);
 
 /** 背景音樂：探索與戰鬥兩首，換的時候淡出淡入（music.js）。 */
 const music = new Music();
+/** 這一場戰鬥放哪一首（music.js 的 BATTLE）：開打是 fight，BOSS 第一次死掉之後是 rally（tune）。 */
+let battle = BATTLE.fight;
+/** BOSS 第一次死掉的時候音樂幾秒淡出。 */
+const HUSH = 1;
+
+/**
+ * 每幀說要哪一首（見檔頭）：不在戰鬥中是探索那一首。BOSS 扣光一條命、還沒開始站起來：靜下來，
+ * 而且 rally 那一首下一次從頭放；開始站起來的那一刻淡入，淡 RALLY.rise 秒——站好剛好響滿。
+ */
+function tune() {
+  if (!run.active) { battle = BATTLE.fight; music.want('explore'); return; }
+  const r = fight.boss()?.rally ?? null;
+  if (r === 0) {
+    battle = BATTLE.rally;
+    music.want(null, HUSH);
+    music.restart(battle);
+    return;
+  }
+  music.want(battle, r === null ? undefined : RALLY.rise);
+}
 
 const cam = makeCam(0, 0);
 
@@ -474,7 +497,7 @@ function frame(now) {
   if (run.active && spawnIn === 0 && !fight.foes.length && !fight.emerging && !death.busy) clear();
   if (died) fall(died);
   else if (hit) hud.flash(`${DEATH_TEXT[hit.cause]}，扣 ${hit.dmg} 點血`);
-  music.want(run.active ? 'fight' : 'explore');
+  tune();
 
   // 動物
   zoo.root.position.set(player.x, player.y, player.z);

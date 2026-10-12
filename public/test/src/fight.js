@@ -619,14 +619,18 @@ export class Fight {
   /**
    * 這一場的 BOSS（站位帶 `boss` 的那一隻，route.js 的 STAGES）：在場上的，或正在從站位底下升上來的
    * （升的時候血是滿的）。`spawn` 是牠的站位——同一次出場從升上來到上場都是同一份，認得出是不是同一隻。
-   * 扣光第一條命、正在站起來（combat.js 的 RALLY）的時候，血照站起來走到哪從 0 補回滿的。
+   * 扣光第一條命、正在站起來（combat.js 的 RALLY）的時候，血照站起來走到哪從 0 補回滿的；`rally` 是
+   * 站起來走到哪（rallied：還沒落地、落地之後等的那一段是 0，站好是 1），不在站起來是 null。
    * 沒有（還沒出生、死了、收起來了）是 null。
    */
   boss() {
     const f = this.foes.find((x) => x.m.spawn.boss);
-    if (f) return { spawn: f.m.spawn, kind: f.m.kind, hp: f.m.rally ? KINDS[f.m.kind].hp * rallied(f.m) : f.m.hp };
+    if (f) {
+      const r = f.m.rally ? rallied(f.m) : null;
+      return { spawn: f.m.spawn, kind: f.m.kind, hp: r === null ? f.m.hp : KINDS[f.m.kind].hp * r, rally: r };
+    }
     const e = this._emerging.find((x) => x.spawn.boss);
-    return e ? { spawn: e.spawn, kind: e.spawn.kind, hp: KINDS[e.spawn.kind].hp } : null;
+    return e ? { spawn: e.spawn, kind: e.spawn.kind, hp: KINDS[e.spawn.kind].hp, rally: null } : null;
   }
 
   /** 復活的國王（king.js）；沒有要收靈魂（戰鬥模式）是 null。 */

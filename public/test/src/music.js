@@ -2,8 +2,8 @@
    背景音樂：探索一首、戰鬥一首（public/assets/music/，tools/make-music.mjs 做的）。
 
    呼叫端每幀說現在要哪一首（`want`），這裡負責換：
-     換曲    正在放的那一首淡出 SWITCH 秒、要的那一首同時淡入。換回來的時候接著上次
-             停下的地方放，不從頭。
+     換曲    正在放的那一首淡出 SWITCH 秒（換的那一幀可以另外給秒數）、要的那一首同時淡入。換回來的時候接著上次
+             停下的地方放，不從頭——除非先說了那一首要從頭（`restart`）。
      循環    快放完的時候，同一首從頭再起一份淡入、這一份淡出（LOOP 秒），交叉著接上，
              不是放完停一下再從頭。所以同一首會有兩份播放器疊著放一陣子。
    每一次響起、停下都是淡的，沒有硬切。
@@ -23,6 +23,13 @@ const BASE = new URL('../../assets/music/', import.meta.url);
 
 /** 有哪幾首（檔名）。 */
 export const TRACKS = ['explore', 'fight'];
+
+/**
+ * 戰鬥放哪一首（TRACKS 的一個）：開打是 fight；這一場的 BOSS 第一次死掉、還有下一條命（combat.js 的
+ * RALLY）的時候音樂淡出，牠站起來的時候 rally 從頭淡入，一直放到這一場打完。現在兩個是同一首；
+ * 有第二首戰鬥曲的話放進 public/assets/music/、加進 TRACKS，換掉 rally 就好。
+ */
+export const BATTLE = { fight: 'fight', rally: 'fight' };
 
 /** 音樂的總音量：墊在底下，比音效小聲很多。 */
 const VOLUME = 0.25;
@@ -84,6 +91,8 @@ export class Music {
     this._voice = null;
     this._last = {};
     this._pos = {};
+    /** 換到現在這一首的時候說好淡入幾秒（還沒解好、晚幾幀才真的開始放的時候照它）。 */
+    this._sec = SWITCH;
 
     if (!audible || !Offline || new URLSearchParams(location.search).get('music') === '0') return;
     for (const t of TRACKS) {
@@ -120,10 +129,19 @@ export class Music {
   }
 
   /**
-   * 每幀叫：現在要哪一首（TRACKS 的一個，null = 不要音樂）。還不能出聲、或那一首還沒解好
-   * 的時候什麼都不做，好了之後的第一幀就照這一幀要的開始放。
+   * 這一首下一次響起的時候從頭放：忘掉停在第幾秒，還在淡出的那一份讓它淡完停掉，不淡回來。
+   * 正在放的那一首不動（先 want 別的、讓它淡出）。
    */
-  want(track) {
+  restart(track) {
+    this._pos[track] = 0;
+    if (this._last[track] !== this._voice) this._last[track] = null;
+  }
+
+  /**
+   * 每幀叫：現在要哪一首（TRACKS 的一個，null = 不要音樂）。還不能出聲、或那一首還沒解好
+   * 的時候什麼都不做，好了之後的第一幀就照這一幀要的開始放。`sec`：換曲的那一幀淡出淡入幾秒。
+   */
+  want(track, sec = SWITCH) {
     const ctx = this._ctx;
     if (!ctx || ctx.state !== 'running') return;
     const now = ctx.currentTime;
@@ -136,9 +154,10 @@ export class Music {
     });
 
     if (track !== this._track) {
-      if (this._voice) this._fade(this._voice, 0, SWITCH);
+      if (this._voice) this._fade(this._voice, 0, sec);
       this._track = track;
       this._voice = null;
+      this._sec = sec;
     }
     const buf = track && this._buf[track];
     if (!buf) return;
@@ -146,9 +165,9 @@ export class Music {
     if (!this._voice) {
       // 上次用的那一份還在淡出就把它淡回來；停了就從停的地方接著放，快到結尾了就從頭。
       const last = this._last[track];
-      if (last) { this._fade(last, 1, SWITCH); this._voice = last; return; }
+      if (last) { this._fade(last, 1, this._sec); this._voice = last; return; }
       const at = this._pos[track] || 0;
-      this._voice = this._start(track, at < buf.duration - LOOP ? at : 0, SWITCH);
+      this._voice = this._start(track, at < buf.duration - LOOP ? at : 0, this._sec);
       return;
     }
 

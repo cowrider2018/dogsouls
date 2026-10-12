@@ -8,7 +8,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CUES } from '../public/test/src/sound.js';
-import { TRACKS } from '../public/test/src/music.js';
+import { TRACKS, BATTLE } from '../public/test/src/music.js';
 import { makeCombo } from '../public/test/src/combat.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,6 +42,7 @@ for (const t of TRACKS) check(existsSync(join(ROOT, 'public/assets/music', `${t}
 const wants = read('public/test/src/mode-flow.js').split('\n').filter((l) => l.includes('music.want('));
 const asked = wants.flatMap((l) => [...l.matchAll(/'(\w+)'/g)].map((m) => m[1]));
 check(asked.length > 0 && asked.every((w) => TRACKS.includes(w)), `mode-flow.js 要的 ${[...new Set(asked)].join('、')} 都有登記`);
+check(Object.values(BATTLE).every((w) => TRACKS.includes(w)), `戰鬥放的 ${Object.entries(BATTLE).map(([k, w]) => `${k}=${w}`).join('、')} 都有登記`);
 
 console.log(bad ? `\n${bad} 項不對` : '\n全部對得上');
 process.exit(bad ? 1 : 0);
