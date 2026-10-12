@@ -154,6 +154,7 @@
                     第一下落地不僵直，就地鎖定主角那時的位置再跳，第二下落地才僵直。
     39. 第二條命的連吐  倒數完每 0.5 秒吐一顆、連吐三顆；每一顆瞄吐的那一刻主角腳下，照拋物線飛 0.9 秒
                     落地（球底貼地），停一幀才炸掉；站著不動三顆都中，吐出去之後走開就躲得掉；吐完第三顆才僵直。
+    40. 國王的第二條命  不再召喚（第一條命照樣召喚）。
    ------------------------------------------------------------------ */
 
 import { PHYS } from '../public/test/src/walk.js';
@@ -165,7 +166,7 @@ import {
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
   SOUL, dropSoul, soulStep, grabs, bankSouls,
 } from '../public/test/src/combat.js';
-import { SKILL, RAGE, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill } from '../public/test/src/skills.js';
+import { SKILL, RAGE, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill } from '../public/test/src/skills.js';
 import { steer } from '../public/test/src/walk.js';
 import { DUST, dustOf, dustFade, QUAKE, quakeBands, quakeFade, quakeTop, PLOW, plowPieces, plowClump } from '../public/test/src/dust.js';
 import { Motion, bloodOf, sizeOf, mirror, riseLift, MOVES as KNIGHT_MOVES } from '../public/test/src/monster.js';
@@ -3300,6 +3301,23 @@ console.log('39. 第二條命的連吐');
   // 動作：連吐的時候每兩顆之間是 orbAgain，下一顆出去的那一刻又是吐到一半那一格。
   ok(near(KNIGHT_MOVES.orbAgain.keys.at(-1)[0], R.every) && KNIGHT_MOVES.orbAgain.keys.at(-1)[1] === KNIGHT_MOVES.orbAgain.keys[0][1],
     'orbAgain 長 0.5 秒，頭尾都是吐到一半那一格');
+}
+
+/* ── 40. 國王的第二條命 ──────────────────────────────────────── */
+console.log('40. 國王的第二條命');
+{
+  const king = (life, x = 0, z = -2) => { const m = makeMonster({ kind: 'king', x, z, yaw: 0 }); m.life = life; m.castT = 0; return m; };
+  const picked = (life) => {
+    const got = new Set();
+    for (let i = 0; i < 40; i++) {
+      const m = king(life);
+      bossStep(m, DT, body(0, 2), makeWorld(), () => (i + 0.5) / 40);
+      if (m.cast) got.add(m.cast.skill);
+    }
+    return [...got].sort().join();
+  };
+  ok(skillsOf(king(1)).includes('summon') && picked(1).includes('summon'), `第一條命照樣召喚（挑得到 ${picked(1)}）`);
+  ok(!skillsOf(king(2)).includes('summon') && !picked(2).includes('summon'), `第二條命不再召喚（挑得到 ${picked(2)}）`);
 }
 
 console.log(fails ? `\n${fails} 項沒過` : '\n全部通過');

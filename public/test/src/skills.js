@@ -5,7 +5,7 @@
    fx.js 與 mode-combat.js 的事，而這一支 node 驗得動（tools/verify-combat.mjs）。
 
    ── 循環 ────────────────────────────────────────────────────────
-   有技能的那一類（KINDS 的 `skills`）每 `every` 秒從自己的技能裡隨機挑一招：帶 `chance` 的招
+   有技能的那一類（KINDS 的 `skills`；第二條命有 `rage` 的照 `rage`，見 skillsOf）每 `every` 秒從自己的技能裡隨機挑一招：帶 `chance` 的招
    照它的機率（國王的召喚 25%），其他的平分剩下的。
    挑中的那一刻鎖定玩家的水平位置，之後玩家怎麼跑都不改——預告就是給人躲的。
    放招的這段時間牠不追人（站著，或照那一招自己的路線走）；放完才回去追。
@@ -68,7 +68,7 @@
               reapGround  對地：落地 gap 秒後在地上轉，轉完緊接著上挑、升到頂點。
             三下之間沒有僵直，最後一下打完才僵直 0.75 秒（甩頭），停在半空中。
 
-   國王的招：
+   國王的招（第二條命不再召喚，KINDS 的 `rage`）：
 
      hew    直線劈砍（不限距離）。牠腳下出現一條往鎖定方向一直延伸到黑牆的紅色長條
             （寬 0.8 個狗高），倒數 0.5 秒；然後站在原地往前劈：劍長（跟騎士跳砍劈的那一條
@@ -205,6 +205,9 @@ export const RAGE = { grow: 1.5, half: (105 / 2) * (Math.PI / 180), hops: 2, orb
 
 /** 這隻在第二條命以後了嗎（有 `lives` 的那一類，combat.js 的 RALLY）：招照 RAGE。 */
 export const raging = (m) => (m.life || 1) > 1;
+
+/** 這隻現在挑得到哪幾招：第二條命以後、那一類有 `rage` 的話照它（國王不再召喚），其餘照 `skills`。 */
+export const skillsOf = (m) => (raging(m) && kindOf(m).rage) || kindOf(m).skills || [];
 
 /** 第二條命放大的那幾招。 */
 const GROWN = new Set(['leap', 'cone']);
@@ -641,13 +644,14 @@ function waveHits(st, p) {
  */
 export function bossStep(m, dt, target, world, rng = Math.random) {
   const k = kindOf(m);
-  if (!k.skills || !k.skills.length || m.rally) return null;   // 站起來的時候（combat.js 的 RALLY）不放招
+  const list = skillsOf(m);
+  if (!list.length || m.rally) return null;   // 站起來的時候（combat.js 的 RALLY）不放招
   if (m.cast && busy(m)) m.cast = null;                // 被打斷
   m.castT -= dt;
   // 衝刺（combat.js 的 LUNGE）打完才挑下一招，兩件事不會疊在一起。
   if (!m.cast && m.castT <= 0 && !busy(m) && !(m.stun > 0) && !m.lunge) {
     const gap = Math.hypot(target.x - m.x, target.z - m.z);
-    const can = k.skills.filter((s) => gap <= rangeOf(m, s) && (!READY[s] || READY[s](m)));
+    const can = list.filter((s) => gap <= rangeOf(m, s) && (!READY[s] || READY[s](m)));
     if (can.length) {
       m.castT = k.every;
       begin(m, pickSkill(can, rng()), target, rng);
