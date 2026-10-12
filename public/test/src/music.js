@@ -86,9 +86,12 @@ class Voice {
     return a + (b - a) * Math.max(0, (now - t0) / (t1 - t0));
   }
 
+  /**
+   * 停在現在這一刻。不拔掉音量那一節：拔線不排時間，離線混音的時候會在算之前就拔掉，整份連淡出都
+   * 聽不到；源停了，沒人接的這一節自己會被收掉。
+   */
   stop() {
     this.src.stop(this.ctx.currentTime);
-    this.gain.disconnect();
   }
 }
 
