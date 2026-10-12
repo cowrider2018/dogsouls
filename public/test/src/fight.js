@@ -22,7 +22,7 @@
               交出去的那一顆拋到牠身上。交滿、最後一顆落到牠身上（拋物線的終點）的那一刻，國王復甦（REVIVE）：屍體炸成一團
               幽靈血，血慢下來之後再加速聚攏回來（bleed.js 的 GATHER），聚到的那一刻活著的國王
               從 0 長到原本大小。演完的那一幀回報 risen。
-     draw     怪物、屍體、劍光（攻擊範圍）、國王劈砍的斬痕與氣流、旋風斬的熱氣流、粉塵（落地、殭屍王範圍攻擊的地震）、殭屍王的預告與球、靈魂、破防的兩圈、國王的盾、刀、
+     draw     怪物（國王瞪視的眼光）、主角被瞪的時候出竅的幽靈與畫面的縮放、模糊（glare.js）、屍體、劍光（攻擊範圍）、國王劈砍的斬痕與氣流、旋風斬的熱氣流、粉塵（落地、殭屍王範圍攻擊的地震）、殭屍王的預告與球、靈魂、破防的兩圈、國王的盾、刀、
               頭頂的愛心。
               在相機擺好之後（破防的兩圈與愛心正對這一幀的鏡頭）；流體場也在這裡
               往前推一幀，所以要在 renderer.render 之前。
@@ -67,6 +67,7 @@ import { Scars, SCAR_REACH } from './scar.js';
 import { SHADE_N, bakeShade } from './occlude.js';
 import { dustOf, dustFade, DUST_LOOK, PUSH_TIME, QUAKE, quakeBands, quakeFade, PLOW, plowPieces, plowClump } from './dust.js';
 import { MUTE } from './sound.js';
+import { EyeGlow, Spirit, dazeView } from './glare.js';
 
 /** _compile 記下原本的 scissor 用。 */
 const _scissor = new THREE.Vector4();
@@ -244,6 +245,10 @@ export class Fight {
 
     /** 玩家頭頂的愛心：還剩幾點血。 */
     this.hearts = new Hearts(scene);
+    /** 被國王瞪得靈魂出竅的時候疊在主角身上的幽靈（glare.js），與畫面糊掉的那一層（CSS 的 filter 寫在畫布上）。 */
+    this._spirit = new Spirit(scene, zoo);
+    this._view = renderer ? renderer.domElement : null;
+    this._blur = '';
     /** 獻靈魂交到哪裡（offer.js），與拋出去、還在飛的那幾顆。 */
     this.offer = makeOffer(this._owed);
     this._thrown = [];
@@ -295,14 +300,19 @@ export class Fight {
     }
   }
 
-  /** 換了動物：刀掛到新那一隻頭上。 */
-  follow() { this.blade.follow(this.zoo.active); }
+  /** 換了動物：刀掛到新那一隻頭上，出竅的幽靈也先建好那一隻的。 */
+  follow() {
+    this.blade.follow(this.zoo.active);
+    this._spirit.prep(this.zoo.modelId);
+    this._cold = true;
+  }
 
   /** 墨線多粗（controls.js 的 fitView 給）。之後才借出去的外觀也要，所以記著。 */
   setInkPx(px, h) {
     this._inkPx = [px, h];
     for (const list of this._pool.values()) for (const s of list) s.critter.setInkPx(px, h);
     if (this._king) this._king.setInkPx(px, h);
+    this._spirit.setInkPx(px, h);
     this._blood.setInkPx(px, h);
     this._fire.setInkPx(px, h);
   }
@@ -326,7 +336,7 @@ export class Fight {
         rend: circleFx(REND.radius),
         whirl: stripFx(SKILL.whirl.radius, true), cleave: stripFx(SKILL.cleave.width / 2, false),
         hew: stripFx(SKILL.hew.width / 2, false), gale: galeFx(SKILL.gale.radius, SHADE_N),
-        blade: null, helm: null, crown: null, shields: null,
+        blade: null, helm: null, crown: null, shields: null, glow: null,
       };
       // 咬著劍的那幾類（騎士、國王）：劍掛在牠自己的頭上，跟主角那把一樣每幀跟著頭。
       if (swordOf(kind)) { slot.blade = new Blade(swordOf(kind)); slot.blade.follow(slot.critter); }
@@ -336,6 +346,8 @@ export class Fight {
       if (crownOf(kind)) { slot.crown = new Crown(); slot.crown.follow(slot.critter); }
       // 有盾的（國王）：幾面盾繞著牠轉，墨線一樣跟著牠的墨色換。
       if (KINDS[kind].shields) { slot.shields = new ShieldRing(KINDS[kind].shields); slot.shields.follow(slot.critter); this.scene.add(slot.shields.node); }
+      // 會瞪的（國王的第二條命）：兩隻眼睛的光暈。
+      if ([...(KINDS[kind].skills || []), ...(KINDS[kind].rage || [])].includes('glare')) slot.glow = new EyeGlow(this.scene, slot.critter);
       if (this._inkPx) slot.critter.setInkPx(...this._inkPx);
       this.scene.add(slot.critter.root, slot.breakFx.node, slot.lane.node, slot.circle.node, slot.rend.node, slot.cone.node, slot.wide.node, slot.whirl.node, slot.cleave.node, slot.hew.node, slot.gale.node);
       list.push(slot);
@@ -364,6 +376,7 @@ export class Fight {
     s.hew.node.visible = false;
     s.gale.node.visible = false;
     if (s.shields) s.shields.hide();
+    if (s.glow) s.glow.hide();
   }
 
   /** 一隻怪物上場：借來的外觀亮出來、面向站位的方向，配上牠的狀態與動作。 */
@@ -965,6 +978,7 @@ export class Fight {
     const combo = this.combo, fx = this._fx;
     if (this._cold) this._compile(camera);
     this._shake(dt, camera);
+    this._daze(camera, player);
     this._eye.copy(camera.position);
     this.blade.update();
     // 剛挨過一下（guard 還開著）：玩家一閃一閃的。頭頂是最大血量幾顆心、剩下的幾顆是滿的。
@@ -975,7 +989,9 @@ export class Fight {
     const blink = blinkOf(this.offer, player);
     this.hearts.show(player.hp, player.max, player.x, player.y, player.z, camera.quaternion,
       blink >= 0 && Math.floor(blink * 12) % 2 === 1);
-    for (const { m, critter, motion, blade, helm, crown, shields } of this.foes) {
+    // 被國王瞪的時候：主角身上浮出自己的幽靈，甩頭（glare.js）。
+    this._spirit.show(dt, player, Math.atan2(camera.position.x - player.x, camera.position.z - player.z));
+    for (const { m, critter, motion, blade, helm, crown, shields, glow } of this.foes) {
       /* 衝刺與放招的動作（monster.js 的 Motion）：疊一套動作，跳的那幾段畫成在空中、
          垂直速度照那一跳。 */
       const mo = motion.step(dt, m, player);
@@ -994,6 +1010,8 @@ export class Fight {
       if (crown) crown.update();
       // 盾繞著牠的腳轉（衝的時候畫得跳起來，盾跟著）。
       if (shields) shields.show(dt, m.shields, m.x, m.y + mo.lift, m.z, sizeOf(m.kind));
+      // 瞪視：眼睛發光。
+      if (glow) glow.show(dt, m, camera);
     }
     for (const f of this._corpses) this._lie(f, dt, camera);
     this._risen(dt, camera, player);
@@ -1151,6 +1169,18 @@ export class Fight {
     if (this.fluid) this.fluid.compile();
     this._blood.compile(camera);
     this._fire.compile(camera);
+  }
+
+  /**
+   * 被國王瞪得靈魂出竅（combat.js 的 DAZE）的時候畫面怎樣（glare.js 的 dazeView）：鏡頭的縮放來回晃、畫布糊掉。
+   * 沒被瞪就回到原本的樣子。縮放是鏡頭自己的 zoom（模式每幀只重擺位置，不碰它）；模糊只在變了的時候寫，
+   * 不蓋掉別人（倒下醒來那一段，death.js）寫的。
+   */
+  _daze(camera, player) {
+    const v = player.daze ? dazeView(player.daze.t) : { zoom: 1, blur: 0 };
+    if (camera.zoom !== v.zoom) { camera.zoom = v.zoom; camera.updateProjectionMatrix(); }
+    const css = v.blur > 0.01 ? `blur(${v.blur.toFixed(2)}px)` : '';
+    if (this._view && css !== this._blur) { this._view.style.filter = css; this._blur = css; }
   }
 
   /**

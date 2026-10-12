@@ -106,7 +106,7 @@
             起來那一下縮成一團、往右擰到底（照 1 秒拉長）；轉的時候是主角落地那一下整隻往左轉一圈，
             劍水平伸在外面掃過去（galeSpin，0.4 秒轉完）；0.5 秒的僵直是甩頭（衝刺僵直那一套甩，
             不先低頭）：停在轉完的那個姿勢 STILL.before 秒，然後一邊甩一邊回到原本的樣子，再 STILL.after 秒沒有動作。劍光是主角第三擊那一道（fight.js）。
-     glare  瞪視（第二條命）：低頭、壓低身子、尾巴垂下去，從眉毛底下往上瞪著主角（頭跟著主角轉，LOOK），
+     glare  瞪視（第二條命）：壓低身子、往前探、尾巴垂下去，頭抬平、臉正對著主角（頭跟著主角轉，LOOK），
             越蓄越低；瞪下去的那一刻頭往前一頂，之後停在那裡一直瞪到收招，僵直裡慢慢回到原本的樣子。
 
    ── 會飛的漂 ──────────────────────────────────────────────────────
@@ -121,7 +121,7 @@
 
 import * as THREE from '../vendor/three.module.js';
 import { Critter } from './critter.js';
-import { LUNGE, STILL, RALLY, kindOf } from './combat.js';
+import { LUNGE, STILL, RALLY, DAZE, kindOf } from './combat.js';
 import { SKILL, RAGE, UP_AIR, REAP, recoverOf } from './skills.js';
 import { PHYS } from './walk.js';
 import { Mover, MOVES as HERO } from './moves.js';
@@ -301,6 +301,21 @@ function shakeKeys(T, base, lead) {
   return keys;
 }
 
+/**
+ * 被國王瞪得靈魂出竅的主角浮出來的那一隻幽靈（glare.js）：DAZE.time 秒一直甩頭——站起來（rally）那一套甩
+ * （SHAKE），只是不先停：一開始就甩、越甩越輕，時間到剛好回到原本的樣子。
+ */
+export const DAZE_MOVE = (() => {
+  const T = DAZE.time, step = 0.02, keys = [[0, {}]];
+  for (let s = step; s < T - 1e-6; s += step) {
+    const e = shakeEnv(s / T), pose = { w: 1 };
+    for (const [k, [a, hz, ph]] of Object.entries(SHAKE)) pose[k] = a * e * Math.sin(2 * Math.PI * hz * s + ph);
+    keys.push([s, pose, 'lin']);
+  }
+  keys.push([T, {}, 'lin']);
+  return { blend: 0.02, keys };
+})();
+
 /* ── 扣光第一條命 ── 低頭是 SLUMP，站起來的時候先抬到 LIFT 再甩。 */
 const SLUMP = { pitch: 0.22, headPitch: 0.95, drop: 0.1, tailPitch: -0.45, front: -0.15, hind: -0.25, knee: -0.4, legs: 0.5, w: 1 };
 const LIFT = { pitch: -0.15, headPitch: -0.35, tailPitch: 0.2, w: 1 };
@@ -361,12 +376,12 @@ const SPIN_END = (() => {
   return { ...pose, yaw: pose.yaw - 2 * Math.PI };
 })();
 
-/* ── 瞪視 ── 蓄力壓低到 GLARE，瞪下去的那一刻頭往前一頂（GLARE_HIT）。 */
+/* ── 瞪視 ── 蓄力壓低到 GLARE（身體往前探，頭扳回來抬平，臉對著前面），瞪下去的那一刻頭往前一頂（GLARE_HIT）。 */
 const GLARE = {
-  pitch: 0.10, headPitch: 0.32, drop: 0.06, tailPitch: -0.35,
+  pitch: 0.10, headPitch: -0.04, drop: 0.06, tailPitch: -0.35,
   front: -0.12, hind: -0.18, knee: -0.30, legs: 0.6, w: 1,
 };
-const GLARE_HIT = { ...GLARE, pitch: 0.18, headPitch: 0.18, drop: 0.03 };
+const GLARE_HIT = { ...GLARE, pitch: 0.18, headPitch: -0.12, drop: 0.03 };
 
 /** 跳砸站著蓄力的那一段有多長（之後 SKILL.leap.air 秒在飛）。 */
 const LEAP_WIND = SKILL.leap.windup - SKILL.leap.air;
