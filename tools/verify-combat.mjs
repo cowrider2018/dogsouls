@@ -152,6 +152,8 @@
                     第二條扣到 0 才死；重生、回到站位都從第一條命開始。
     38. 第二條命的跳砸與扇形  半徑都是 1.5 倍（扇形夠得到的距離跟著變長），傷害不變；跳砸連跳兩下：
                     第一下落地不僵直，就地鎖定主角那時的位置再跳，第二下落地才僵直。
+    39. 第二條命的連吐  倒數完每 0.5 秒吐一顆、連吐三顆；每一顆瞄吐的那一刻主角腳下，照拋物線飛 0.9 秒
+                    落地（球底貼地），停一幀才炸掉；站著不動三顆都中，吐出去之後走開就躲得掉；吐完第三顆才僵直。
    ------------------------------------------------------------------ */
 
 import { PHYS } from '../public/test/src/walk.js';
@@ -3241,6 +3243,51 @@ console.log('38. 第二條命的跳砸與扇形');
     ok(!stunBetween && Math.abs(hits[1].t - hits[0].t - SKILL.leap.windup) < 2 * DT && stunAt >= 0 && b.hop === undefined,
       `兩下之間不僵直（隔 ${(hits[1].t - hits[0].t).toFixed(2)} 秒，跟一下的倒數一樣長），第二下落地才僵直`);
   }
+}
+
+/* ── 39. 第二條命的連吐 ────────────────────────────────────── */
+console.log('39. 第二條命的連吐');
+{
+  const R = RAGE.orb;
+  ok(R.count === 3 && R.every === 0.5 && R.flight === 0.9, '第二條命：倒數完每 0.5 秒吐一顆、連吐三顆，每一顆飛 0.9 秒');
+  // dodge(k, q)：第 k 顆吐出去之後主角怎麼動。回傳每一顆吐出去的時刻、瞄的落點、有沒有打中、落地的時刻。
+  const run = (dodge) => {
+    const w = makeWorld(), b = makeMonster({ kind: 'boss', x: 0, z: -4, yaw: 0 }), q = body(0, 2);
+    b.life = 2; b.castT = 0;
+    const balls = [];
+    let t = 0, stunAt = -1;
+    while (t < 4) {
+      const n = w.shots.length;
+      bossStep(b, DT, q, w, () => 0);
+      for (const s of w.shots.slice(n)) balls.push({ s, at: t, aim: [q.x, q.z], hit: false, gone: -1, end: null });
+      if (stunAt < 0 && !b.cast && b.stun > 0) stunAt = t;
+      for (const g of shotsStep(w, DT)) { const o = balls.find((x) => x.s === g); o.gone = t; o.end = [g.x, g.y, g.z]; }
+      for (const o of balls) if (w.shots.includes(o.s) && shotHits(o.s, q)) o.hit = true;
+      dodge(balls.length, q);
+      t += DT;
+    }
+    return { balls, stunAt };
+  };
+  const stay = run(() => {});
+  const at = stay.balls.map((o) => o.at - SKILL.orb.windup);
+  ok(stay.balls.length === 3 && at.every((a, i) => Math.abs(a - i * R.every) < 2 * DT),
+    `倒數完第 ${at.map((a) => a.toFixed(2)).join('、')} 秒各吐一顆`);
+  ok(stay.balls.every((o) => o.hit && o.s.dmg === SKILL.orb.damage), '站著不動：三顆都打中，各扣 5');
+  ok(stay.balls.every((o) => Math.abs(o.gone - o.at - R.flight) < 3 * DT && near(o.end[0], 0) && near(o.end[2], 2) && near(o.end[1], SKILL.orb.radius, 1e-3)),
+    '每一顆飛 0.9 秒落在主角腳下（球底貼地），落地停一幀才炸掉');
+  ok(Math.max(...stay.balls.map((o) => o.s.lob.vy)) > 0 && stay.balls.every((o) => near(o.s.lob.y0, R.mouth)), '從嘴（腳上 1.5 個狗高）往上拋出去');
+  ok(Math.abs(stay.stunAt - SKILL.orb.windup - 2 * R.every) < 2 * DT, '吐完第三顆才僵直');
+  // 每一顆吐出去之後主角往旁邊跨 1.2 公尺：每一顆都瞄著吐的那一刻主角在的地方，全部落空。
+  const side = run((k, q) => { q.x = 1.2 * k; });
+  ok(side.balls.every((o, i) => near(o.aim[0], 1.2 * i) && near(o.s.lob.tx, 1.2 * i) && !o.hit), '每一顆瞄吐的那一刻主角腳下；吐出去之後走開就躲得掉');
+  // 第一條命還是一顆直線的球。
+  const w1 = makeWorld(), b1 = makeMonster({ kind: 'boss', x: 0, z: -4, yaw: 0 });
+  b1.castT = 0;
+  for (let i = 0; i < 120; i++) bossStep(b1, DT, body(0, 2), w1, () => 0);
+  ok(w1.shots.length === 1 && !w1.shots[0].lob, '第一條命：一顆直線的球');
+  // 動作：連吐的時候每兩顆之間是 orbAgain，下一顆出去的那一刻又是吐到一半那一格。
+  ok(near(KNIGHT_MOVES.orbAgain.keys.at(-1)[0], R.every) && KNIGHT_MOVES.orbAgain.keys.at(-1)[1] === KNIGHT_MOVES.orbAgain.keys[0][1],
+    'orbAgain 長 0.5 秒，頭尾都是吐到一半那一格');
 }
 
 console.log(fails ? `\n${fails} 項沒過` : '\n全部通過');

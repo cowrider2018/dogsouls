@@ -55,7 +55,7 @@ import {
 import { SoulLook } from './soul.js';
 import { makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, flySoul } from './offer.js';
 import { DEATH, tipAngle, footprint, fallSide, fallHalf, tipNode } from './death.js';
-import { SKILL, GUST, WHIRL_LEN, REAP, REND, radiusOf, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, ringsStep, shotHits, strikeHits, gustHits, ringHits, laneLength } from './skills.js';
+import { SKILL, GUST, WHIRL_LEN, REAP, REND, radiusOf, raging, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, ringsStep, shotHits, strikeHits, gustHits, ringHits, laneLength } from './skills.js';
 import { Hearts } from './hearts.js';
 import { Fluid, Sheet } from './fluid.js';
 import { TRAILS } from './trail.js';
@@ -189,6 +189,9 @@ export class Fight {
     /* 殭屍王放出來的球：畫成火球（fireball.js）；尾巴的火粒要 renderer 畫場。 */
     this.world = makeWorld();
     this._fire = new Fireballs(scene, SKILL.orb.radius, renderer);
+    /** 拋物線的球（第二條命的殭屍王吐的）落點上的預告：一顆一圈，不夠就多做。先做好一圈，理由同劍光。 */
+    this._marks = [circleFx(SKILL.orb.radius)];
+    scene.add(this._marks[0].node);
 
     /* 連段的狀態與按鍵的提示圈。 */
     this.combo = makeCombo();
@@ -1024,7 +1027,8 @@ export class Fight {
       const c = m.cast;
       this._hew(f);
       this._gale(f);
-      const orb = !!c && c.skill === 'orb', leap = !!c && c.skill === 'leap', fan = !!c && c.skill === 'cone';
+      // 第二條命吐的是拋物線的球：沒有這一條，預告是每一顆的落點（_landing）。
+      const orb = !!c && c.skill === 'orb' && !raging(m), leap = !!c && c.skill === 'leap', fan = !!c && c.skill === 'cone';
       /* 劍迴旋衝刺：從起步的地方往鎖定的方向，衝得到多遠（黑牆擋住的話到牆前）。衝的時候
          亮著滿的——那一條就是還會被掃到的地方。 */
       const wh = !!c && c.skill === 'whirl';
@@ -1062,8 +1066,9 @@ export class Fight {
         radiusOf(m, 'cone') / SKILL.cone.radius);
     }
 
-    // 飛著的球（火球）。
+    // 飛著的球（火球）與拋物線的球的落點。
     this._fire.draw(dt, this.world.shots, camera);
+    this._landing();
 
     // 靈魂：頭、光暈、冒出來的小球（soul.js）。
     const souls = this._thrown.length ? [...this.souls, ...this._thrown] : this.souls;
@@ -1078,6 +1083,24 @@ export class Fight {
     for (const { m, breakFx: bf } of this.foes) {
       showBreak(bf, m.breakT / BREAK_WINDOW, m.x, m.y + PHYS.height / 2, m.z, camera.quaternion);
     }
+  }
+
+  /**
+   * 拋物線的球（skills.js 的 lob）落點上的預告：落點那一塊地板上一圈球那麼大的淺色圓，亮色照飛了幾成
+   * 從中心長到邊，長滿的那一刻球落下來。
+   */
+  _landing() {
+    const lobs = this.world.shots.filter((s) => s.lob);
+    while (this._marks.length < lobs.length) {
+      const f = circleFx(SKILL.orb.radius);
+      this.scene.add(f.node);
+      this._marks.push(f);
+      this._cold = true;
+    }
+    this._marks.forEach((f, i) => {
+      const L = lobs[i]?.lob;
+      showCircle(f, !!L, L ? L.t / L.T : 0, L ? L.tx : 0, L ? L.tz : 0, L ? L.floor : 0);
+    });
   }
 
   /**

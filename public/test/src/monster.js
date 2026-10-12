@@ -47,7 +47,8 @@
 
      orb   仰頭伸展蓄力：胸口挺起、頭往後仰到朝天、尾巴翹起來，越蓄越仰；
            倒數最後那一下頭往前甩，球出去的那一刻正甩到一半——吐出去的；
-           甩到底停一下，然後在僵直裡慢慢回到原本的樣子。
+           甩到底停一下，然後在僵直裡慢慢回到原本的樣子。第二條命連吐三顆（skills.js 的 RAGE）：
+           兩顆之間（orbAgain）甩到底停一下，再仰回去蓄滿，下一顆出去的那一刻又正甩到一半。
      cone  前肢抬起：整個前半身立起來、兩隻前腳離地收在胸前，頭反過來壓低
            盯著主角；倒數最後那一下整隻砸下去，打下去的那一刻前腳踩到地；
            僵直裡再往下一沉，然後慢慢起身。
@@ -117,7 +118,7 @@
 import * as THREE from '../vendor/three.module.js';
 import { Critter } from './critter.js';
 import { LUNGE, STILL, RALLY, kindOf } from './combat.js';
-import { SKILL, UP_AIR, REAP, recoverOf } from './skills.js';
+import { SKILL, RAGE, UP_AIR, REAP, recoverOf } from './skills.js';
 import { PHYS } from './walk.js';
 import { Mover, MOVES as HERO } from './moves.js';
 
@@ -404,6 +405,10 @@ export const MOVES = {
     blend: 0.08,
     keys: [[0, {}], [0.55, STRETCH, 'out'], [SKILL.orb.windup - 0.06, STRETCH_MAX, 'inOut'], [SKILL.orb.windup, SPIT_MID, 'in']],
   },
+  orbAgain: {
+    blend: 0.02,
+    keys: [[0, SPIT_MID], [0.05, SPIT, 'out'], [0.12, SPIT, 'lin'], [RAGE.orb.every - 0.06, STRETCH_MAX, 'inOut'], [RAGE.orb.every, SPIT_MID, 'in']],
+  },
   orbRec: { blend: 0.02, keys: [[0, SPIT_MID], [0.05, SPIT, 'out'], [0.14, SPIT, 'lin'], [SKILL.recover, {}, 'inOut']] },
   coneWind: {
     blend: 0.1,
@@ -577,6 +582,8 @@ export class Motion {
     if (c) {
       this._skill = c.skill;
       if (c.skill === 'leap' && c.t >= LEAP_WIND) return ['leapAir', c.t - LEAP_WIND];
+      // 第二條命連吐：吐出第一顆之後，每一顆之間是 orbAgain（從吐出上一顆那一刻算起）。
+      if (c.skill === 'orb' && c.spat) return ['orbAgain', c.t - SKILL.orb.windup - (c.spat - 1) * RAGE.orb.every];
       if (c.skill === 'whirl' && c.t >= SKILL.whirl.windup) return ['whirlDash', c.t - SKILL.whirl.windup];
       if (c.skill === 'gale' && c.t >= SKILL.gale.windup) return ['galeSpin', c.t - SKILL.gale.windup];
       if (c.skill === 'cleave' && c.up) {

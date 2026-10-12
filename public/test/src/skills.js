@@ -17,7 +17,7 @@
    的是破防攻擊：被定住的那一刻放到一半的招直接取消，不打。倒數照走，下一招
    還是從上一招開始算起的 `every` 秒後。
 
-   出招之後（球射出去、跳砸落地、扇形打下去、跳砍的上挑落地）僵直 SKILL.recover 秒（有自己的
+   出招之後（球射出去——第二條命是第三顆、跳砸落地——第二條命是第二下、扇形打下去、跳砍的上挑落地）僵直 SKILL.recover 秒（有自己的
    `recover` 的招照它的：hew 短一點，甩頭的 reap、gale 多出甩之前與之後不動的 STILL 秒）：站著不動、
    也不追人，而且跟平常一樣打得退、傷害照算——這是反擊的空檔。被破防攻擊打斷
    的不算出招，沒有僵直。
@@ -32,6 +32,10 @@
            亮色的扇形從殭屍王腳下往外長，長滿的那一刻打那一整片。
 
    殭屍王的第二條命（combat.js 的 RALLY 站起來之後）招變兇（RAGE），傷害不變：
+     orb   連吐三顆拋物線的球：倒數一樣 0.75 秒，之後每 0.5 秒吐一顆，每一顆吐的那一刻轉向主角、
+           瞄準主角那時腳下的地板，從嘴（腳上 1.5 個狗高）照拋物線 0.9 秒落到那一點（球底剛好貼地）。
+           飛的時候落點上有一圈預告（fight.js），亮色照飛了幾成長滿。落地停一幀（站在落點上的照樣
+           被打中）就炸掉；路上撞到場上的東西一樣炸掉。吐完第三顆才僵直。
      leap  範圍半徑 1.5 倍，而且連跳兩下：第一下落地打下去的那一刻，就地鎖定玩家那時的位置、
            再倒數一次跳過去（倒數、預告都跟第一下一樣），第二下落地才僵直。
      cone  半徑 1.5 倍（長度變長，所以夠得到的距離 `range` 也是 1.5 倍）。
@@ -195,8 +199,9 @@ export const RING = { depth: GUST.top - GUST.inner, half: SKILL.gale.wave.half }
 
 /**
  * 殭屍王第二條命的招（見檔頭）。grow：跳砸與扇形的半徑（扇形連 range）放大幾倍；hops：跳砸連跳幾下。
+ * orb：連吐 count 顆拋物線的球，倒數完之後每 every 秒一顆，每一顆從腳上 mouth 那麼高飛 flight 秒落到主角腳下。
  */
-export const RAGE = { grow: 1.5, hops: 2 };
+export const RAGE = { grow: 1.5, hops: 2, orb: { count: 3, every: 0.5, flight: 0.9, mouth: 1.5 * DOG_H } };
 
 /** 這隻在第二條命以後了嗎（有 `lives` 的那一類，combat.js 的 RALLY）：招照 RAGE。 */
 export const raging = (m) => (m.life || 1) > 1;
@@ -339,9 +344,18 @@ function allowed(m, x, y, z) {
 
 /** 每一招倒數時與倒數完的那一幀要做什麼。 */
 const CAST = {
-  orb(m, world) {
+  orb(m, world, target) {
     const c = m.cast, S = SKILL.orb;
     if (c.t < S.windup) return;
+    if (raging(m)) {
+      // 第二條命：倒數完每 every 秒吐一顆拋物線的球（`spat` 是吐了幾顆），吐滿收招。
+      const n = c.spat || 0, R = RAGE.orb;
+      if (c.t < S.windup + n * R.every) return;
+      world.shots.push(lob(m, target));
+      c.spat = n + 1;
+      if (c.spat >= R.count) m.cast = null;
+      return;
+    }
     // 從身體前緣發出去，剛好不跟自己重疊。
     const off = PHYS.radius + S.radius;
     world.shots.push({
@@ -463,6 +477,26 @@ const CAST = {
     return null;
   },
 };
+
+/**
+ * 吐一顆拋物線的球（第二條命的 orb）：轉向玩家，從嘴（身體前緣、腳上 RAGE.orb.mouth）飛 flight 秒
+ * 落到玩家腳下那一塊地板上（球心在地板上一個半徑，球底剛好貼地）。位置照時間算（`lob`，shotsStep），
+ * 跟幀長無關；vx、vz 是水平的速度（火球照它朝向、噴尾巴）。
+ */
+function lob(m, target) {
+  const S = SKILL.orb, R = RAGE.orb, T = R.flight;
+  const dx = target.x - m.x, dz = target.z - m.z, d = Math.hypot(dx, dz);
+  if (d > 1e-6) { m.aimX = dx / d; m.aimZ = dz / d; }
+  m.cast.dirX = m.aimX; m.cast.dirZ = m.aimZ;
+  const off = PHYS.radius + S.radius;
+  const x0 = m.x + m.aimX * off, y0 = m.y + R.mouth, z0 = m.z + m.aimZ * off;
+  const floor = supportInfo(m.field.cols, target.x, target.z, target.y).y, y1 = floor + S.radius;
+  const vx = (target.x - x0) / T, vz = (target.z - z0) / T;
+  return {
+    x: x0, y: y0, z: z0, vx, vz, r: S.radius, dmg: S.damage,
+    lob: { x0, y0, z0, vy: (y1 - y0) / T + (PHYS.gravity * T) / 2, t: 0, T, tx: target.x, tz: target.z, floor },
+  };
+}
 
 /**
  * 跳砍落地：轉向玩家現在的位置，記下上挑的方向與那一片扇形的末端點（起跳那一層、
@@ -653,10 +687,24 @@ export function blockerAt(field, x, z, r, lo, hi) {
 /** 一顆球撞到場上的東西了嗎：球（用外接方框近似）跟碰撞體重疊（blockerAt）。 */
 export const shotBlocked = (s, field) => !!blockerAt(field, s.x, s.z, s.r, s.y - s.r + SKIM, s.y + s.r);
 
-/** 球往前飛，碰到黑牆或場上的東西就炸掉消失。回傳這一幀炸掉的那幾顆（畫爆炸用）。 */
+/**
+ * 球往前飛，碰到黑牆或場上的東西就炸掉消失。回傳這一幀炸掉的那幾顆（畫爆炸用）。
+ * 拋物線的球（`lob`）照時間擺在拋物線上，落到落點的那一幀停在那裡（這一幀照樣打得到人），下一幀炸掉；
+ * 不看黑牆——起點與落點都在場裡，中間那一條也在。
+ */
 export function shotsStep(world, dt) {
   const gone = [];
   world.shots = world.shots.filter((s) => {
+    const L = s.lob;
+    if (L) {
+      if (L.t >= L.T) { gone.push(s); return false; }
+      L.t = Math.min(L.T, L.t + dt);
+      s.x = L.x0 + s.vx * L.t; s.z = L.z0 + s.vz * L.t;
+      s.y = L.y0 + L.vy * L.t - (PHYS.gravity * L.t * L.t) / 2;
+      const hit = shotBlocked(s, world.field);
+      if (hit) gone.push(s);
+      return !hit;
+    }
     s.x += s.vx * dt; s.z += s.vz * dt;
     const hit = arenaGap(world.field.arena, s.x, s.z) <= s.r || shotBlocked(s, world.field);
     if (hit) gone.push(s);
