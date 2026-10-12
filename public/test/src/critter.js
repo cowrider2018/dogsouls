@@ -1589,14 +1589,19 @@ export class Critter {
 
        轉身那一份是累加的（跟 _yaw 一樣不收進 ±π）：迴旋斬轉完一整圈之後
        動作會從 2π 換回 0，兩個是同一個朝向，鏈子不該因此被倒轉一圈。
-       每一小步內插上一幀到這一幀，鏈子看到的是連續的轉，不是一幀一階。 */
+       每一小步內插上一幀到這一幀，鏈子看到的是連續的轉，不是一幀一階。
+
+       欄位缺了就是 0，跟 moveOverlay 一樣：只有主角的招式（moves.js）每個欄位都補齊，
+       怪物的姿勢、Gaze 給的轉頭都只有幾個欄位。直接讀的話 undefined 會變成 NaN 餵進鏈子，
+       而 _mvYaw 是累加的，一幀 NaN 之後尾巴就永遠不見了。 */
     const mv = st.move || null;
-    const mvYaw = mv ? mv.yaw : 0;
+    const mf = (k) => (mv && mv[k]) || 0;
+    const mvYaw = mf('yaw');
     const yaw0 = this._mvYaw;
     this._mvYaw += wrapPi(mvYaw - this._mvYawPrev) * MOVE_TAIL_SPIN;
     this._mvYawPrev = mvYaw;
-    const tail0 = this._mvTail, tail1 = mv ? mv.tailYaw : 0;
-    const pitch0 = this._mvPitch, pitch1 = mv ? mv.pitch + mv.tailPitch * 0.5 : 0;
+    const tail0 = this._mvTail, tail1 = mf('tailYaw');
+    const pitch0 = this._mvPitch, pitch1 = mf('pitch') + mf('tailPitch') * 0.5;
     this._mvTail = tail1;
     this._mvPitch = pitch1;
 
