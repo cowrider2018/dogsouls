@@ -150,7 +150,7 @@
                     落地；從那一刻到站好打不到（不扣血、不累積破防、破防攻擊瞄不到）、不追人、不放招；
                     落地 1 秒之後花 2 秒站起來，站好血補滿、第二條命。動作是 slump（空中也是）→ rally。
                     第二條扣到 0 才死；重生、回到站位都從第一條命開始。
-    38. 第二條命的跳砸與扇形  半徑都是 1.5 倍（扇形夠得到的距離跟著變長），傷害不變；跳砸連跳兩下：
+    38. 第二條命的跳砸與扇形  半徑都是 1.5 倍（扇形夠得到的距離跟著變長）、扇形張開到 105°，傷害不變；跳砸連跳兩下：
                     第一下落地不僵直，就地鎖定主角那時的位置再跳，第二下落地才僵直。
     39. 第二條命的連吐  倒數完每 0.5 秒吐一顆、連吐三顆；每一顆瞄吐的那一刻主角腳下，照拋物線飛 0.9 秒
                     落地（球底貼地），停一幀才炸掉；站著不動三顆都中，吐出去之後走開就躲得掉；吐完第三顆才僵直。
@@ -165,7 +165,7 @@ import {
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
   SOUL, dropSoul, soulStep, grabs, bankSouls,
 } from '../public/test/src/combat.js';
-import { SKILL, RAGE, radiusOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill } from '../public/test/src/skills.js';
+import { SKILL, RAGE, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill } from '../public/test/src/skills.js';
 import { steer } from '../public/test/src/walk.js';
 import { DUST, dustOf, dustFade, QUAKE, quakeBands, quakeFade, quakeTop, PLOW, plowPieces, plowClump } from '../public/test/src/dust.js';
 import { Motion, bloodOf, sizeOf, mirror, riseLift, MOVES as KNIGHT_MOVES } from '../public/test/src/monster.js';
@@ -3222,6 +3222,11 @@ console.log('38. 第二條命的跳砸與扇形');
     ok(st.shape === 'cone' && near(st.r, R) && st.dmg === SKILL.cone.damage
       && strikeHits(sw, body(0, R + PHYS.radius - 0.01)) && !strikeHits(sw, body(0, R + PHYS.radius + 0.01)),
       `扇形長 ${R.toFixed(2)} 公尺、扣 ${st.dmg}`);
+    // 角度：105°。身體張開的角度算進去，所以量在遠處（4 公尺，身體只佔 ±4.3°）。
+    const ang = (deg) => body(Math.sin(deg * Math.PI / 180) * 4, Math.cos(deg * Math.PI / 180) * 4);
+    ok(near(st.half * 2, 105 * Math.PI / 180) && near(halfOf(makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 })) * 2, Math.PI / 3)
+      && strikeHits(sw, ang(52)) && strikeHits(sw, ang(-52)) && !strikeHits(sw, ang(58)),
+      '扇形張開 105°（偏 52° 中、58° 不中）；第一條命還是 60°');
   }
   // 跳砸：第一下落在鎖定的點、不僵直，就地對著主角那時的位置再跳一下，第二下落地才僵直。
   {

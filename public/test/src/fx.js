@@ -137,7 +137,7 @@ export function showCircle(f, on, frac, x, z, y = 0, size = 1) {
   f.bright.scale.setScalar(Math.max(1e-3, frac));
 }
 
-/** 扇形的預告：淺色的整片 60° 扇形與一片從圓心往外長的亮色扇形，貼在地上。 */
+/** 扇形的預告（張開 2·half）：淺色的整片扇形與一片從圓心往外長的亮色扇形，貼在地上。 */
 export function coneFx(radius, half) {
   const at = (a) => [Math.sin(a) * radius, 0.03, Math.cos(a) * radius];
   const g = () => fan([0, 0.03, 0], at, -half, half);

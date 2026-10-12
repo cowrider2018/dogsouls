@@ -38,7 +38,7 @@
            被打中）就炸掉；路上撞到場上的東西一樣炸掉。吐完第三顆才僵直。
      leap  範圍半徑 1.5 倍，而且連跳兩下：第一下落地打下去的那一刻，就地鎖定玩家那時的位置、
            再倒數一次跳過去（倒數、預告都跟第一下一樣），第二下落地才僵直。
-     cone  半徑 1.5 倍（長度變長，所以夠得到的距離 `range` 也是 1.5 倍）。
+     cone  半徑 1.5 倍（長度變長，所以夠得到的距離 `range` 也是 1.5 倍），角度從 60° 張開到 105°。
 
    騎士的招：
 
@@ -198,10 +198,10 @@ export const gustRise = (t) => GUST.edge + (1 - GUST.edge) * Math.sqrt(Math.max(
 export const RING = { depth: GUST.top - GUST.inner, half: SKILL.gale.wave.half };
 
 /**
- * 殭屍王第二條命的招（見檔頭）。grow：跳砸與扇形的半徑（扇形連 range）放大幾倍；hops：跳砸連跳幾下。
+ * 殭屍王第二條命的招（見檔頭）。grow：跳砸與扇形的半徑（扇形連 range）放大幾倍；half：扇形的半角；hops：跳砸連跳幾下。
  * orb：連吐 count 顆拋物線的球，倒數完之後每 every 秒一顆，每一顆從腳上 mouth 那麼高飛 flight 秒落到主角腳下。
  */
-export const RAGE = { grow: 1.5, hops: 2, orb: { count: 3, every: 0.5, flight: 0.9, mouth: 1.5 * DOG_H } };
+export const RAGE = { grow: 1.5, half: (105 / 2) * (Math.PI / 180), hops: 2, orb: { count: 3, every: 0.5, flight: 0.9, mouth: 1.5 * DOG_H } };
 
 /** 這隻在第二條命以後了嗎（有 `lives` 的那一類，combat.js 的 RALLY）：招照 RAGE。 */
 export const raging = (m) => (m.life || 1) > 1;
@@ -211,6 +211,9 @@ const GROWN = new Set(['leap', 'cone']);
 
 /** 這隻放這一招的半徑：第二條命的跳砸與扇形是 RAGE.grow 倍。 */
 export const radiusOf = (m, skill) => SKILL[skill].radius * (raging(m) && GROWN.has(skill) ? RAGE.grow : 1);
+
+/** 這隻放扇形的半角：第二條命張開到 RAGE.half。 */
+export const halfOf = (m) => (raging(m) ? RAGE.half : SKILL.cone.half);
 
 /** 這隻放這一招要離玩家多近（不限距離是 Infinity）：第二條命的扇形照它變長的半徑。 */
 const rangeOf = (m, skill) => (SKILL[skill].range ?? Infinity) * (raging(m) && skill === 'cone' ? RAGE.grow : 1);
@@ -391,7 +394,7 @@ const CAST = {
     const c = m.cast, S = SKILL.cone;
     if (c.t < S.windup) return null;
     m.cast = null;
-    return { shape: 'cone', x: m.x, y: m.y, z: m.z, dirX: c.dirX, dirZ: c.dirZ, r: radiusOf(m, 'cone'), half: S.half, dmg: S.damage };
+    return { shape: 'cone', x: m.x, y: m.y, z: m.z, dirX: c.dirX, dirZ: c.dirZ, r: radiusOf(m, 'cone'), half: halfOf(m), dmg: S.damage };
   },
 
   /* 倒數的時候站著；之後 air 秒沿直線飛向落點、高度是一條最高 hop 的拋物線（疊在起點與

@@ -55,7 +55,7 @@ import {
 import { SoulLook } from './soul.js';
 import { makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, flySoul } from './offer.js';
 import { DEATH, tipAngle, footprint, fallSide, fallHalf, tipNode } from './death.js';
-import { SKILL, GUST, WHIRL_LEN, REAP, REND, radiusOf, raging, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, ringsStep, shotHits, strikeHits, gustHits, ringHits, laneLength } from './skills.js';
+import { SKILL, RAGE, GUST, WHIRL_LEN, REAP, REND, radiusOf, raging, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, ringsStep, shotHits, strikeHits, gustHits, ringHits, laneLength } from './skills.js';
 import { Hearts } from './hearts.js';
 import { Fluid, Sheet } from './fluid.js';
 import { TRAILS } from './trail.js';
@@ -321,6 +321,8 @@ export class Fight {
         // pts：身體的輪廓，倒下的支點照它算（death.js）。要趁還沒動過、在待機姿勢的時候量。
         critter, pts: footprint(critter), breakFx: breakFx(),
         lane: laneFx(SKILL.orb.radius), circle: circleFx(SKILL.leap.radius), cone: coneFx(SKILL.cone.radius, SKILL.cone.half),
+        // 第二條命的扇形張得比較開：角度改不了縮放，另一片。
+        wide: coneFx(SKILL.cone.radius, RAGE.half),
         rend: circleFx(REND.radius),
         whirl: stripFx(SKILL.whirl.radius, true), cleave: stripFx(SKILL.cleave.width / 2, false),
         hew: stripFx(SKILL.hew.width / 2, false), gale: galeFx(SKILL.gale.radius, SHADE_N),
@@ -335,7 +337,7 @@ export class Fight {
       // 有盾的（國王）：幾面盾繞著牠轉，墨線一樣跟著牠的墨色換。
       if (KINDS[kind].shields) { slot.shields = new ShieldRing(KINDS[kind].shields); slot.shields.follow(slot.critter); this.scene.add(slot.shields.node); }
       if (this._inkPx) slot.critter.setInkPx(...this._inkPx);
-      this.scene.add(slot.critter.root, slot.breakFx.node, slot.lane.node, slot.circle.node, slot.rend.node, slot.cone.node, slot.whirl.node, slot.cleave.node, slot.hew.node, slot.gale.node);
+      this.scene.add(slot.critter.root, slot.breakFx.node, slot.lane.node, slot.circle.node, slot.rend.node, slot.cone.node, slot.wide.node, slot.whirl.node, slot.cleave.node, slot.hew.node, slot.gale.node);
       list.push(slot);
       this._cold = true;
     }
@@ -356,6 +358,7 @@ export class Fight {
     s.circle.node.visible = false;
     s.rend.node.visible = false;
     s.cone.node.visible = false;
+    s.wide.node.visible = false;
     s.whirl.node.visible = false;
     s.cleave.node.visible = false;
     s.hew.node.visible = false;
@@ -1023,7 +1026,7 @@ export class Fight {
 
     // 怪物技能的預告：貼在牠（或跳砸的落點）那一層地板上。
     for (const f of this.foes) {
-      const { m, lane, circle, rend, cone, whirl, cleave } = f;
+      const { m, lane, circle, rend, cone, wide, whirl, cleave } = f;
       const c = m.cast;
       this._hew(f);
       this._gale(f);
@@ -1062,7 +1065,9 @@ export class Fight {
       showCircle(circle, leap, leap ? Math.min(1, c.t / SKILL.leap.windup) : 0, leap ? c.tx : 0, leap ? c.tz : 0, leap ? c.ty : 0,
         radiusOf(m, 'leap') / SKILL.leap.radius);
       showCircle(rend, spinOn, spinFrac, m.x, m.z, m.y + REND.waist);
-      showCone(cone, fan, fan ? Math.min(1, c.t / SKILL.cone.windup) : 0, m.x, m.z, fan ? Math.atan2(c.dirX, c.dirZ) : 0, m.y,
+      const rage = raging(m);
+      showCone(rage ? cone : wide, false);
+      showCone(rage ? wide : cone, fan, fan ? Math.min(1, c.t / SKILL.cone.windup) : 0, m.x, m.z, fan ? Math.atan2(c.dirX, c.dirZ) : 0, m.y,
         radiusOf(m, 'cone') / SKILL.cone.radius);
     }
 
@@ -1434,7 +1439,7 @@ export class Fight {
   /**
    * 範圍攻擊揚一片地震的塵：借一格流體、一片煙，平貼在打下去的那一層地上，蓋住整個
    * 範圍，再留一段往外推的距離。
-   *   扇形  煙片正中間放在扇形半徑的一半處：扇形上離那裡最遠的是兩個角（0.62 r）。
+   *   扇形  煙片正中間放在扇形半徑的一半處：扇形上離那裡最遠的是兩個角（60° 是 0.62 r，105° 是 0.80 r）。
    *   圓    煙片正中間就是圓心，半邊長是半徑。
    */
   _startQuake(st) {
@@ -1444,7 +1449,8 @@ export class Fight {
     q.tile = this.fluid.acquire(q);
     const fan = st.shape === 'cone';
     const c = fan ? [st.x + (st.dirX * st.r) / 2, st.z + (st.dirZ * st.r) / 2] : [st.x, st.z];
-    sheet.place([c[0], st.y + 0.03, c[1]], [1, 0, 0], [0, 0, -1], (fan ? 0.62 : 1) * st.r + 0.6,
+    const far = fan ? Math.hypot(Math.sin(st.half), Math.cos(st.half) - 0.5) : 1;
+    sheet.place([c[0], st.y + 0.03, c[1]], [1, 0, 0], [0, 0, -1], far * st.r + 0.6,
       { ...DUST_LOOK, thick: k.thick, soft: k.soft, rise: QUAKE.rise });
     return q;
   }
