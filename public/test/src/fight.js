@@ -55,7 +55,7 @@ import {
 import { SoulLook } from './soul.js';
 import { makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, flySoul } from './offer.js';
 import { DEATH, tipAngle, footprint, fallSide, fallHalf, tipNode } from './death.js';
-import { SKILL, RAGE, GUST, WHIRL_LEN, REAP, REND, radiusOf, raging, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, ringsStep, shotHits, strikeHits, gustHits, ringHits, laneLength } from './skills.js';
+import { SKILL, RAGE, GUST, WHIRL_LEN, REAP, REND, radiusOf, raging, cut, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, ringsStep, shotHits, strikeHits, gustHits, ringHits, laneLength } from './skills.js';
 import { Hearts } from './hearts.js';
 import { Fluid, Sheet } from './fluid.js';
 import { TRAILS } from './trail.js';
@@ -275,7 +275,9 @@ export class Fight {
     const need = new Map(), add = (kind, n) => need.set(kind, (need.get(kind) || 0) + n);
     for (const s of spawns) {
       add(s.kind, 1);
-      if (KINDS[s.kind].skills?.includes('summon')) add(SKILL.summon.kind, SKILL.summon.cap);
+      // 第二條命一直召的（國王）場上最多 rage.cap 隻，比第一條命多。
+      const K = KINDS[s.kind];
+      if (K.skills?.includes('summon')) add(SKILL.summon.kind, K.rage?.includes('summon') ? SKILL.summon.rage.cap : SKILL.summon.cap);
     }
     return need;
   }
@@ -399,15 +401,16 @@ export class Fight {
   }
 
   /**
-   * 召喚：倒數一開始，每一個召喚點借一份外觀（f.rising），倒數的時候從地底升上來（draw）；
-   * 倒數完那一幀 skills.js 把牠們放進 world.spawns，這裡照順序接上場——用的就是升上來的
-   * 那一份外觀，站在那一點、跟召喚牠的那一隻（`m.by`）同一塊場地。招被打斷（沒冒出來）
+   * 召喚：每一個召喚點一開始升（skills.js 的 spots，第二條命是一隻一隻加進去的）就借一份外觀（f.rising），
+   * 升的時候從地底升上來（draw）；升完那一幀 skills.js 把牠放進 world.spawns，這裡接上場——用的就是升上來的
+   * 那一份外觀（照點認），站在那一點、跟召喚牠的那一隻（`m.by`）同一塊場地。招被打斷（沒冒出來）
    * 的話，升到一半的那幾份收起來。
    */
   _rise() {
     for (const sp of this.world.spawns) {
       const host = this.foes.find((f) => f.m === sp.by);
-      const r = host && host.rising && host.rising.shift();
+      const i = host && host.rising ? host.rising.findIndex((x) => x.spot === sp.spot) : -1;
+      const r = i >= 0 ? host.rising.splice(i, 1)[0] : null;
       const f = Fight._enter(r ? r.slot : this._free(sp.kind), sp, sp.by.field);
       f.m.by = sp.by;
       this.foes.push(f);
@@ -416,10 +419,10 @@ export class Fight {
     for (const f of this.foes) {
       const c = f.m.cast, on = !!c && c.skill === 'summon';
       if (!on) { Fight._sink(f); continue; }
-      if (f.rising) continue;
-      f.rising = [];
+      f.rising ??= [];
       for (const spot of c.spots) {
-        f.rising.push({ slot: this._free(SKILL.summon.kind), spot, yaw: Math.atan2(c.tx - spot.x, c.tz - spot.z) });
+        if (spot.out || f.rising.some((r) => r.spot === spot)) continue;
+        f.rising.push({ slot: this._free(SKILL.summon.kind), spot, yaw: spot.yaw ?? Math.atan2(c.tx - spot.x, c.tz - spot.z) });
       }
     }
   }
@@ -878,6 +881,8 @@ export class Fight {
       if (spared(m)) continue;                              // 扣光第一條命、站起來的時候（RALLY）：打不到
       if (reach && !combo.hit.has(m) && reach(body, m)) {
         combo.hit.add(m);
+        // 打得斷的招（國王第二條命一直召）：被打到就斷——盾擋掉的也算。
+        if (m.cast && m.cast.frail) cut(m);
         if (parry(m)) { sound.play('parry'); continue; }   // 盾擋掉了（國王）：這一下整個不算
         sound.play('hit');
         knock(m, body.x, body.z, body.aimX, body.aimZ, KNOCK_SCALE[combo.phase]);
@@ -1029,8 +1034,8 @@ export class Fight {
     // 召喚中：幽靈從地底升上來，倒數完的那一刻剛好整隻離開地面（monster.js 的 riseLift）。
     for (const f of this.foes) {
       if (!f.rising || !f.m.cast) continue;
-      const u = f.m.cast.t / SKILL.summon.windup;
       for (const { slot, spot, yaw } of f.rising) {
+        const u = (f.m.cast.t - spot.t0) / spot.dur;
         const c = slot.critter;
         c.root.visible = true;
         c.root.position.set(spot.x, spot.y + riseLift(u, SKILL.summon.kind), spot.z);

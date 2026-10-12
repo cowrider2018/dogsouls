@@ -68,7 +68,7 @@
               reapGround  對地：落地 gap 秒後在地上轉，轉完緊接著上挑、升到頂點。
             三下之間沒有僵直，最後一下打完才僵直 0.75 秒（甩頭），停在半空中。
 
-   國王的招（第二條命不再召喚、多了瞪視，KINDS 的 `rage`）：
+   國王的招（第二條命多了瞪視、召喚改成一直召，KINDS 的 `rage`）：
 
      hew    直線劈砍（不限距離）。牠腳下出現一條往鎖定方向一直延伸到黑牆的紅色長條
             （寬 0.8 個狗高），倒數 0.5 秒；然後站在原地往前劈：劍長（跟騎士跳砍劈的那一條
@@ -88,6 +88,10 @@
             （不打人的招）。場上牠召喚出來、還活著的
             （`m.brood`，呼叫端每幀數好寫進來）最多 4 隻：0～2 隻的時候召兩隻，3 隻的時候
             召一隻，滿 4 隻就挑不到這一招。召出來的放進 world.spawns，由呼叫端接上場。
+            第二條命是一直召（SKILL.summon.rage）：從挑的那一刻起每 1 秒在身邊挑一個點、一隻幽靈從那裡升上來
+            （升 1 秒，升完上場），場上牠召喚的（連正在升的）最多 6 隻；滿了就不再升，最後一隻升完才收招、
+            僵直。這是唯一打得斷的招（`frail`）：召到一半被主角打到（盾擋掉的也算）就斷——正在升的那一隻
+            收回去，不僵直；倒數中不是 armored（打得退、傷害照算），沒滿 6 隻才挑得到。
      gale   旋風斬（不限距離）。整片場地亮起淡紅，牠腰那麼高浮著一片圓（半徑是劍長）從中心長到邊，
             倒數 1 秒；然後原地轉一圈——主角第三擊落地那一下（SKILL.gale.spin 秒轉完，前 swing 秒
             打得到）：腰那麼高的一片水平圓盤，扣 5。轉完的那一刻那一圈劍光推出去，成一圈熱氣流
@@ -176,8 +180,9 @@ export const SKILL = {
   },
   /* 國王的召喚：倒數 windup，在身邊 radius 公尺內（離牠至少 near，不疊在牠身上）的點上各冒出
      一隻 kind（倒數的時候從地底升上來）。場上牠召喚的最多 cap 隻，一次最多召 each 隻（補到 cap 為止）。
-     挑得到的時候被挑中的機率是 chance（pickSkill）。 */
-  summon: { chance: 0.25, windup: 0.5, radius: 3, near: 2 * PHYS.radius, cap: 4, each: 2, kind: 'ghost' },
+     挑得到的時候被挑中的機率是 chance（pickSkill）。rage：第二條命一直召——每 every 秒升一隻（升 every 秒），
+     場上最多 cap 隻（連正在升的）。 */
+  summon: { chance: 0.25, windup: 0.5, radius: 3, near: 2 * PHYS.radius, cap: 4, each: 2, kind: 'ghost', rage: { every: 1, cap: 6 } },
   /* 國王的旋風斬：倒數 windup，然後原地轉一圈（主角第三擊落地那一下：spin 秒轉完，前 swing 秒
      打得到），一片在腰（waist：國王畫成 1.4 倍高，腰是 1.4 × DOG_H / 2）那麼高、半徑 radius（劍長，
      跟 hew 一樣）的水平圓盤。轉完的那一刻劍光推出去成一圈熱氣流（wave）：每秒 speed 公尺往外，
@@ -225,7 +230,7 @@ export const RAGE = { grow: 1.5, half: (105 / 2) * (Math.PI / 180), hops: 2, orb
 /** 這隻在第二條命以後了嗎（有 `lives` 的那一類，combat.js 的 RALLY）：招照 RAGE。 */
 export const raging = (m) => (m.life || 1) > 1;
 
-/** 這隻現在挑得到哪幾招：第二條命以後、那一類有 `rage` 的話照它（國王不再召喚），其餘照 `skills`。 */
+/** 這隻現在挑得到哪幾招：第二條命以後、那一類有 `rage` 的話照它（國王多了瞪視），其餘照 `skills`。 */
 export const skillsOf = (m) => (raging(m) && kindOf(m).rage) || kindOf(m).skills || [];
 
 /** 第二條命放大的那幾招。 */
@@ -246,8 +251,20 @@ export const recoverOf = (skill) => SKILL[skill].recover ?? SKILL.recover;
 /** 這一次召喚召幾隻：補到 cap 為止，一次最多 each 隻（0～2 隻時召 2、3 隻時召 1、滿了 0）。 */
 export const summonCount = (m) => Math.max(0, Math.min(SKILL.summon.each, SKILL.summon.cap - (m.brood || 0)));
 
-/** 除了距離（`range`）之外，這一招現在挑不挑得到。 */
-const READY = { summon: (m) => summonCount(m) > 0 };
+/** 這隻場上最多有幾隻牠召喚的：第二條命是 SKILL.summon.rage.cap。 */
+export const broodCap = (m) => (raging(m) ? SKILL.summon.rage.cap : SKILL.summon.cap);
+
+/** 除了距離（`range`）之外，這一招現在挑不挑得到：第二條命只要場上沒滿。 */
+const READY = { summon: (m) => (raging(m) ? (m.brood || 0) < broodCap(m) : summonCount(m) > 0) };
+
+/**
+ * 打斷一招打得斷的招（`frail`：第二條命的召喚）：收招、不僵直，下一招從現在起 `every` 秒之後才挑
+ * （不然召了好幾秒，挑招的倒數早就到了，一斷就馬上又挑一招）。
+ */
+export function cut(m) {
+  m.cast = null;
+  m.castT = kindOf(m).every;
+}
 
 /** 劍迴旋衝刺衝出去 s 秒（0 ≤ s ≤ time）走了多遠：速度從 speed 線性減到 0 的積分。 */
 export const whirlDist = (s) => SKILL.whirl.speed * (s - (s * s) / (2 * SKILL.whirl.time));
@@ -316,7 +333,11 @@ function begin(m, skill, target, rng) {
   m.aimX = dirX; m.aimZ = dirZ;
   m.vx = 0; m.vz = 0;
   if (skill === 'cleave' || REAP[skill]) aimCleave(m, d);
-  if (skill === 'summon') m.cast.spots = summonSpots(m, rng);
+  if (skill === 'summon') {
+    // 第二條命一直召：點是升的那一刻才挑（channel），而且打得斷。
+    if (raging(m)) Object.assign(m.cast, { spots: [], next: 0, rng, frail: true });
+    else m.cast.spots = summonSpots(m, rng);
+  }
   if (skill === 'gale') m.cast.env = galeShade(m);
 }
 
@@ -334,14 +355,18 @@ function galeShade(m) {
  * 不是半徑均勻），夾回黑牆裡面，高度是那一點的地板。
  */
 function summonSpots(m, rng) {
-  const S = SKILL.summon, out = [];
-  for (let i = 0; i < summonCount(m); i++) {
-    const a = rng() * 2 * Math.PI;
-    const r = Math.sqrt(S.near * S.near + rng() * (S.radius * S.radius - S.near * S.near));
-    const [x, z] = clampArena(m.field.arena, m.x + Math.sin(a) * r, m.z + Math.cos(a) * r, PHYS.radius);
-    out.push({ x, z, y: supportInfo(m.field.cols, x, z, m.y + PHYS.step).y });
-  }
+  const out = [];
+  for (let i = 0; i < summonCount(m); i++) out.push({ ...summonSpot(m, rng), t0: 0, dur: SKILL.summon.windup });
   return out;
+}
+
+/** 一個召喚的點（summonSpots 的一個）。 */
+function summonSpot(m, rng) {
+  const S = SKILL.summon;
+  const a = rng() * 2 * Math.PI;
+  const r = Math.sqrt(S.near * S.near + rng() * (S.radius * S.radius - S.near * S.near));
+  const [x, z] = clampArena(m.field.arena, m.x + Math.sin(a) * r, m.z + Math.cos(a) * r, PHYS.radius);
+  return { x, z, y: supportInfo(m.field.cols, x, z, m.y + PHYS.step).y };
 }
 
 /**
@@ -502,17 +527,45 @@ const CAST = {
   },
 
   /* 倒數的時候站著；倒數完每一個點上場一隻（面向玩家被鎖定的那一點），交給呼叫端接上場。
-     不打人。 */
-  summon(m, world) {
+     不打人。第二條命一直召（channel）。每一個點記著它從什麼時候升（t0）、升多久（dur），升完的標 out。 */
+  summon(m, world, target) {
     const c = m.cast, S = SKILL.summon;
+    if (c.frail) return channel(m, world, target);
     if (c.t < S.windup) return null;
     for (const s of c.spots) {
-      world.spawns.push({ kind: S.kind, x: s.x, y: s.y, z: s.z, yaw: Math.atan2(c.tx - s.x, c.tz - s.z), by: m });
+      s.out = true;
+      world.spawns.push({ kind: S.kind, x: s.x, y: s.y, z: s.z, yaw: Math.atan2(c.tx - s.x, c.tz - s.z), by: m, spot: s });
     }
     m.cast = null;
     return null;
   },
 };
+
+/**
+ * 第二條命的召喚一幀：到了下一隻該升的時刻（`next`，每 every 秒），場上牠召喚的（m.brood）加上正在升的
+ * 還沒滿 cap 就在身邊挑一個點、開始升一隻，滿了就不再升（`full`）。升完 every 秒的那一隻上場（world.spawns）。
+ * 先看要不要升、再上場：同一幀剛升完的那一隻還沒算進 m.brood，這樣才算得到它。滿了、正在升的都上場了，收招。
+ */
+function channel(m, world, target) {
+  const c = m.cast, S = SKILL.summon, R = S.rage;
+  const rising = c.spots.filter((s) => !s.out);
+  if (!c.full && c.t >= c.next) {
+    if ((m.brood || 0) + rising.length < R.cap) {
+      const s = { ...summonSpot(m, c.rng), t0: c.next, dur: R.every };
+      s.yaw = Math.atan2(target.x - s.x, target.z - s.z);          // 升的那一刻面向主角
+      c.spots.push(s);
+      rising.push(s);
+      c.next += R.every;
+    } else c.full = true;
+  }
+  for (const s of rising) {
+    if (c.t - s.t0 < s.dur) continue;
+    s.out = true;
+    world.spawns.push({ kind: S.kind, x: s.x, y: s.y, z: s.z, yaw: s.yaw, by: m, spot: s });
+  }
+  if (c.full && c.spots.every((s) => s.out)) m.cast = null;
+  return null;
+}
 
 /**
  * 吐一顆拋物線的球（第二條命的 orb）：轉向玩家，從嘴（身體前緣、腳上 RAGE.orb.mouth）飛 flight 秒
@@ -718,7 +771,10 @@ export function bossStep(m, dt, target, world, rng = Math.random) {
   const k = kindOf(m);
   const list = skillsOf(m);
   if (!list.length || m.rally) return null;   // 站起來的時候（combat.js 的 RALLY）不放招
-  if (m.cast && busy(m)) m.cast = null;                // 被打斷
+  if (m.cast && busy(m)) {                             // 被打斷
+    if (m.cast.frail) cut(m);
+    else m.cast = null;
+  }
   m.castT -= dt;
   // 衝刺（combat.js 的 LUNGE）打完才挑下一招，兩件事不會疊在一起。
   if (!m.cast && m.castT <= 0 && !busy(m) && !(m.stun > 0) && !m.lunge) {

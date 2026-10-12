@@ -103,6 +103,8 @@
             召出來的幽靈在同一段 0.5 秒裡從地底升上來（riseLift）：一開始整隻在地板底下，
             先快後慢，倒數完的那一刻腳剛好離開地面——也就是牠進場、開始動的那一刻。
             埋在地板底下的那一截被地板的深度擋掉，不必另外裁。
+            第二條命一直召：第一秒跟第一條命一樣仰到最高，之後每升一隻就收一點、再仰回最高（summonAgain，
+            每 1 秒一次）；被打斷就淡回原本的樣子。
      gale   旋風斬：騎士劍迴旋那一套（主角第三擊），只是不衝、只轉一圈。倒數的 1 秒是主角二段跳
             起來那一下縮成一團、往右擰到底（照 1 秒拉長）；轉的時候是主角落地那一下整隻往左轉一圈，
             劍水平伸在外面掃過去（galeSpin，0.4 秒轉完）；0.5 秒的僵直是甩頭（衝刺僵直那一套甩，
@@ -493,6 +495,7 @@ export const MOVES = {
     keys: [...HERO.rise.keys.slice(0, -1).map(([t, pose, ease]) => [t, mirror(pose), ease]), [UP_AIR + SKILL.hew.recover, {}, 'inOut']],
   },
   summonWind: { blend: 0.08, keys: [[0, {}], [0.3, STRETCH, 'out'], [SKILL.summon.windup, STRETCH_MAX, 'inOut']] },
+  summonAgain: { blend: 0.02, keys: [[0, STRETCH_MAX], [0.25, STRETCH, 'out'], [SKILL.summon.rage.every, STRETCH_MAX, 'inOut']] },
   summonRec: { blend: 0.02, keys: [[0, STRETCH_MAX], [0.12, STRETCH_MAX, 'lin'], [recoverOf('summon'), {}, 'inOut']] },
   /* 國王的旋風斬：蓄力是騎士劍迴旋的那一套（主角二段跳那一下，照 1 秒拉長），轉是主角落地那一下
      （一圈），僵直是甩頭——停在轉完的那一格不動，再一邊甩一邊回來。 */
@@ -636,6 +639,11 @@ export class Motion {
       if (c.skill === 'orb' && c.spat) return ['orbAgain', c.t - SKILL.orb.windup - (c.spat - 1) * RAGE.orb.every];
       if (c.skill === 'whirl' && c.t >= SKILL.whirl.windup) return ['whirlDash', c.t - SKILL.whirl.windup];
       if (c.skill === 'gale' && c.t >= SKILL.gale.windup) return ['galeSpin', c.t - SKILL.gale.windup];
+      // 第二條命一直召：第一秒仰到最高，之後每一秒一次 summonAgain。
+      if (c.skill === 'summon' && c.frail && c.t >= SKILL.summon.rage.every) {
+        const E = SKILL.summon.rage.every;
+        return ['summonAgain', (c.t - E) % E];
+      }
       if (c.skill === 'cleave' && c.up) {
         const S = SKILL.cleave, u = c.t - S.windup - S.air - S.up.gap;
         return u < 0 ? ['cleaveLand', u + S.up.gap] : ['cleaveUp', u];

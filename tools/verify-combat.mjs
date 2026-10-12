@@ -154,7 +154,7 @@
                     第一下落地不僵直，就地鎖定主角那時的位置再跳，第二下落地才僵直。
     39. 第二條命的連吐  倒數完每 0.5 秒吐一顆、連吐三顆；每一顆瞄吐的那一刻主角腳下，照拋物線飛 0.9 秒
                     落地（球底貼地），停一幀才炸掉；站著不動三顆都中，吐出去之後走開就躲得掉；吐完第三顆才僵直。
-    40. 國王的第二條命  不再召喚（第一條命照樣召喚）。劈砍是下劈後上挑：劈下去那一刻才瞄第二刀，0.25 秒後
+    40. 國王的第二條命  一直召：每 1 秒升一隻、場上最多 6 隻，滿了才收；打得斷（第一條命照舊）。劈砍是下劈後上挑：劈下去那一刻才瞄第二刀，0.25 秒後
                     原地起跳、受重力落回，扇形半徑是劍長、跳起來躲不掉，起跳推出第二道氣流；落地才僵直。
                     瞪視（只有第二條命）：蓄力 0.75 秒一直轉向主角，瞪下去一次（不扣血），再瞪 0.5 秒才收招；
                     主角操作停 0.5 秒、被往國王吸過去半個狗高。
@@ -3321,7 +3321,52 @@ console.log('40. 國王的第二條命');
     return [...got].sort().join();
   };
   ok(skillsOf(king(1)).includes('summon') && picked(1).includes('summon'), `第一條命照樣召喚（挑得到 ${picked(1)}）`);
-  ok(!skillsOf(king(2)).includes('summon') && !picked(2).includes('summon'), `第二條命不再召喚（挑得到 ${picked(2)}）`);
+  ok(picked(2).includes('summon'), `第二條命也召喚（挑得到 ${picked(2)}）`);
+  // 第二條命一直召：每 1 秒升一隻、升 1 秒上場，場上（連正在升的）滿 6 隻就不再升，最後一隻上場才收招、僵直。
+  {
+    const R = SKILL.summon.rage;
+    ok(R.every === 1 && R.cap === 6, '第二條命：每 1 秒一隻、場上最多 6 隻');
+    const channel = (brood, hit = Infinity) => {
+      const w = makeWorld(), m = king(2), q = body(0, 3), mo = new Motion();
+      m.brood = brood;
+      const out = [], stages = new Set();
+      let t = 0, endAt = -1, armoredOnce = false, cutAt = -1;
+      while (t < 9 && endAt < 0 && cutAt < 0) {
+        bossStep(m, DT, q, w, () => 0.3);                 // 0.3：summon
+        for (const s of w.spawns) out.push({ t, s });
+        m.brood += w.spawns.length;                       // fight.js 每幀數好寫進來的
+        w.spawns.length = 0;
+        if (m.cast && armored(m)) armoredOnce = true;
+        if (m.cast) stages.add(mo._stage(m)[0]);
+        if (t >= hit && m.cast) { knock(m, 0, 3, 0, -1); bossStep(m, DT, q, w, () => 0.3); cutAt = t; }
+        monsterStep(m, DT, q);
+        t += DT;
+        if (!m.cast && cutAt < 0 && endAt < 0) endAt = t;
+      }
+      return { out, endAt, cutAt, armoredOnce, stages, m };
+    };
+    const full = channel(0);
+    const at = full.out.map((o) => o.t);
+    ok(full.out.length === 6 && at.every((a, i) => Math.abs(a - (i + 1)) < 2 * DT), `場上沒有：每 1 秒上場一隻（第 ${at.map((a) => a.toFixed(2)).join('、')} 秒），6 隻就停`);
+    ok(Math.abs(full.endAt - 6) < 2 * DT && near(full.m.stun, recoverOf('summon') - DT, 1e-6), '第 6 隻上場才收招、僵直');
+    ok(full.out.every((o) => { const d = Math.hypot(o.s.x - full.m.x, o.s.z - full.m.z); return d >= SKILL.summon.near - 1e-6 && d <= SKILL.summon.radius + 1e-6; }),
+      '每一隻都在牠身邊 near～radius 那一圈裡');
+    ok(!full.armoredOnce && full.stages.has('summonWind') && full.stages.has('summonAgain'), '召的時候不是 armored（打得退、傷害照算）；動作是 summonWind → summonAgain');
+    const four = channel(4);
+    ok(four.out.length === 2 && Math.abs(four.endAt - 2) < 2 * DT, '場上已經 4 隻：再召 2 隻補滿 6 隻就收');
+    const m6 = king(2); m6.brood = 6;
+    ok(!skillsOf(m6).filter((s) => s === 'summon').some(() => { bossStep(m6, DT, body(0, 3), makeWorld(), () => 0.3); return m6.cast && m6.cast.skill === 'summon'; }),
+      '場上滿 6 隻挑不到召喚');
+    const cutOff = channel(0, 2.5);
+    ok(cutOff.out.length === 2 && !cutOff.m.cast && !(cutOff.m.stun > 0) && near(cutOff.m.castT, KINDS.king.every, 0.05),
+      '召到一半被打（打飛）就斷：正在升的那一隻不上場、不僵直，下一招 every 秒之後才挑');
+    const k1 = king(1), w1 = makeWorld();
+    k1.brood = 0;
+    let n1 = 0;
+    // 第一條命 0.5：summon
+    for (let i = 0; i < 60; i++) { bossStep(k1, DT, body(0, 3), w1, () => 0.5); n1 += w1.spawns.length; w1.spawns.length = 0; }
+    ok(n1 === 2 && armored({ ...k1, cast: { skill: 'summon' }, lunge: null }), '第一條命照舊：倒數 0.5 秒一次召 2 隻，打不斷');
+  }
 
   // 劈砍：第二條命劈下去之後接上挑。主角在倒數的時候走到旁邊——第二刀照劈下去那一刻的位置瞄。
   {

@@ -195,7 +195,7 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  *           在空中原地轉一圈；reapGround：下劈、在地上原地轉一圈、上挑。三下連著），每次各一半。
  *           衝刺咬人照常。
  *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3.8，走路、
- *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（不再召喚、多了瞪視，skills.js）。`lunges`：一次衝刺衝兩下才僵直（見 LUNGE）。`shields`：身邊幾面盾，
+ *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺衝兩下才僵直（見 LUNGE）。`shields`：身邊幾面盾，
  *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。衝刺跟小怪一樣一打就取消。每 `every`
  *           秒從 `skills` 裡挑一招（skills.js）。
  *
@@ -213,7 +213,7 @@ export const KINDS = {
   ghost: { name: '幽靈', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1, fly: true },
   knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], every: 3 },
   wraith: { name: '幽靈騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
-  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, skills: ['hew', 'summon', 'gale'], rage: ['hew', 'gale', 'glare'], every: 3 },
+  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, skills: ['hew', 'summon', 'gale'], rage: ['hew', 'summon', 'gale', 'glare'], every: 3 },
 };
 
 /**
@@ -649,10 +649,10 @@ export const attacking = (m) => !busy(m)
 
 /**
  * 不可打斷：不會被擊退，受到的傷害減半。就是攻擊中——只有
- *   · 放招（m.cast）一律算；
+ *   · 放招（m.cast）算，打得斷的招（`frail`：國王第二條命的召喚，skills.js）除外；
  *   · 衝刺只有 `steady` 那一類（殭屍王）算。小怪的衝刺一打就取消。
  */
-export const armored = (m) => attacking(m) && (!!m.cast || !!kindOf(m).steady);
+export const armored = (m) => attacking(m) && (m.cast ? !m.cast.frail : !!kindOf(m).steady);
 
 /** 這一下打在牠身上實際扣幾點：放招倒數中（armored）減半、無條件捨去。hurt 扣的就是這一份。 */
 export const taken = (m, dmg) => (armored(m) ? Math.floor(dmg / 2) : dmg);
