@@ -33,7 +33,7 @@ import { makeCam, snapCam, updateCam } from './camera.js';
 import { buildVeil } from './veil.js';
 import { hazeMesh } from './stage.js';
 import { createLight, POST_ON } from './light.js';
-import { pixelRatio, Cost } from './pace.js';
+import { pixelRatio, Cost, Pace } from './pace.js';
 import { Controls, speedFor, fitView, wardrobe } from './controls.js';
 import { ARENA, COLS, SPAWN, MODES, DEFAULT_MODE, KINDS, resetLife, refill } from './combat.js';
 import { Fight, DEATH_TEXT } from './fight.js';
@@ -138,8 +138,15 @@ let last = performance.now();
 let fpsAcc = 0, fpsN = 0, hudAcc = 0;
 /** 每幀的 CPU 花在算與畫各多少（pace.js），接在 fps 後面。 */
 const cost = new Cost();
+/** 觸控裝置一秒最多 60 幀（pace.js；`?fps=` 改）。 */
+const pace = new Pace();
 
 function frame(now) {
+  // 還沒到時間格的這一次什麼都不做：`last` 也不動，下一次的 dt 是整段真實的時間。
+  if (!pace.due(now)) {
+    requestAnimationFrame(frame);
+    return;
+  }
   cost.begin();
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;

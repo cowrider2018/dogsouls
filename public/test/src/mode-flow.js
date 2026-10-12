@@ -76,7 +76,7 @@ import { makeCam, snapCam, updateCam } from './camera.js';
 import { Controls, fitView, wardrobe } from './controls.js';
 import { buildStage } from './stage.js';
 import { createLight, POST_ON } from './light.js';
-import { pixelRatio, Cost } from './pace.js';
+import { pixelRatio, Cost, Pace } from './pace.js';
 import { makeHero, steerHero, moveHero } from './hero.js';
 import { Transit } from './transit.js';
 import { Death } from './death.js';
@@ -422,8 +422,15 @@ let clock = last;
 let fpsAcc = 0, fpsN = 0, hudAcc = 0;
 /** 每幀的 CPU 花在算與畫各多少（pace.js），接在 fps 後面。 */
 const cost = new Cost();
+/** 觸控裝置一秒最多 60 幀（pace.js；`?fps=` 改）。 */
+const pace = new Pace();
 
 function frame(now) {
+  // 還沒到時間格的這一次什麼都不做（開始畫面也一樣）：`last` 也不動，下一次的 dt 是整段真實的時間。
+  if (!pace.due(now)) {
+    requestAnimationFrame(frame);
+    return;
+  }
   cost.begin();
   // 第一幀的時間戳可能比 `last`（載入完的那一刻）早：夾在 0 以上，不然劇情的鐘會倒退。
   const real = Math.max(0, Math.min(0.05, (now - last) / 1000));
