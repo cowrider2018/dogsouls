@@ -150,6 +150,8 @@
                     落地；從那一刻到站好打不到（不扣血、不累積破防、破防攻擊瞄不到）、不追人、不放招；
                     落地 1 秒之後花 2 秒站起來，站好血補滿、第二條命。動作是 slump（空中也是）→ rally。
                     第二條扣到 0 才死；重生、回到站位都從第一條命開始。
+    38. 第二條命的跳砸與扇形  半徑都是 1.5 倍（扇形夠得到的距離跟著變長），傷害不變；跳砸連跳兩下：
+                    第一下落地不僵直，就地鎖定主角那時的位置再跳，第二下落地才僵直。
    ------------------------------------------------------------------ */
 
 import { PHYS } from '../public/test/src/walk.js';
@@ -161,7 +163,7 @@ import {
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
   SOUL, dropSoul, soulStep, grabs, bankSouls,
 } from '../public/test/src/combat.js';
-import { SKILL, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill } from '../public/test/src/skills.js';
+import { SKILL, RAGE, radiusOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill } from '../public/test/src/skills.js';
 import { steer } from '../public/test/src/walk.js';
 import { DUST, dustOf, dustFade, QUAKE, quakeBands, quakeFade, quakeTop, PLOW, plowPieces, plowClump } from '../public/test/src/dust.js';
 import { Motion, bloodOf, sizeOf, mirror, riseLift, MOVES as KNIGHT_MOVES } from '../public/test/src/monster.js';
@@ -3189,6 +3191,56 @@ console.log('37. 兩條命');
   m.life = 2;
   placeMonster(m);
   ok(m.life === 1 && !m.rally, '回到站位：第一條命');
+}
+
+/* ── 38. 第二條命的跳砸與扇形 ──────────────────────────────── */
+console.log('38. 第二條命的跳砸與扇形');
+{
+  const second = (x, z) => { const m = makeMonster({ kind: 'boss', x, z, yaw: 0 }); m.life = 2; m.castT = 0; return m; };
+  ok(RAGE.grow === 1.5 && RAGE.hops === 2, '第二條命：跳砸與扇形的半徑 1.5 倍、跳砸連跳兩下');
+  ok(near(radiusOf(second(0, 0), 'leap'), 1.5 * SKILL.leap.radius) && near(radiusOf(second(0, 0), 'cone'), 1.5 * SKILL.cone.radius)
+    && near(radiusOf(makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 }), 'leap'), SKILL.leap.radius), '第一條命照原本的半徑');
+  // 扇形：夠得到的距離跟著長度變長。
+  const picks = (d) => {
+    const got = new Set();
+    for (const r of [0, 0.34, 0.67, 0.99]) {
+      const b = second(0, 0);
+      bossStep(b, DT, body(0, d), makeWorld(), () => r);
+      if (b.cast) got.add(b.cast.skill);
+    }
+    return [...got].sort().join();
+  };
+  ok(picks(5.4) === 'cone,leap,orb' && picks(5.6) === 'leap,orb', `扇形 ${(1.5 * SKILL.cone.range).toFixed(2)} 公尺以內才放（5.4：${picks(5.4)}；5.6：${picks(5.6)}）`);
+  // 扇形打下去的那一片照放大的半徑，傷害不變。
+  {
+    const b = second(0, 0), q = body(0, 2);
+    let st = null;
+    for (let i = 0; i < 200 && !st; i++) st = bossStep(b, DT, q, makeWorld(), () => 0.99);
+    const sw = { ...st, from: 0, to: st.r }, R = 1.5 * SKILL.cone.radius;
+    ok(st.shape === 'cone' && near(st.r, R) && st.dmg === SKILL.cone.damage
+      && strikeHits(sw, body(0, R + PHYS.radius - 0.01)) && !strikeHits(sw, body(0, R + PHYS.radius + 0.01)),
+      `扇形長 ${R.toFixed(2)} 公尺、扣 ${st.dmg}`);
+  }
+  // 跳砸：第一下落在鎖定的點、不僵直，就地對著主角那時的位置再跳一下，第二下落地才僵直。
+  {
+    const w = makeWorld(), b = second(0, -3), q = body(0, 3);
+    const hits = [];
+    let t = 0, stunAt = -1, stunBetween = false;
+    while (t < 4 && stunAt < 0) {
+      if (!hits.length && b.cast && b.cast.t > 1) q.x = 2;               // 第一下倒數到一半，主角往旁邊走
+      const st = bossStep(b, DT, q, w, () => 0.5);
+      if (st) hits.push({ st, t });
+      if (hits.length === 1 && b.stun > 0) stunBetween = true;
+      monsterStep(b, DT, q);
+      if (hits.length === 2 && b.stun > 0) stunAt = t;
+      t += DT;
+    }
+    ok(hits.length === 2 && near(hits[0].st.x, 0) && near(hits[0].st.z, 3) && near(hits[1].st.x, 2) && near(hits[1].st.z, 3),
+      '第一下砸在一開始鎖定的點（主角已經走開了）、第二下砸在第一下落地那一刻主角在的地方');
+    ok(hits.every((h) => near(h.st.r, 1.5 * SKILL.leap.radius) && h.st.dmg === SKILL.leap.damage), '兩下都是 1.5 倍半徑、傷害不變');
+    ok(!stunBetween && Math.abs(hits[1].t - hits[0].t - SKILL.leap.windup) < 2 * DT && stunAt >= 0 && b.hop === undefined,
+      `兩下之間不僵直（隔 ${(hits[1].t - hits[0].t).toFixed(2)} 秒，跟一下的倒數一樣長），第二下落地才僵直`);
+  }
 }
 
 console.log(fails ? `\n${fails} 項沒過` : '\n全部通過');

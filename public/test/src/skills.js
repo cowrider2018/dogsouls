@@ -31,6 +31,11 @@
      cone  離玩家 3.68 公尺（扇形的長度）以內才放。站在原地朝鎖定的方向倒數 1 秒：淺色的 60° 扇形（長 4 個狗高）是範圍，
            亮色的扇形從殭屍王腳下往外長，長滿的那一刻打那一整片。
 
+   殭屍王的第二條命（combat.js 的 RALLY 站起來之後）招變兇（RAGE），傷害不變：
+     leap  範圍半徑 1.5 倍，而且連跳兩下：第一下落地打下去的那一刻，就地鎖定玩家那時的位置、
+           再倒數一次跳過去（倒數、預告都跟第一下一樣），第二下落地才僵直。
+     cone  半徑 1.5 倍（長度變長，所以夠得到的距離 `range` 也是 1.5 倍）。
+
    騎士的招：
 
      whirl  劍迴旋衝刺（離玩家 3.2 公尺以內才放）。牠腳下出現一條往目標延伸的
@@ -188,6 +193,23 @@ export const gustRise = (t) => GUST.edge + (1 - GUST.edge) * Math.sqrt(Math.max(
  */
 export const RING = { depth: GUST.top - GUST.inner, half: SKILL.gale.wave.half };
 
+/**
+ * 殭屍王第二條命的招（見檔頭）。grow：跳砸與扇形的半徑（扇形連 range）放大幾倍；hops：跳砸連跳幾下。
+ */
+export const RAGE = { grow: 1.5, hops: 2 };
+
+/** 這隻在第二條命以後了嗎（有 `lives` 的那一類，combat.js 的 RALLY）：招照 RAGE。 */
+export const raging = (m) => (m.life || 1) > 1;
+
+/** 第二條命放大的那幾招。 */
+const GROWN = new Set(['leap', 'cone']);
+
+/** 這隻放這一招的半徑：第二條命的跳砸與扇形是 RAGE.grow 倍。 */
+export const radiusOf = (m, skill) => SKILL[skill].radius * (raging(m) && GROWN.has(skill) ? RAGE.grow : 1);
+
+/** 這隻放這一招要離玩家多近（不限距離是 Infinity）：第二條命的扇形照它變長的半徑。 */
+const rangeOf = (m, skill) => (SKILL[skill].range ?? Infinity) * (raging(m) && skill === 'cone' ? RAGE.grow : 1);
+
 /** 這一招出完僵直幾秒：那一招自己的 `recover`，沒有就是 SKILL.recover。 */
 export const recoverOf = (skill) => SKILL[skill].recover ?? SKILL.recover;
 
@@ -330,8 +352,9 @@ const CAST = {
   },
 
   /* 倒數的前 0.9 秒站著，最後 `air` 秒沿直線飛向目標、高度是一條拋物線（頂點
-     g·air²/8，0.6 秒大約 1 公尺）。倒數到 0 那一幀落在目標點上，打那一圈。 */
-  leap(m) {
+     g·air²/8，0.6 秒大約 1 公尺）。倒數到 0 那一幀落在目標點上，打那一圈。第二條命還沒跳滿
+     RAGE.hops 下的話，落地的那一刻就地對著玩家現在的位置再開始一下（`hop` 是第幾下），不收招。 */
+  leap(m, world, target) {
     const c = m.cast, S = SKILL.leap;
     const s = (c.t - (S.windup - S.air)) / S.air;
     if (s < 0) return null;
@@ -345,14 +368,16 @@ const CAST = {
     m.x = c.tx; m.z = c.tz; m.y = c.ty;
     m.grounded = true;
     m.cast = null;
-    return { shape: 'circle', x: c.tx, y: c.ty, z: c.tz, r: S.radius, dmg: S.damage };
+    const hop = c.hop || 1;
+    if (raging(m) && hop < RAGE.hops) { begin(m, 'leap', target); m.cast.hop = hop + 1; }
+    return { shape: 'circle', x: c.tx, y: c.ty, z: c.tz, r: radiusOf(m, 'leap'), dmg: S.damage };
   },
 
   cone(m) {
     const c = m.cast, S = SKILL.cone;
     if (c.t < S.windup) return null;
     m.cast = null;
-    return { shape: 'cone', x: m.x, y: m.y, z: m.z, dirX: c.dirX, dirZ: c.dirZ, r: S.radius, half: S.half, dmg: S.damage };
+    return { shape: 'cone', x: m.x, y: m.y, z: m.z, dirX: c.dirX, dirZ: c.dirZ, r: radiusOf(m, 'cone'), half: S.half, dmg: S.damage };
   },
 
   /* 倒數的時候站著；之後 air 秒沿直線飛向落點、高度是一條最高 hop 的拋物線（疊在起點與
@@ -572,7 +597,7 @@ function waveHits(st, p) {
  * 什麼都不做。要在 monsterStep 之前叫——放招中的怪物 monsterStep 讓牠站著不動（要走的招
  * 自己在 CAST 裡走）。
  *
- * 挑招只從夠得到的招裡挑（`range`，見檔頭；召喚還要場上沒滿，READY）；一招都挑不到的話不重新計時，下一幀再看。
+ * 挑招只從夠得到的招裡挑（`range`，見檔頭，第二條命的扇形見 RAGE；召喚還要場上沒滿，READY）；一招都挑不到的話不重新計時，下一幀再看。
  *
  * @param {() => number} rng 挑招用的亂數（離線驗證給固定的）
  * @returns {object|null} 這一幀打下來的範圍攻擊（給 strikeHits），沒有就是 null
@@ -585,7 +610,7 @@ export function bossStep(m, dt, target, world, rng = Math.random) {
   // 衝刺（combat.js 的 LUNGE）打完才挑下一招，兩件事不會疊在一起。
   if (!m.cast && m.castT <= 0 && !busy(m) && !(m.stun > 0) && !m.lunge) {
     const gap = Math.hypot(target.x - m.x, target.z - m.z);
-    const can = k.skills.filter((s) => !(gap > SKILL[s].range) && (!READY[s] || READY[s](m)));
+    const can = k.skills.filter((s) => gap <= rangeOf(m, s) && (!READY[s] || READY[s](m)));
     if (can.length) {
       m.castT = k.every;
       begin(m, pickSkill(can, rng()), target, rng);

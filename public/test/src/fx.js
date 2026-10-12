@@ -128,11 +128,12 @@ export function circleFx(radius) {
   return { node, pale, bright };
 }
 
-/** 擺跳砸的預告。frac 是倒數走了幾成（0 → 1），y 是貼在哪一層地板上。 */
-export function showCircle(f, on, frac, x, z, y = 0) {
+/** 擺跳砸的預告。frac 是倒數走了幾成（0 → 1），y 是貼在哪一層地板上，size 是半徑放大幾倍（第二條命）。 */
+export function showCircle(f, on, frac, x, z, y = 0, size = 1) {
   f.node.visible = on;
   if (!on) return;
   f.node.position.set(x, y, z);
+  f.node.scale.set(size, 1, size);
   f.bright.scale.setScalar(Math.max(1e-3, frac));
 }
 
@@ -147,11 +148,15 @@ export function coneFx(radius, half) {
   return { node, pale, bright };
 }
 
-/** 擺扇形的預告。frac 是倒數走了幾成（0 → 1），亮色的半徑就是那幾成；y 是貼在哪一層地板上。 */
-export function showCone(f, on, frac, x, z, yaw, y = 0) {
+/**
+ * 擺扇形的預告。frac 是倒數走了幾成（0 → 1），亮色的半徑就是那幾成；y 是貼在哪一層地板上，
+ * size 是半徑放大幾倍（第二條命）。
+ */
+export function showCone(f, on, frac, x, z, yaw, y = 0, size = 1) {
   f.node.visible = on;
   if (!on) return;
   f.node.position.set(x, y, z);
+  f.node.scale.set(size, 1, size);
   f.node.rotation.y = yaw;
   const k = Math.max(1e-3, frac);
   f.bright.scale.set(k, 1, k);
