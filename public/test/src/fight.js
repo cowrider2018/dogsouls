@@ -881,9 +881,9 @@ export class Fight {
       if (spared(m)) continue;                              // 扣光第一條命、站起來的時候（RALLY）：打不到
       if (reach && !combo.hit.has(m) && reach(body, m)) {
         combo.hit.add(m);
-        // 打得斷的招（國王第二條命一直召）：被打到就斷——盾擋掉的也算。
+        if (parry(m)) { sound.play('parry'); continue; }   // 盾擋掉了（國王）：這一下整個不算，召喚也不斷
+        // 打得斷的招（國王第二條命一直召）：真的打到身上就斷。
         if (m.cast && m.cast.frail) cut(m);
-        if (parry(m)) { sound.play('parry'); continue; }   // 盾擋掉了（國王）：這一下整個不算
         sound.play('hit');
         knock(m, body.x, body.z, body.aimX, body.aimZ, KNOCK_SCALE[combo.phase]);
         if (taken(m, DAMAGE[combo.phase]) > 0) this._bleed(hitFrame(combo.phase, body, combo.tip, m, sizeOf(m.kind)), m, m.kind);
