@@ -30,7 +30,8 @@
     "verify:story": "node tools/verify-story.mjs",
     "verify:sound": "node tools/verify-sound.mjs",
     "verify:hatless": "node tools/verify-hatless.mjs",
-    "verify:share": "node tools/verify-share.mjs"
+    "verify:share": "node tools/verify-share.mjs",
+    "verify:tape": "node tools/verify-tape.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

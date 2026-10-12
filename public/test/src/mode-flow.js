@@ -85,6 +85,7 @@ import { SCRIPT, pagesOf, preloadComic } from './comic.js';
 import { Fight, DEATH_TEXT } from './fight.js';
 import { Folk } from './folk.js';
 import { Sound } from './sound.js';
+import { audioContext } from './audio.js';
 import { Music, BATTLE } from './music.js';
 import { resetLife, refill, regen, KINDS, RALLY } from './combat.js';
 import { BLOCKS, THRONE } from './blocks.js';
@@ -94,9 +95,17 @@ import { Signpost } from './signpost.js';
 import { BossBar } from './bossbar.js';
 import { roamMap } from './roam.js';
 import { Lobby, aimBackdrop } from './lobby.js';
+import { BOOT_SEED, reseed } from './chance.js';
+import { Deck, blankTape, END_TAIL } from './tape.js';
 
 /** 完整遊戲（boot.js 的 game）：完整流程去掉面板、提示字與開發用的鍵。 */
 const GAME = document.body.dataset.mode === 'game';
+/**
+ * 錄影模式（boot.js 的 record／replay）：'record' 是完整遊戲、同時錄下每一幀吃了什麼（tape.js），
+ * 國王坐上王位就結束、進轉檔畫面（record.js）；'replay' 是轉檔的時候藏在 iframe 裡重演的那一頁
+ * （replay.js）。不是錄影模式是 null。
+ */
+const TAPE = document.body.dataset.tape || null;
 
 const canvas = document.getElementById('view');
 /* 後製開著的時候畫面是畫進它那一張多重取樣的圖、再一筆貼上畫布的，畫布自己不必再反鋸齒
@@ -141,7 +150,9 @@ const player = { ...makeHero(0, 0, 0), block: 'wallwalk' };
 
 /* 戰鬥：打死的怪物就沒了（不重生），場上沒有怪物就是這一場清完。每一場的怪物現在就把
    外觀建好——牠是進場之後才上場的，那時候才建就是一頓。 */
-const fight = new Fight(scene, zoo, { respawn: false, renderer, sound: new Sound(), souls: SOULS });
+/** 戰鬥的聲音（sound.js）。轉檔的時候重演那一頁把它接到離線混音上（replay.js）。 */
+const sound = new Sound();
+const fight = new Fight(scene, zoo, { respawn: false, renderer, sound, souls: SOULS });
 fight.preload(STAGES.map((_, k) => foesOf(k)));
 
 /** 國王復活之後的王國人民（folk.js）。 */
@@ -292,6 +303,7 @@ function startFrom(k) {
 function engage() {
   const k = run.next;
   run.active = true;
+  deck?.enter(k);
   applyDoors();
   const say = () => hud.flash(`第 ${k + 1} 場：${stageName(k)}`);
   const comic = !!SCRIPT.open[k] && !opened.has(k);
@@ -325,7 +337,11 @@ function clear() {
   const k = run.next - 1;
   // 墓室打完不走回去：書頁蓋住的時候直接送到下一場的休息點（route.js 的 warp）。
   const warpTo = STAGES[k].warp && !done ? () => place(restAt(run.next, ruins)) : null;
-  const say = () => hud.flash(done ? '六場全部打完——門全開了' : `這一場清完了。下一場：${stageName(run.next)}`);
+  // 錄影模式：戰後的漫畫翻完，這一場的片段就到這裡（最後一場到國王坐上王位，見 play）。
+  const say = () => {
+    hud.flash(done ? '六場全部打完——門全開了' : `這一場清完了。下一場：${stageName(run.next)}`);
+    if (!done) deck?.close(k);
+  };
   // 王座廳的戰後頁（第 14 頁）只演到國王倒下：書頁走了才交靈魂，國王復活那一頁另外翻（SCRIPT.offered）。
   // 沒有戰後頁的話只有慢動作，慢完才開門、浮字。
   const pages = SCRIPT.after[k] ? pagesOf(SCRIPT.after[k]) : [];
@@ -415,6 +431,62 @@ const controls = new Controls(canvas, pad, cam, (k, e) => {
   if (k >= '1' && k <= '9' && STAGES[+k - 1]) startFrom(+k - 1);
 });
 
+/* ── 錄影模式的帶子（tape.js）──────────────────────────────────────
+   錄的時候每一幀記下吃了什麼，放的時候照著餵回去。操作的那三個問法與手把的事件包起來；
+   帶子本身錄影模式在按下開始的那一刻才建（begin），重演的那一頁是收到之後才換上（replay.js）。 */
+const deck = TAPE ? new Deck(TAPE, blankTape(null), { cam, story, pad, view: viewNow, sum: worldSum }) : null;
+if (deck) {
+  deck.wrap(controls, ['axis', 'jumpPressed', 'jumpDown']);
+  deck.wrapPad(pad);
+}
+
+/** 現在的畫面：CSS 像素的寬高與安全區（重演的那一頁照它擺 iframe 與操作列）。 */
+function viewNow() {
+  const cs = getComputedStyle(document.documentElement);
+  const px = (n) => parseFloat(cs.getPropertyValue(n)) || 0;
+  return { w: innerWidth, h: innerHeight, safe: { l: px('--sa-l'), r: px('--sa-r'), t: px('--sa-t'), b: px('--sa-b') } };
+}
+
+/** 這一幀世界的指紋要吃哪些數（tape.js 的 sums）：主角、路線、鏡頭、時鐘、劇情、場上的怪物。 */
+function worldSum() {
+  const out = [player.x, player.y, player.z, player.vx, player.vy, player.vz, player.hp, player.max,
+    run.next, run.active ? 1 : 0, deaths, cam.yaw, cam.pitch, cam.px, cam.pz, clock, story.t, fight.foes.length];
+  for (const f of fight.foes) out.push(f.m.x, f.m.y, f.m.z, f.m.hp);
+  return out;
+}
+
+/** 錄影模式：國王坐上王位之後已經多錄了幾秒（END_TAIL 秒就結束）；null = 還沒坐好。 */
+let ending = null;
+/** 整場結束了：主迴圈不再排下一幀。 */
+let stopped = false;
+
+/** 錄影模式每一幀問一次：國王坐好了沒有。坐好了就收最後一段、再錄 END_TAIL 秒，然後結束。 */
+function watchThrone(real) {
+  if (ending === null) {
+    if (fight.king?.trip?.phase !== 'seated') return;
+    deck.close(STAGES.length - 1, END_TAIL);
+    ending = 0;
+  }
+  ending += real;
+  if (ending >= END_TAIL) finish();
+}
+
+/**
+ * 錄影模式的結束：不再算、不再出聲，帶子封起來，換轉檔畫面（record.js）。轉不轉是玩家按的；
+ * 要轉的話先把這一頁的 GL 還掉，重演的那一頁要自己的。
+ */
+function finish() {
+  stopped = true;
+  deck.rolling = false;
+  deck.tape.over = true;
+  audioContext()?.suspend().catch(() => {});
+  import('./record.js').then((m) => m.showReel({
+    tape: deck.tape,
+    stages: STAGES.map((st) => st.name),
+    release: () => { renderer.dispose(); renderer.forceContextLoss(); },
+  }));
+}
+
 /* ── 主迴圈 ──────────────────────────────────────────────────── */
 let last = performance.now();
 /** 世界的時鐘（毫秒）：跟著慢動作走、書頁蓋住的時候停住。火光、旗子這些照它動。 */
@@ -426,6 +498,7 @@ const cost = new Cost();
 const pace = new Pace();
 
 function frame(now) {
+  if (stopped) return;
   // 還沒到時間格的這一次什麼都不做（開始畫面也一樣）：`last` 也不動，下一次的 dt 是整段真實的時間。
   if (!pace.due(now)) {
     requestAnimationFrame(frame);
@@ -444,13 +517,23 @@ function frame(now) {
  */
 function step(real, draw = true) {
   cost.begin();
+  // 錄影模式：這一幀開始（重演的話先照帶子按手把、拖鏡頭、點書頁，real 照帶子）。
+  if (deck && !lobby) real = deck.begin(real);
   pad.update(real);
 
   if (lobby) {
     lobbyFrame(real);
     return;
   }
+  play(real, draw);
+  if (deck) {
+    deck.end();
+    if (TAPE === 'record') watchThrone(real);
+  }
+}
 
+/** 世界的一幀（開始畫面之後）。 */
+function play(real, draw) {
   /* 劇情（story.js）先決定世界這一幀走多快：慢動作的時候慢、書頁整個蓋住的時候停——
      那時候整幀不算也不畫，畫面上反正只有書頁。這一下跳是給書頁的還是給連段的，
      也是它先問。 */
@@ -611,7 +694,34 @@ function begin() {
   document.body.classList.remove('lobby');
   pad.releaseAll();
   controls.jumpPressed();
+  /* 錄影模式：這一刻起開始錄。重演要從同一個起點走：換一顆亂數的種子記下來，連同造型、時鐘、
+     鏡頭的仰角與遠近、畫面大小——開始畫面停多久、在上面做了什麼都不影響之後。 */
+  if (TAPE === 'record') {
+    deck.tape = blankTape({
+      bootSeed: BOOT_SEED, seed: reseed(), look: zoo.look, hat: zoo.hatOn, god: !!player.god, clock,
+      cam: { pitch: cam.pitch, dist: cam.dist }, view: viewNow(), when: Date.now(),
+    });
+  }
   startFrom(0);
+  deck?.roll();
+}
+
+/**
+ * 重演的那一頁（replay.js）：回到錄影模式按下開始的那一刻（begin），照帶子記下的起點。
+ * 造型照開始畫面收尾的那樣換（lobby.js 的 end：先戴帽子再換 look），帽子最後再對一次。
+ */
+function rewind(meta) {
+  zoo.setHat(true);
+  zoo.setLook(meta.look);
+  if (zoo.hatOn !== meta.hat) zoo.setHat(meta.hat);
+  fight.follow();
+  player.god = meta.god;
+  clock = meta.clock;
+  cam.pitch = meta.cam.pitch;
+  cam.dist = meta.cam.dist;
+  reseed(meta.seed);
+  startFrom(0);
+  deck.roll();
 }
 
 fitView({
@@ -620,17 +730,27 @@ fitView({
 });
 
 document.getElementById('boot').remove();
-if (GAME) {
-  document.body.classList.add('lobby');
-  lobby = new Lobby({
-    zoo, view: document.getElementById('lobby-view'), start: document.getElementById('start'), onStart: begin,
-  });
-} else startFrom(0);
-requestAnimationFrame(frame);
+if (TAPE === 'replay') {
+  // 重演的那一頁沒有開始畫面、不跟著螢幕刷新走：等帶子來了，由 replay.js 一幀一幀推。
+  import('./replay.js').then((m) => m.serve({
+    step, rewind, deck, story, pad, renderer, sound, music, stages: STAGES.map((st) => st.name),
+  }));
+} else {
+  if (GAME) {
+    document.body.classList.add('lobby');
+    lobby = new Lobby({
+      zoo, view: document.getElementById('lobby-view'), start: document.getElementById('start'), onStart: begin,
+    });
+  } else startFrom(0);
+  requestAnimationFrame(frame);
+}
 
 // 給主控台一個把手，方便手動看東西。run 會被換掉，所以是 getter。
 window.flowArea = {
   scene, camera, renderer, zoo, player, ruins, cam, pad, hud, fight, folk, music, doors, death, story, bossBar, startFrom,
   get run() { return run; },
   get foes() { return fight.foes; },
+  /* 錄影模式：帶子；不等國王坐好、現在就結束進轉檔畫面（試轉檔用）。 */
+  deck,
+  finish: TAPE === 'record' ? () => { if (!stopped) finish(); } : undefined,
 };
