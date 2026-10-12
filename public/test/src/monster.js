@@ -37,6 +37,7 @@
               落地那一沉（critter.js 的 airPose）。身體畫得跳起一點點（DASH_HOP）
               讓那個姿勢站得住——只是畫面，碰撞還是地上那一個圓柱。
      recover  僵直：先低頭（BOW_TIME 秒頭垂下去、尾巴放低），低到底完全不動 STILL.before 秒，之後才甩——
+              （被破防攻擊推開、落地滑停之後的回神也是這一套，combat.js 的 m.reel）
               甩頭（頭左右甩、跟著側過去）、甩尾巴（跟頭反向）、身體左右
               搖晃（慢一拍、幅度小），一邊甩一邊把頭抬回來，一開始最用力、
               收乾淨之後再 STILL.after 秒沒有動作，僵直才結束。
@@ -619,6 +620,8 @@ export class Motion {
       return up < 0 ? ['slump', R.t] : ['rally', up];
     }
     if (m.air || m.held || m.slide) return [null, 0];
+    // 被破防攻擊推開之後回神：衝刺衝完的那一套甩頭。
+    if (m.reel && m.stun > 0) return ['recover', LUNGE.recover - m.stun];
     const c = m.cast;
     if (c) {
       this._skill = c.skill;

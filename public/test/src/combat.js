@@ -69,6 +69,9 @@
      跳離  轉完扣 5 點血，玩家往突進的反方向、往上跳下來；同一瞬間怪物被往
            另一邊（突進的方向）推開——只有水平，不往上挑。在地上的怪物是沿著
            地面滑出去、滑到停；在空中被定住的，放開之後帶著這一份水平速度落下。
+     回神  每一類都一樣：被推開的那一隻滑停（在空中被定住的是落地；會飛的是在原本的高度滑停）的那一刻，
+           先播衝刺衝完的那一套甩頭僵直（LUNGE.recover 秒：低頭、停住、甩頭，m.reel），甩完才回去追人、
+           放招、衝刺。僵直跟出招後的一樣：站著不動、打得退、傷害照算。
 
    ── 玩家的血 ────────────────────────────────────────────────────
    一開始 LIFE.start（3）顆心。被咬、被殭屍王的招打到都扣血，扣多少看是哪一下
@@ -548,6 +551,8 @@ export function placeMonster(m) {
   m.stun = 0;                             // 出招後的僵直還剩幾秒（skills.js）
   m.lunge = null;                         // 衝刺：{ t, n, dirX, dirZ }，見 LUNGE
   m.shields = kindOf(m).shields || 0;     // 還剩幾面盾（國王，見 parry）
+  m.broke = false;                        // 被破防攻擊推開、還沒落地滑停（落地就回神，見檔頭的「回神」）
+  m.reel = false;                         // 正在回神：這一段僵直（m.stun）播衝刺的甩頭
   m.shieldT = 0;                          // 上一次挨打之後過了幾秒（補盾用）
   m.aimX = Math.sin(s.yaw); m.aimZ = Math.cos(s.yaw);
 }
@@ -698,6 +703,7 @@ export function hurt(m, dmg, respawn = true) {
 export function monsterStep(m, dt, target) {
   if (m.rally) rallyStep(m, dt);
   if (m.stun > 0) m.stun = Math.max(0, m.stun - dt);
+  if (m.reel && !(m.stun > 0)) m.reel = false;
   shieldStep(m, dt);
   // 破防窗口：時間到了還沒用上就是錯過，累積歸零。
   if (broken(m)) {
@@ -726,7 +732,12 @@ export function monsterStep(m, dt, target) {
     if (!m.air) m.airT = 0;
     return;
   }
-  // 沒有目標、站起來的時候（RALLY）、放招中、出招後的僵直（skills.js）：站著不動。
+  // 被破防攻擊推開、落地滑停了：先回神——衝刺衝完的那一套甩頭僵直（站起來的時候 RALLY 優先）。
+  if (m.broke) {
+    m.broke = false;
+    if (!m.rally) { m.stun = LUNGE.recover; m.reel = true; m.cast = null; m.lunge = null; }
+  }
+  // 沒有目標、站起來的時候（RALLY）、放招中、出招後的僵直（skills.js、回神）：站著不動。
   if (!target || m.rally) { m.lunge = null; m.vx = 0; m.vy = 0; m.vz = 0; return; }
   if (m.cast || m.stun > 0) { m.vx = 0; m.vy = 0; m.vz = 0; return; }
   /* 一次衝好幾下的那一類（國王）：這一下衝完、還沒到 `lunges` 下，不發呆，重新蓄力
@@ -1427,6 +1438,7 @@ export function spinStep(c, p, m, respawn = true) {
   m.vx = c.dashX * BREAK_ATK.push.h;
   m.vz = c.dashZ * BREAK_ATK.push.h;
   m.vy = 0;
+  m.broke = true;                                             // 落地滑停就回神（monsterStep）
   if (m.y > floorAt(m) + 1e-3 && !kindOf(m).fly) { m.air = true; m.grounded = false; }   // 在空中被定住的：放開就帶著水平速度落下
   else m.slide = true;                                       // 會飛的不落下：在原本的高度滑開
   const took = spared(m) ? 0 : taken(m, DAMAGE.break);

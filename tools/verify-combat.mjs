@@ -158,6 +158,7 @@
                     原地起跳、受重力落回，扇形半徑是劍長、跳起來躲不掉，起跳推出第二道氣流；落地才僵直。
                     瞪視（只有第二條命）：蓄力 0.75 秒一直轉向主角，瞪下去一次（不扣血），再瞪 0.5 秒才收招；
                     主角操作停 0.5 秒、被往國王吸過去半個狗高。
+    41. 破防之後回神  每一類被破防攻擊推開、滑停（在空中的落地）之後，先甩頭僵直（衝刺衝完那一套）才回去動。
    ------------------------------------------------------------------ */
 
 import { PHYS } from '../public/test/src/walk.js';
@@ -3401,6 +3402,38 @@ console.log('40. 國王的第二條命');
     dazeStep(k, DT);
     ok(k.daze && k.vx > 0 && k.vz === 0, '中途被打飛：照擊退飛，不再吸，操作一樣停著');
   }
+}
+
+/* ── 41. 破防之後回神 ──────────────────────────────────────────── */
+console.log('41. 破防之後回神');
+{
+  // 破防攻擊轉完、推開：滑停（在空中被定住的落地）之後播衝刺的甩頭僵直，甩完才回去追人。
+  const run = (kind, y = 0) => {
+    const m = makeMonster({ kind, x: 0, z: -2, yaw: 0 }), c = makeCombo(), p = body(0, 0), q = body(0, 6), mo = new Motion();
+    m.hp = 99; m.y = y; m.castT = 99;
+    c.dashX = 0; c.dashZ = -1;
+    latch(c, p, m);
+    c.t = BREAK_ATK.spin;
+    spinStep(c, p, m);
+    let t = 0, stopAt = -1, reelEnd = -1, moved = false, stage = new Set(), z = 0, was = false;
+    while (t < 4 && reelEnd < 0) {
+      monsterStep(m, DT, q);
+      t += DT;
+      if (stopAt < 0 && !m.slide && !m.air) { stopAt = t; z = m.z; }
+      if (stopAt >= 0 && m.reel) { stage.add(mo._stage(m)[0]); if (m.z !== z) moved = true; }
+      if (was && !m.reel && reelEnd < 0) reelEnd = t;
+      was = m.reel;
+    }
+    return { stopAt, reelEnd, moved, stage, m };
+  };
+  for (const [kind, y, how] of [['minion', 0, '滑停'], ['boss', 0, '滑停'], ['king', 0, '滑停'], ['ghost', 1.5, '在原本的高度滑停'], ['knight', 1.2, '在空中被定住、落地']]) {
+    const r = run(kind, y);
+    ok(r.stopAt > 0 && Math.abs(r.reelEnd - r.stopAt - LUNGE.recover) < 3 * DT && !r.moved && r.stage.has('recover') && r.stage.size === 1,
+      `${KINDS[kind].name}：${how}之後甩頭僵直 ${(r.reelEnd - r.stopAt).toFixed(2)} 秒（衝刺那一套），這段時間不動`);
+  }
+  const r = run('minion'), z0 = r.m.z;
+  for (let i = 0; i < 30; i++) monsterStep(r.m, DT, body(0, 6));
+  ok(r.m.z > z0 + 0.5, '甩完才回去追人');
 }
 
 console.log(fails ? `\n${fails} 項沒過` : '\n全部通過');
