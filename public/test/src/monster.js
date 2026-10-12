@@ -123,7 +123,7 @@
    ------------------------------------------------------------------ */
 
 import * as THREE from '../vendor/three.module.js';
-import { Critter } from './critter.js';
+import { Critter, depthOnly, samePlace } from './critter.js';
 import { LUNGE, STILL, RALLY, DAZE, kindOf } from './combat.js';
 import { SKILL, RAGE, UP_AIR, REAP, recoverOf } from './skills.js';
 import { PHYS } from './walk.js';
@@ -229,7 +229,9 @@ export function makeLivingKing(zoo) {
 function seeThrough(c, alpha) {
   const depth = c.mesh;
   /* 材質的 clone 不帶 onBeforeCompile 與快取鍵，要自己接上——骨頭與毛色的
-     著色都在那裡面。uniform 是 rig3 閉包裡的同一份，所以兩個網格一起動。 */
+     著色都在那裡面。uniform 是 rig3 閉包裡的同一份，所以兩個網格一起動。
+     兩趟的頂點位置要逐位元相同，上色那一趟才比得過深度：兩邊都接 invariant
+     （critter.js 的 samePlace／depthOnly）。 */
   const tint = depth.material.map((m) => {
     const t = m.clone();
     t.onBeforeCompile = m.onBeforeCompile;
@@ -237,10 +239,12 @@ function seeThrough(c, alpha) {
     t.transparent = true;
     t.opacity = alpha;
     t.depthWrite = false;
-    return t;
+    return samePlace(t);
   });
-  c._inkMats.push(tint[2]);              // 畫出來的墨線是這一份，換墨色要連它一起換
-  for (const m of depth.material) { m.transparent = true; m.colorWrite = false; }
+  /* 只寫深度的那一趟：同樣的頂點著色器、不算顏色的片段著色器（critter.js 的 depthOnly）。
+     畫出來的墨線是上色那一份，換墨色的名單裡換成它。 */
+  c._inkMats.splice(c._inkMats.indexOf(depth.material[2]), 1, tint[2]);
+  depth.material = depth.material.map(depthOnly);
   const mesh = new THREE.Mesh(c.geometry, tint);
   mesh.position.copy(depth.position);
   mesh.scale.copy(depth.scale);

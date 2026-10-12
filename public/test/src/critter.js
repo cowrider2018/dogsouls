@@ -481,6 +481,65 @@ function rig3(material, uniforms, opts) {
   return material;
 }
 
+/* ── 半透明的兩趟：只寫深度的那一趟，與它對得上的上色那一趟 ─────────
+   monster.js 的 seeThrough 是畫兩趟：先只寫深度，再照 alpha 上色、深度測試用
+   LessEqual（three 的材質預設）去比第一趟寫下的深度。只寫深度的那一趟先前是
+   原本那三顆材質關掉 colorWrite——片段著色器照跑全套（投影的四次取樣、亮邊、
+   ACES、sRGB 的 pow、fwidth），算完再丟掉。
+
+   現在那一趟換成同一支頂點著色器配一支什麼都不算的片段著色器。頂點那一半
+   一字不動（rig3 的 onBeforeCompile 照接，骨頭、尾巴的擺、臉往鏡頭推、墨線在
+   螢幕上的那一推都在裡面；uniform 是 rig3 閉包裡的同一份，所以兩趟一起動），
+   用不到的 varying 編譯器自己會丟掉。
+
+   要緊的是兩趟的 gl_Position 必須逐位元相同：上色那一趟要「等於」才畫得出來，
+   差一個 ulp 就是一片斑點（量過：深度那一趟的 z 故意乘上 1.0000002，一張畫面就有上百個
+   像素不一樣；照這裡做，SwiftShader 與 D3D11、有無 MSAA，跟改之前逐像素相同）。
+   以前兩趟是同一支程式，自然相同；現在是兩支，所以兩支都宣告 invariant gl_Position——
+   GLSL ES 3.00 保證算式相同、輸入相同時，宣告了 invariant 的輸出在不同程式之間
+   也相同（4.6.1）。上色那一趟因此也要接 invariant（samePlace），它的程式鍵跟著
+   換，不跟不透明的那幾隻共用。 */
+const INVARIANT = 'invariant gl_Position;\nvoid main() {';
+const DEPTH_FRAG = `
+#include <common>
+#include <logdepthbuf_pars_fragment>
+#include <clipping_planes_pars_fragment>
+void main() {
+  #include <clipping_planes_fragment>
+  #include <logdepthbuf_fragment>
+  gl_FragColor = vec4(0.0);
+}
+`;
+
+/** rig3 的材質接上 invariant gl_Position（半透明那兩趟的上色那一趟），回傳同一顆。 */
+export function samePlace(material) {
+  const compile = material.onBeforeCompile, key = material.customProgramCacheKey;
+  material.onBeforeCompile = (shader, renderer) => {
+    compile(shader, renderer);
+    shader.vertexShader = shader.vertexShader.replace('void main() {', INVARIANT);
+  };
+  material.customProgramCacheKey = () => `${key()}:inv`;
+  return material;
+}
+
+/**
+ * 一顆 rig3 材質的「只寫深度」版：同一支頂點著色器（加 invariant gl_Position），
+ * 片段著色器什麼都不算。渲染狀態（正反面、臉的 polygonOffset、深度測試）照抄原本那一顆。
+ */
+export function depthOnly(material) {
+  const compile = material.onBeforeCompile, key = material.customProgramCacheKey;
+  const d = material.clone();
+  d.transparent = true;
+  d.colorWrite = false;
+  d.onBeforeCompile = (shader, renderer) => {
+    compile(shader, renderer);
+    shader.vertexShader = shader.vertexShader.replace('void main() {', INVARIANT);
+    shader.fragmentShader = DEPTH_FRAG;
+  };
+  d.customProgramCacheKey = () => `${key()}:depth`;
+  return d;
+}
+
 /**
  * 載入整個動物園。
  *
