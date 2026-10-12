@@ -810,11 +810,13 @@ export class Fight {
         if (QUAKE[st.shape]) this._rumbles.push({ shape: st.shape, t: 0, at: quakeBands(st.shape, st.r).map((b) => b.at) });
         else sound.play(st.shape);
       }
-      // 國王劈下去（那一刀帶著氣流）：劍長那一截裂開，鏡頭往劈的方向晃。
-      if (st.gust) {
-        this._scars.cut(st, this.world.field.cols);
-        const n = Math.hypot(SHAKE.ahead, 1);
-        this._shakes.push({ t: 0, x: (st.dirX * SHAKE.ahead) / n, y: -1 / n, z: (st.dirZ * SHAKE.ahead) / n });
+      /* 國王劈下去、上挑（那一刀帶著氣流）：劍長那一截裂開（上挑的照它帶的 mark），鏡頭往劈的方向晃——
+         上挑往上。上挑連著好幾幀都在打，只有頭一幀。 */
+      if (st.gust && !st.gust.scarred) {
+        st.gust.scarred = true;
+        const k = st.mark || st, n = Math.hypot(SHAKE.ahead, 1);
+        this._scars.cut(k, this.world.field.cols);
+        this._shakes.push({ t: 0, x: (k.dirX * SHAKE.ahead) / n, y: (st.up ? 1 : -1) / n, z: (k.dirZ * SHAKE.ahead) / n });
       }
       // 地震（dust.js 的 QUAKE）是震波，放在 world.waves 一圈圈往外推；其餘的這一幀一次打完。
       if (!QUAKE[st.shape]) { strikes.push(st); continue; }
@@ -1163,12 +1165,16 @@ export class Fight {
 
   /**
    * 國王的直線劈砍：倒數的時候是一條從牠腳下往鎖定方向一直到黑牆的長條（氣流最遠走得到那裡），
-   * 亮色從腳下長到那一頭；劈下去就收掉——跟球的預告一樣，出手之後不留。
+   * 亮色從腳下長到那一頭；劈下去就收掉——跟球的預告一樣，出手之後不留。第二條命劈下去之後換成
+   * 上挑那一條（從起跳的地方往瞄好的方向到黑牆），站著的那 up.gap 秒長滿，上挑出手就收掉。
    */
   _hew(f) {
-    const { m, hew } = f, c = m.cast, on = !!c && c.skill === 'hew';
-    showStrip(hew, on, on ? Math.min(1, c.t / SKILL.hew.windup) : 0, m.x, m.z, on ? Math.atan2(c.dirX, c.dirZ) : 0,
-      on ? laneLength(m.x, m.z, c.dirX, c.dirZ, m.field.arena) : 0, m.y);
+    const { m, hew } = f, c = m.cast, S = SKILL.hew, up = !!c && c.skill === 'hew' && c.up;
+    const t = up ? c.t - S.windup : c ? c.t : 0, T = up ? S.up.gap : S.windup;
+    const on = !!c && c.skill === 'hew' && t < T;
+    const o = up ? { x: up.x, y: up.y, z: up.z, dirX: up.dirX, dirZ: up.dirZ } : { x: m.x, y: m.y, z: m.z, dirX: c?.dirX, dirZ: c?.dirZ };
+    showStrip(hew, on, on ? Math.min(1, t / T) : 0, o.x, o.z, on ? Math.atan2(o.dirX, o.dirZ) : 0,
+      on ? laneLength(o.x, o.z, o.dirX, o.dirZ, m.field.arena) : 0, o.y);
   }
 
   /**
@@ -1243,10 +1249,15 @@ export class Fight {
   /**
    * 國王的直線劈砍：跟騎士跳砍劈下去那一道一樣——頭往下甩的那一刻（出手前 CHOP_LEAD 秒）
    * 起一道 cleave，從正上方劈到前面，照劍長（SKILL.hew.len）縮放：劍光是那一刀本身，
-   * 往前推出去的是氣流。
+   * 往前推出去的是氣流。第二條命的上挑：起跳那一幀起一道同一片扇形、反過來從前面往上掃的
+   * （rise，末端點在劍長那麼遠，跟判定同一片），一樣照劍長縮放。
    */
   _hewQi(m, c) {
     const S = SKILL.hew, L = S.len;
+    if (c.up && !c.qi && c.t >= S.windup + S.up.gap) {
+      this._foeQi(m, c, 'rise', c.up.tip, L / REACH, c.up.dirX, c.up.dirZ);
+      c.qi = true;
+    }
     if (c.chopQi || c.t < S.windup - CHOP_LEAD) return;
     this._foeQi(m, c, 'cleave', { x: m.x + c.dirX * L, y: m.y, z: m.z + c.dirZ * L }, L / REACH, c.dirX, c.dirZ);
     c.chopQi = true;

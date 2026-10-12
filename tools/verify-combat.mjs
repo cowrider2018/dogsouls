@@ -154,7 +154,8 @@
                     第一下落地不僵直，就地鎖定主角那時的位置再跳，第二下落地才僵直。
     39. 第二條命的連吐  倒數完每 0.5 秒吐一顆、連吐三顆；每一顆瞄吐的那一刻主角腳下，照拋物線飛 0.9 秒
                     落地（球底貼地），停一幀才炸掉；站著不動三顆都中，吐出去之後走開就躲得掉；吐完第三顆才僵直。
-    40. 國王的第二條命  不再召喚（第一條命照樣召喚）。
+    40. 國王的第二條命  不再召喚（第一條命照樣召喚）。劈砍是下劈後上挑：劈下去那一刻才瞄第二刀，0.25 秒後
+                    原地起跳、受重力落回，扇形半徑是劍長、跳起來躲不掉，起跳推出第二道氣流；落地才僵直。
    ------------------------------------------------------------------ */
 
 import { PHYS } from '../public/test/src/walk.js';
@@ -3318,6 +3319,48 @@ console.log('40. 國王的第二條命');
   };
   ok(skillsOf(king(1)).includes('summon') && picked(1).includes('summon'), `第一條命照樣召喚（挑得到 ${picked(1)}）`);
   ok(!skillsOf(king(2)).includes('summon') && !picked(2).includes('summon'), `第二條命不再召喚（挑得到 ${picked(2)}）`);
+
+  // 劈砍：第二條命劈下去之後接上挑。主角在倒數的時候走到旁邊——第二刀照劈下去那一刻的位置瞄。
+  {
+    const S = SKILL.hew, w = makeWorld(), m = king(2), q = body(0, 2), mo = new Motion();
+    const hits = [], stages = new Set();
+    let t = 0, top = 0, stunAt = -1, chopAt = -1, upAt = -1, stunBetween = false;
+    m.castT = 0;
+    while (t < 2 && stunAt < 0) {
+      if (m.cast && m.cast.t > 0.2 && !m.cast.up) q.x = 2;
+      const st = bossStep(m, DT, q, w, () => 0);        // 0：hew
+      if (st && chopAt < 0) chopAt = t;
+      if (st && st.shape === 'fan' && upAt < 0) upAt = t;
+      if (st) hits.push(st);
+      if (chopAt >= 0 && upAt < 0 && m.stun > 0) stunBetween = true;
+      monsterStep(m, DT, q);
+      stages.add(mo._stage(m)[0]);
+      top = Math.max(top, m.y);
+      if (stunAt < 0 && !m.cast && m.stun > 0) stunAt = t;
+      t += DT;
+    }
+    const chop = hits[0], fans = hits.filter((h) => h.shape === 'fan');
+    ok(chop.shape === 'strip' && near(chop.dirX, 0) && chop.dmg === S.damage && !stunBetween, '第一刀照挑招那一刻的方向直劈，劈完不僵直');
+    const d = Math.hypot(2, 2 - (-2));
+    ok(near(fans[0].aimX, 2 / d) && near(fans[0].aimZ, 4 / d) && near(Math.hypot(fans[0].tip.x - m.x, fans[0].tip.z - m.z), S.len),
+      '第二刀照劈下去那一刻主角在的方向上挑（扇形的末端在劍長那麼遠）');
+    ok(Math.abs(upAt - chopAt - S.up.gap) < 2 * DT && fans.every((h) => h.r === S.len && h.dmg === S.up.damage && h.gust === fans[0].gust),
+      `劈下去 ${(upAt - chopAt).toFixed(2)} 秒後上挑，扇形半徑是劍長、扣 ${S.up.damage}`);
+    ok(Math.abs(top - PHYS.jump ** 2 / (2 * PHYS.gravity)) < 0.02 && m.y === 0 && m.grounded,
+      `上挑原地起跳、受重力落回來（最高 ${top.toFixed(2)} 公尺），不停在空中`);
+    ok(Math.abs(stunAt - upAt - UP_AIR) < 2 * DT && near(m.stun, recoverOf('hew') - DT, 1e-6), '上挑落地才僵直，僵直跟劈砍一樣短');
+    ok(w.gusts.length === 2 && near(w.gusts[1].dirX, 2 / d) && near(w.gusts[1].x, m.x) && chop.gust === w.gusts[0] && fans[0].gust === w.gusts[1],
+      '兩刀各推出一道氣流：第二道沿上挑的方向');
+    ok(fans[0].mark && near(fans[0].mark.len, S.len) && fans[0].up, '上挑帶著劍長那一條，斬痕照它留');
+    // 上挑是立起來的：跳起來躲不掉；身體偏離那一片就打不到。
+    const fan = fans[0], at = (k, y = 0) => ({ x: fan.x + fan.aimX * k, y, z: fan.z + fan.aimZ * k });
+    ok(strikeHits({ ...fan, y: 0 }, at(1.5, 1.2)) && !strikeHits({ ...fan, y: 0 }, at(S.len + PHYS.radius + 0.05)), '上挑打得到跳起來的主角，劍長以外打不到');
+    ok(['hewWind', 'cleaveLand', 'hewUp'].every((s) => stages.has(s)) && !stages.has('hewRec'),
+      '動作是 hewWind → cleaveLand → hewUp（騎士跳砍落地的那兩段），僵直接著播 hewUp 的收尾');
+    const k1 = king(1), w1 = makeWorld();
+    for (let i = 0; i < 60; i++) bossStep(k1, DT, body(0, 2), w1, () => 0);
+    ok(w1.gusts.length === 1 && !k1.cast, '第一條命：劈一刀就收');
+  }
 }
 
 console.log(fails ? `\n${fails} 項沒過` : '\n全部通過');

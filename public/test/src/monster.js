@@ -95,6 +95,8 @@
             0.25 秒的僵直整段是一個停頓：劈到底、整隻壓低、頭朝著地面（騎士的 CHOP），一動不動
             （打擊的頓，鏡頭同時往劈的方向晃，fight.js）；僵直完才淡回原本的樣子。劍光也是
             騎士跳砍那一道（fight.js）。
+            第二條命劈下去之後接著上挑：落地劈到底、翻頭（騎士的 cleaveLand），上挑是騎士的那一下
+            （hewUp：主角第二擊左右鏡像，起跳、受重力落回來），收尾拉長到上挑落地之後的僵直結束。
      summon 召喚：仰頭嚎叫——殭屍王蓄火球那一套（胸口挺起、頭仰到朝天、尾巴翹起來），
             倒數的 0.5 秒仰到最高，冒出來的那一刻停在那裡，僵直裡慢慢回到原本的樣子。
             召出來的幽靈在同一段 0.5 秒裡從地底升上來（riseLift）：一開始整隻在地板底下，
@@ -460,6 +462,11 @@ export const MOVES = {
     keys: [[0, {}], [0.3, RAISE, 'out'], [SKILL.hew.windup - CHOP_LEAD, WOUND, 'inOut'], [SKILL.hew.windup, CHOP_MID, 'in']],
   },
   hewRec: { blend: 0.02, keys: [[0, CHOP], [SKILL.hew.recover, CHOP, 'lin']] },
+  /* 第二條命劈下去之後的上挑：騎士的 cleaveUp，收尾拉到劈砍自己的僵直結束。 */
+  hewUp: {
+    blend: 0.03,
+    keys: [...HERO.rise.keys.slice(0, -1).map(([t, pose, ease]) => [t, mirror(pose), ease]), [UP_AIR + SKILL.hew.recover, {}, 'inOut']],
+  },
   summonWind: { blend: 0.08, keys: [[0, {}], [0.3, STRETCH, 'out'], [SKILL.summon.windup, STRETCH_MAX, 'inOut']] },
   summonRec: { blend: 0.02, keys: [[0, STRETCH_MAX], [0.12, STRETCH_MAX, 'lin'], [recoverOf('summon'), {}, 'inOut']] },
   /* 國王的旋風斬：蓄力是騎士劍迴旋的那一套（主角二段跳那一下，照 1 秒拉長），轉是主角落地那一下
@@ -491,8 +498,9 @@ const DASH_HOP = 0.25;
 export class Motion {
   constructor() {
     this.mover = new Mover(MOVES, (phase, t) => [phase, t]);
-    /** 上一次在放哪一招：出招之後的僵直播它的收尾。 */
+    /** 上一次在放哪一招：出招之後的僵直播它的收尾。_up：那一招是劈下去之後接上挑的劈砍（國王第二條命）。 */
     this._skill = null;
+    this._up = false;
     /** 頭跟著主角轉的那一份現在有多少（0～1，追 LOOK.stages 給的目標）。 */
     this._look = 0;
     /** 漂的力道（0～1，追速度）與擺到哪（弳）。 */
@@ -518,7 +526,7 @@ export class Motion {
     if (stage === 'dash') this._hop(o, m, t);
     if (stage === 'leapAir') this._fly(o, m, t);
     if (stage === 'cleaveAir') this._hopTo(o, m, t);
-    if (stage === 'cleaveUp' && t < UP_AIR) { o.air = true; o.vy = PHYS.jump - PHYS.gravity * t; }
+    if ((stage === 'cleaveUp' || stage === 'hewUp') && t < UP_AIR) { o.air = true; o.vy = PHYS.jump - PHYS.gravity * t; }
     if (stage === 'reapUp') { o.air = true; o.vy = PHYS.jump - PHYS.gravity * t; }
     const move = this.mover.step(dt, stage, t);
     o.move = this._lookAt(dt, stage, m, player, this._float(dt, stage, m, move));
@@ -581,6 +589,12 @@ export class Motion {
     const c = m.cast;
     if (c) {
       this._skill = c.skill;
+      // 國王第二條命的劈砍：劈下去之後是騎士跳砍落地的那兩段（劈到底翻頭、上挑），僵直接著播上挑的收尾。
+      this._up = c.skill === 'hew' && !!c.up;
+      if (this._up) {
+        const u = c.t - SKILL.hew.windup - SKILL.hew.up.gap;
+        return u < 0 ? ['cleaveLand', u + SKILL.hew.up.gap] : ['hewUp', u];
+      }
       if (c.skill === 'leap' && c.t >= LEAP_WIND) return ['leapAir', c.t - LEAP_WIND];
       // 第二條命連吐：吐出第一顆之後，每一顆之間是 orbAgain（從吐出上一顆那一刻算起）。
       if (c.skill === 'orb' && c.spat) return ['orbAgain', c.t - SKILL.orb.windup - (c.spat - 1) * RAGE.orb.every];
@@ -602,6 +616,7 @@ export class Motion {
       return MOVES[`${c.skill}Wind`] ? [`${c.skill}Wind`, c.t] : [null, 0];
     }
     // 跳砍的僵直接著播上挑那一套的收尾。
+    if (m.stun > 0 && this._skill === 'hew' && this._up) return ['hewUp', UP_AIR + recoverOf('hew') - m.stun];
     if (m.stun > 0 && this._skill === 'cleave') return ['cleaveUp', UP_AIR + SKILL.recover - m.stun];
     if (m.stun > 0 && MOVES[`${this._skill}Rec`]) return [`${this._skill}Rec`, recoverOf(this._skill) - m.stun];
     const L = m.lunge;

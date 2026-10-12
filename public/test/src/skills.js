@@ -77,6 +77,11 @@
             走，走到黑牆、或撞上場上的東西（跟球一樣，開著的門不擋）就停。一招只打得到一次：
             被那一刀劈到的，氣流就不再算。出招後只僵直 0.25 秒
             （SKILL.hew.recover，其他招是 SKILL.recover）；氣流不等僵直，自己走完。
+            第二條命是下劈後上挑：劈下去的那一刻（不是挑招的那一刻）才轉向玩家、瞄第二刀，牠腳下
+            再出一條往那個方向一直到黑牆的長條，0.25 秒（up.gap）後上挑——騎士跳砍之後的那一下：原地
+            起跳、受重力落回來（不像幽靈騎士停在空中），劍往上掃一片直立扇形（半徑是劍長，起跳後
+            SWING 秒內，跳起來躲不掉），起跳那一刻劍尖沿那個方向推出第二道氣流（跟劈的那一道一樣），
+            劍長那一截一樣留斬痕。上挑落地才僵直（一樣 0.25 秒）。
      summon 召喚。挑的那一刻在牠身邊半徑 3 公尺內隨機挑幾個點（地板上），倒數 0.5 秒——
             這段時間每個點上一隻幽靈從地底升上來（畫面，fight.js；沒有紅圈），還不算上場、
             不動、打不到也打不到人；倒數完的那一刻整隻離開地面，就在那一點上場、開始追人
@@ -107,7 +112,7 @@
                  跳上去追牠的才挨；對地的在地上轉：跟 gale 一樣跳得過。
      gale        轉的那一下跟騎士的 whirl 同一種（移動的圓盤，只是不移動）。熱氣流是一圈薄薄的環帶
                  （ringHits），在牠腰那麼高：跳得過，也躲得到東西後面。
-     跳砍之後的上挑例外：那一片是立起來的。
+     跳砍之後的上挑例外：那一片是立起來的（國王第二條命劈砍之後的上挑也是）。
 
    碰到扣血：殭屍王的招 5、騎士的 whirl 2、cleave 3、上挑 3、幽靈騎士的連斬劈 3、挑 3、轉 2、國王的 hew 5、氣流 2、gale 5、熱氣流 2（每一招的 `damage`；衝刺咬到的見 combat.js 的 KINDS）。
    打中人的球就炸掉消失。玩家無敵的時候（第三段、破防攻擊）碰到不算，球穿過去。
@@ -131,6 +136,9 @@ export const REND = {
   recover: STILL.before + 0.5 + STILL.after,
 };
 
+/** 跳砍（與國王第二條命的劈砍）劈下去之後站多久才上挑（秒）：兩招是同一套身體動作（monster.js 的 cleaveLand）。 */
+const UP_GAP = 0.25;
+
 /** 每一招的數值。長度一律用狗高量；`damage` 是打中玩家扣幾點血。 */
 export const SKILL = {
   orb: { windup: 0.75, radius: 0.75 * DOG_H, speed: 6, damage: 5 },
@@ -149,15 +157,19 @@ export const SKILL = {
      扇形往左右各厚 thick（預告那一條的半寬）。 */
   cleave: {
     windup: 0.5, air: 0.4, hop: 1.2, len: 2.2 * DOG_H, width: 0.8 * DOG_H, range: 8, damage: 3,
-    up: { gap: 0.25, swing: SWING, thick: 0.4 * DOG_H, damage: 3 },
+    up: { gap: UP_GAP, swing: SWING, thick: 0.4 * DOG_H, damage: 3 },
   },
   /* 幽靈騎士的兩套連斬：數值是同一份（REND），只差後兩下的順序（REAP）。 */
   reapAir: REND,
   reapGround: REND,
   /* 國王的直線劈砍：倒數 windup，劈一條從牠腳下往鎖定方向、長 len、寬 width 的長條（劍長，
      跟騎士跳砍劈的那一條一樣長）。不限距離：劍尖推出一道同樣寬的氣流（gust），每秒 speed
-     公尺往前走到黑牆或撞上東西。出招後的僵直是自己的 recover（比別招短）。 */
-  hew: { windup: 0.5, len: 2.2 * DOG_H, width: 0.2 * DOG_H, damage: 5, recover: 0.25, gust: { speed: 20, damage: 2 } },
+     公尺往前走到黑牆或撞上東西。出招後的僵直是自己的 recover（比別招短）。
+     up：第二條命劈下去 gap 秒後上挑（扇形的半徑是 len），起跳後 swing 秒內打。 */
+  hew: {
+    windup: 0.5, len: 2.2 * DOG_H, width: 0.2 * DOG_H, damage: 5, recover: 0.25, gust: { speed: 20, damage: 2 },
+    up: { gap: UP_GAP, swing: SWING, damage: 5 },
+  },
   /* 國王的召喚：倒數 windup，在身邊 radius 公尺內（離牠至少 near，不疊在牠身上）的點上各冒出
      一隻 kind（倒數的時候從地底升上來）。場上牠召喚的最多 cap 隻，一次最多召 each 隻（補到 cap 為止）。
      挑得到的時候被挑中的機率是 chance（pickSkill）。 */
@@ -440,18 +452,16 @@ const CAST = {
   },
 
   /* 倒數的時候站著；倒數完站在原地劈劍長那一條（黑牆比劍近的話到牆為止），劍尖推出一道氣流。
-     那一刀記著它的氣流（`gust`）：劈到人的話氣流就不再算（fight.js）。 */
-  hew(m, world) {
+     那一刀記著它的氣流（`gust`）：劈到人的話氣流就不再算（fight.js）。第二條命劈下去的那一刻才
+     轉向玩家、瞄第二刀，接著是上挑（hewUp），不收招。 */
+  hew(m, world, target) {
     const c = m.cast, S = SKILL.hew;
     if (c.t < S.windup) return null;
-    m.cast = null;
-    const wall = laneLength(m.x, m.z, c.dirX, c.dirZ, m.field.arena), len = Math.min(S.len, wall);
-    const gust = {
-      x: m.x, y: m.y, z: m.z, dirX: c.dirX, dirZ: c.dirZ, w: S.width, dmg: S.gust.damage, wall,
-      from: len, to: len, fresh: true, done: false, spent: false, blocker: null,
-    };
-    world.gusts.push(gust);
-    return { shape: 'strip', x: m.x, y: m.y, z: m.z, dirX: c.dirX, dirZ: c.dirZ, len, w: S.width, dmg: S.damage, gust };
+    if (c.up) return hewUp(m, world);
+    const gust = hewGust(m, world, m.x, m.y, m.z, c.dirX, c.dirZ);
+    if (raging(m)) aimUp(m, target, S.len);
+    else m.cast = null;
+    return { shape: 'strip', x: m.x, y: m.y, z: m.z, dirX: c.dirX, dirZ: c.dirZ, len: gust.len, w: S.width, dmg: S.damage, gust };
   },
 
   /* 倒數的時候站著；倒數完原地轉一圈：轉的頭 swing 秒每一幀打腰那麼高的那一片圓盤（跟騎士的
@@ -501,6 +511,48 @@ function lob(m, target) {
   return {
     x: x0, y: y0, z: z0, vx, vz, r: S.radius, dmg: S.damage,
     lob: { x0, y0, z0, vy: (y1 - y0) / T + (PHYS.gravity * T) / 2, t: 0, T, tx: target.x, tz: target.z, floor },
+  };
+}
+
+/**
+ * 國王劈砍劍尖推出去的一道氣流（world.gusts）：從腳 (x, y, z) 沿 (dirX, dirZ)，前緣一開始在劍長
+ * （黑牆比劍近的話到牆為止，`len`）。
+ */
+function hewGust(m, world, x, y, z, dirX, dirZ) {
+  const S = SKILL.hew, wall = laneLength(x, z, dirX, dirZ, m.field.arena), len = Math.min(S.len, wall);
+  const gust = {
+    x, y, z, dirX, dirZ, w: S.width, dmg: S.gust.damage, wall, len,
+    from: len, to: len, fresh: true, done: false, spent: false, blocker: null,
+  };
+  world.gusts.push(gust);
+  return gust;
+}
+
+/**
+ * 國王第二條命的上挑（劈下去之後）：身體是騎士跳砍之後的那一下（upper），只是劍是國王的。劈下去的
+ * 那一刻已經瞄好了（aimUp，扇形的末端在劍長那麼遠）。站 up.gap 秒，然後原地起跳（初速 PHYS.jump、
+ * 受重力，UP_AIR 秒落回同一層）；起跳那一刻劍尖沿上挑的方向推出第二道氣流（跟劈的那一道一樣），
+ * 起跳後 swing 秒內每一幀打一片直立扇形（半徑是劍長，左右各厚半條長條寬）。落地收招。
+ * 打下去的那一下帶著 `mark`：斬痕照它留（劍長那一條，在起跳那一層；fight.js）。
+ */
+function hewUp(m, world) {
+  const c = m.cast, S = SKILL.hew, U = S.up, up = c.up;
+  const u = c.t - S.windup - U.gap;
+  if (u < 0) return null;
+  c.upGust ??= hewGust(m, world, up.x, up.y, up.z, up.dirX, up.dirZ);
+  if (u >= UP_AIR) {
+    m.y = up.y;
+    m.grounded = true;
+    m.cast = null;
+    return null;
+  }
+  m.y = up.y + PHYS.jump * u - (PHYS.gravity * u * u) / 2;
+  m.grounded = false;
+  if (u > U.swing) return null;
+  const g = c.upGust;
+  return {
+    shape: 'fan', x: m.x, y: m.y, z: m.z, aimX: up.dirX, aimZ: up.dirZ, tip: up.tip, thick: S.width / 2, r: S.len, dmg: U.damage,
+    gust: g, up: true, mark: { x: up.x, y: up.y, z: up.z, dirX: up.dirX, dirZ: up.dirZ, len: g.len, w: S.width },
   };
 }
 
