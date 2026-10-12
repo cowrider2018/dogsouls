@@ -146,7 +146,7 @@
                     轉完才僵直，僵直的時候停在空中不掉。轉的那一圈打不到站在地上的人，跳上去的才挨。
                     動作是 cleaveWind → cleaveAir → cleaveLand → reapUp → reapSpin → reapRec。
     36. 甩頭前後不動 甩頭的僵直：先停 STILL.before 秒，甩完回到原本的樣子之後再 STILL.after 秒沒有動作。
-    37. 兩條命      殭屍王兩條命、一樣多血，其他類一條。第一條扣到 0 不算死：不重生、不倒下，帶著擊退
+    37. 兩條命      殭屍王與國王兩條命、一樣多血，其他類一條。第一條扣到 0 不算死：不重生、不倒下，帶著擊退
                     落地；從那一刻到站好打不到（不扣血、不累積破防、破防攻擊瞄不到）、不追人、不放招；
                     落地 1 秒之後花 2 秒站起來，站好血補滿、第二條命。動作是 slump（空中也是）→ rally。
                     第二條扣到 0 才死；重生、回到站位都從第一條命開始。
@@ -3149,7 +3149,8 @@ console.log('36. 甩頭前後不動');
 /* ── 37. 兩條命 ────────────────────────────────────────────── */
 console.log('37. 兩條命');
 {
-  ok(KINDS.boss.lives === 2 && Object.entries(KINDS).every(([k, v]) => k === 'boss' || !v.lives), '殭屍王兩條命，其他類一條');
+  ok(KINDS.boss.lives === 2 && KINDS.king.lives === 2 && Object.entries(KINDS).every(([k, v]) => ['boss', 'king'].includes(k) || !v.lives),
+    '殭屍王與國王兩條命，其他類一條');
   ok(RALLY.wait === 1 && RALLY.rise === 2, '落地 1 秒之後站起來，站 2 秒');
   const m = makeMonster({ kind: 'boss', x: 0, z: -4, yaw: 0 }), p = body(0, 4);
   const mo = new Motion();
@@ -3193,6 +3194,12 @@ console.log('37. 兩條命');
   m.life = 2;
   placeMonster(m);
   ok(m.life === 1 && !m.rally, '回到站位：第一條命');
+  // 國王也一樣：第一條扣到 0 低頭、站起來，盾擋不擋都一樣（站起來的時候根本打不到）。
+  const k = makeMonster({ kind: 'king', x: 0, z: -4, yaw: 0 }), km = new Motion();
+  k.hp = 1;
+  ok(!hurt(k, DAMAGE.slash, false) && spared(k) && km._stage(k)[0] === 'slump', '國王第一條扣到 0：不算死、低頭、打不到');
+  for (let s = 0; s < RALLY.wait + RALLY.rise + 0.5; s += DT) monsterStep(k, DT, p);
+  ok(!k.rally && k.life === 2 && k.hp === KINDS.king.hp, '國王站起來：第二條命、血滿');
 }
 
 /* ── 38. 第二條命的跳砸與扇形 ──────────────────────────────── */

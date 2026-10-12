@@ -47,7 +47,7 @@
    每一下都會扣血（各段的傷害見 DAMAGE）。血扣到 0 就死，當場在牠自己的
    重生點重生（血滿、破防歸零），玩家留在原地。
 
-   殭屍王有兩條命（KINDS 的 `lives`），兩條一樣多血。第一條扣到 0 不算死、不倒下（RALLY）：
+   殭屍王與國王有兩條命（KINDS 的 `lives`），兩條一樣多血。第一條扣到 0 不算死、不倒下（RALLY）：
    那一刻往前低頭（在空中也是），帶著那一下的擊退落地；落地 RALLY.wait 秒之後站起來
    （RALLY.rise 秒：抬頭、甩頭、回到原本的樣子），站好血補滿、換第二條命（m.life），
    招換成第二條命的那一套（skills.js 的 RAGE）。從扣到 0 到站好都打不到（spared）：
@@ -192,7 +192,7 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  *           在空中原地轉一圈；reapGround：下劈、在地上原地轉一圈、上挑。三下連著），每次各一半。
  *           衝刺咬人照常。
  *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3.8，走路、
- *           受重力。`lunges`：一次衝刺衝兩下才僵直（見 LUNGE）。`shields`：身邊幾面盾，
+ *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY）。`lunges`：一次衝刺衝兩下才僵直（見 LUNGE）。`shields`：身邊幾面盾，
  *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。衝刺跟小怪一樣一打就取消。每 `every`
  *           秒從 `skills` 裡挑一招（skills.js）。
  *
@@ -210,7 +210,7 @@ export const KINDS = {
   ghost: { name: '幽靈', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1, fly: true },
   knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], every: 3 },
   wraith: { name: '幽靈騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
-  king: { name: '國王', hp: 40, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, skills: ['hew', 'summon', 'gale'], every: 3 },
+  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, skills: ['hew', 'summon', 'gale'], every: 3 },
 };
 
 /**
