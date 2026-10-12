@@ -1076,10 +1076,10 @@ export function inSlash(p, m) {
   return off <= SLASH_HALF + Math.asin(Math.min(1, r / d));
 }
 
-/** 鉛直面上的一點（前 f、上 u，從腳下量）在不在 [a0, a1] 那片扇形裡。 */
-function inFanAt(f, u, a0, a1) {
+/** 鉛直面上的一點（前 f、上 u，從腳下量）在不在 [a0, a1]、半徑 r 那片扇形裡。 */
+function inFanAt(f, u, a0, a1, r) {
   const rho = Math.hypot(f, u);
-  if (rho > FAN.r) return false;
+  if (rho > r) return false;
   if (rho < 1e-9) return true;
   const th = Math.atan2(u, f);
   return th >= a0 && th <= a1;
@@ -1099,8 +1099,9 @@ function inFanAt(f, u, a0, a1) {
  *
  * `thick`：扇形往面的左右各有這麼厚（公尺，預設 0 就是上面那一片平面）。騎士的上挑
  * （skills.js）用它——身體碰到那一塊厚片就算，切出來的長方形取最靠近面的那一刀。
+ * `reach`：扇形的半徑，預設 FAN.r（REACH）；國王的上挑照牠的劍長（skills.js）。
  */
-export function inFan(p, m, tip, thick = 0) {
+export function inFan(p, m, tip, thick = 0, reach = FAN.r) {
   const { dirX, dirZ, a0, a1 } = fanFrame(p, tip);
   const r = PHYS.radius;
   const dx = m.x - p.x, dz = m.z - p.z;
@@ -1113,12 +1114,12 @@ export function inFan(p, m, tip, thick = 0) {
   const u0 = m.y - p.y, u1 = u0 + PHYS.height;
   for (let i = 0; i <= 4; i++) {
     for (let j = 0; j <= 6; j++) {
-      if (inFanAt(f0 + ((f1 - f0) * i) / 4, u0 + ((u1 - u0) * j) / 6, a0, a1)) return true;
+      if (inFanAt(f0 + ((f1 - f0) * i) / 4, u0 + ((u1 - u0) * j) / 6, a0, a1, reach)) return true;
     }
   }
   for (const a of [a0, a1]) {
     for (let k = 0; k <= 32; k++) {
-      const q = (FAN.r * k) / 32;
+      const q = (reach * k) / 32;
       const qf = Math.cos(a) * q, qu = Math.sin(a) * q;
       if (qf >= f0 && qf <= f1 && qu >= u0 && qu <= u1) return true;
     }

@@ -506,13 +506,13 @@ function lob(m, target) {
 
 /**
  * 跳砍落地：轉向玩家現在的位置，記下上挑的方向與那一片扇形的末端點（起跳那一層、
- * 往前 REACH——預告那一條的遠端，fanFrame 的下緣指著它）。
+ * 往前 len——預告那一條的遠端，fanFrame 的下緣指著它；騎士是 REACH）。
  */
-function aimUp(m, target) {
+function aimUp(m, target, len = REACH) {
   const c = m.cast;
   const dx = target.x - m.x, dz = target.z - m.z, d = Math.hypot(dx, dz);
   const [dirX, dirZ] = d > 1e-6 ? [dx / d, dz / d] : [c.dirX, c.dirZ];
-  c.up = { dirX, dirZ, x: m.x, y: m.y, z: m.z, tip: { x: m.x + dirX * REACH, y: m.y, z: m.z + dirZ * REACH } };
+  c.up = { dirX, dirZ, x: m.x, y: m.y, z: m.z, tip: { x: m.x + dirX * len, y: m.y, z: m.z + dirZ * len } };
   m.aimX = dirX; m.aimZ = dirZ;
 }
 
@@ -588,11 +588,11 @@ export function pickSkill(can, r) {
  *   cone     尖在 (x, z)、朝 (dirX, dirZ)、半角 half、長 r。同上，只有那一片扇形裡的那一段前緣。
  *   capsule  (x, z)–(x1, z1) 那一段往外擴 r（劍迴旋衝刺這一幀走過的那一段），在 waist 那個高度：移動的圓盤。
  *   strip    從 (x, z) 往 (dirX, dirZ) 長 len、寬 w 的長方形（跳砍劈下去的那一條）。
- *   fan      腳在 (x, y, z)、下緣指著 tip 的直立扇形，左右各厚 thick（跳砍之後的上挑，
+ *   fan      腳在 (x, y, z)、下緣指著 tip 的直立扇形，左右各厚 thick、半徑 r（沒有就是 REACH）（跳砍之後的上挑，
  *            combat.js 的 inFan）。立起來的，所以不看高度——跳起來躲不掉。
  */
 export function strikeHits(st, p) {
-  if (st.shape === 'fan') return inFan(st, p, st.tip, st.thick);
+  if (st.shape === 'fan') return inFan(st, p, st.tip, st.thick, st.r);
   if (QUAKE[st.shape]) return waveHits(st, p);
   if (st.shape === 'capsule') {
     // 移動的圓盤：跟 inRing 一樣，waist 那片平面切得到身體的圓柱、這一幀走過的那一段（膠囊）又碰到身體。
