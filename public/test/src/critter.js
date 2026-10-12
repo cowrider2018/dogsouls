@@ -1342,8 +1342,8 @@ export class Critter {
       boneN, partN, inkOut: this._inkOut, shade: 'ink',
     });
 
-    /* 墨線材質的名單：半透明的怪物（monster.js 的 seeThrough）會再加一份自己的，
-       換墨色時全部一起換。 */
+    /* 墨線材質的名單：半透明的怪物（monster.js 的 seeThrough）把這一顆換成上色那一趟的，
+       頭盔、王冠會再加自己的，換墨色時全部一起換。 */
     this._inkMats = [ink];
     this.mesh = new THREE.Mesh(this.geometry, [fur, face, ink]);
     // 骨頭在著色器裡才動，three 算不出正確的邊界球——包圍球自己給（_buildMesh 最後），照常裁。
