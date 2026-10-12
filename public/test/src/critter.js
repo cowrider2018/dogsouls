@@ -912,6 +912,21 @@ function dropBones(index, groups, bone, drop) {
   return { index: out.slice(0, n), groups: ranges };
 }
 
+/* ── 烘焙一種動物一次 ───────────────────────────────────────────
+   量部位、烘超橢球、量大小與包圍球是建一隻 Critter 最貴的那一段（桌機一隻 60～90 ms，
+   手機好幾倍），而它只看「是哪一份 cat.bin 資料的哪一種動物」：身高是 mesh 的縮放、毛色是
+   顏色屬性、帽子是索引，三個都不碰烘焙。怪物的池子一次建好幾隻同一種（地窖那一關七隻），
+   每一隻重烘一次就是一頓。
+
+   所以結果記在這裡，同一份 data、同一種動物的第二隻起直接拿：部位表、烘好的頂點陣列、
+   待機姿勢的大小、包圍球，與兩種索引（戴得上帽子的、永遠光頭的）。全部是唯讀的——建好之後
+   沒有人再寫它們（每幀動的是骨頭的 uniform）。每一隻自己的只有：顏色屬性（setCoat、怪物的
+   paint、頭盔的 paintEars 都寫它）、BufferAttribute 物件本身（GPU 上的緩衝還是一隻一份，
+   所以 folk.js／lobby.js 各自 dispose 不會拆到別隻的）、群組、包圍球的那一顆 Sphere。
+
+   鍵是 data 物件本身（WeakMap），Zoo 丟掉之後跟著一起走。 */
+const BAKES = new WeakMap();
+
 export class Critter {
   constructor(data, modelId, opts = {}) {
     this.data = data;
@@ -964,17 +979,23 @@ export class Critter {
        圓角比例——烘焙的超橢球就照它定，見 _bakeGeometry。
 
        它內部會 reset 並 update 骨架去量，所以一定要在姿勢開始跑之前
-       叫——這裡是建構子，後面 _buildMesh 會再擺一次待機姿勢。 */
-    this.shape = measureShapes(data, this.rig, this.model.parts, this.model.ride, this.model.patch);
-    this._buildGeometry();
-    this._buildMesh(opts);
+       叫——這裡是建構子，後面 _buildMesh 會再擺一次待機姿勢。
+
+       同一種動物烘過了就照拿（見 BAKES），連部位表一起。 */
+    const kept = BAKES.get(data)?.get(modelId) || null;
+    this.shape = kept ? kept.shape : measureShapes(data, this.rig, this.model.parts, this.model.ride, this.model.patch);
+    this._buildGeometry(kept);
+    this._buildMesh(opts, kept);
   }
 
   /* ── 幾何 ─────────────────────────────────────────────────────
      一份 BufferGeometry，三個 draw range。範圍就是檔案自己的三個群組，
      順序也是檔案自己的（lit、unlit、outline，頂點範圍互不重疊）——
-     那個佈局是 build.js 保證的，這裡只是照著用。 */
-  _buildGeometry() {
+     那個佈局是 build.js 保證的，這裡只是照著用。
+
+     `kept` 是同一種動物烘好的那一份（見 BAKES）：給了就整份照拿，頂點陣列是同一個，
+     只有屬性物件、索引的群組與顏色是這一隻自己的。 */
+  _buildGeometry(kept) {
     const d = this.data;
     const nv = d.header.vertexCount;
     const g = new THREE.BufferGeometry();
@@ -986,6 +1007,20 @@ export class Critter {
     this._unlitGroup = G.unlit;
     this._litGroup = G.lit;
     this._outlineGroup = G.outline;
+    if (kept) {
+      this._posRaw = kept.posRaw;
+      this._nrmRaw = kept.nrmRaw;
+      this._boneId = kept.boneId;
+      this._twin = kept.twin;
+      this._posBaked = kept.posBaked;
+      for (const [name, arr, n] of kept.attrs) g.setAttribute(name, new THREE.BufferAttribute(arr, n));
+      this._index(g, kept, order);
+      this.geometry = g;
+      this._colorAttr = new THREE.Float32BufferAttribute(new Float32Array(nv * 3), 3);
+      g.setAttribute('color', this._colorAttr);
+      this.setCoat(this.coatId);
+      return;
+    }
 
     this._posRaw = d.position.slice();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this._posRaw.slice(), 3));
@@ -1022,25 +1057,35 @@ export class Critter {
     g.setAttribute('aBone', new THREE.Float32BufferAttribute(bone, 1));
     g.setAttribute('aSway', new THREE.Float32BufferAttribute(swayG, 1));
 
-    this._index(g, order);
+    this._index(g, null, order);
     this.geometry = g;
     this._colorAttr = new THREE.Float32BufferAttribute(new Float32Array(nv * 3), 3);
     g.setAttribute('color', this._colorAttr);
     this.setCoat(this.coatId);
   }
 
-  /** 索引與三個群組（材質照 order 的順序）。 */
-  _index(g, order) {
+  /**
+   * 索引與三個群組。`kept` 是同一種動物烘好的那一份：同一種索引（戴得上帽子／永遠光頭）
+   * 算過了就共用同一個陣列，沒算過就算一次記進去。
+   */
+  _index(g, kept, order) {
     const d = this.data;
     /* 永遠不戴帽子的那幾隻（_bare）：帽子的三角形不進索引。縮到零的帽子照樣每幀過頂點著色、
        建三角形——一隻立耳犬 46,280 個三角形裡 4,480 個是它，半透明的怪物還畫兩趟。量過
        （tools/verify-hatless.mjs）：帽子的三角形三個角都在帽子的骨頭上，沒有一個跨到別的骨頭，
        所以拿掉的就只有它，其餘的照原本的順序留著，畫出來一模一樣。
-       d.index 是 Zoo 那幾隻共用的，不動它；這裡動的是這一隻自己的那份。烘焙、量高度、包圍球
+       d.index 是 Zoo 那幾隻共用的，不動它；這裡用的是另外拷的一份（同一種動物、一樣光不光頭的
+       幾隻共用它，誰也不寫它）。烘焙、量高度、包圍球
        照舊看全部的頂點（連帽子），所以大小、站的位置、裁切也都跟以前一樣。 */
-    const ix = this._bare
-      ? dropBones(d.index, order, this._boneId, new Set(this._hatBones))
-      : { index: d.index.slice(), groups: order.map((q) => ({ start: q.start, count: q.count })) };
+    const which = this._bare ? 'bare' : 'full';
+    let ix = kept && kept.index[which];
+    if (!ix) {
+      ix = this._bare
+        ? dropBones(d.index, order, this._boneId, new Set(this._hatBones))
+        : { index: d.index.slice(), groups: order.map((q) => ({ start: q.start, count: q.count })) };
+      if (kept) kept.index[which] = ix;
+    }
+    this._ix = ix;
     g.setIndex(new THREE.BufferAttribute(ix.index, 1));
     ix.groups.forEach((r, m) => g.addGroup(r.start, r.count, m));
   }
@@ -1238,7 +1283,7 @@ export class Critter {
     return { pos: baked, nrm: surfaceNormals(baked, d.index, nv, this._nrmRaw), inkW };
   }
 
-  _buildMesh(opts) {
+  _buildMesh(opts, kept) {
     const boneN = this.rig.count;
     const S = this.shape;
     const partN = S.parts.length;
@@ -1309,7 +1354,7 @@ export class Critter {
     this.rig.reset();
     applyPose(this.rig, this.drv.pose);
     this.rig.update();
-    const box = this._measure();
+    const box = kept ? kept.box : this._measure();
     const height = opts.height || 1.0;
     this._scale = height / (box.max[1] - box.min[1]);
     this.mesh.scale.setScalar(this._scale);
@@ -1321,7 +1366,16 @@ export class Critter {
 
     /* 造型烘進幾何：頂點位置、墨線往外推的方向、每個頂點露在外面的程度，
        載入時算一次。大小與腳的位置上面是照原始網格量的，所以烘焙不會
-       改動牠有多高、站在哪裡。 */
+       改動牠有多高、站在哪裡。
+
+       同一種動物烘過了（kept）就整段跳過：頂點早就是烘好的那一份。骨架照樣放回烘焙完的樣子
+       （_bound 最後那一步），建構完之後讀它的人（death.js 的 footprint）看到的跟自己烘的一樣。 */
+    if (kept) {
+      this.rig.reset();
+      this.rig.update();
+      this.geometry.boundingSphere = kept.sphere.clone();
+      return;
+    }
     const b = this._bakeGeometry();
     this._posBaked = b.pos;
     const A = this.geometry.attributes;
@@ -1329,6 +1383,17 @@ export class Critter {
     A.aBakeN.array.set(b.nrm);
     A.aInkW.array.set(b.inkW);
     this.geometry.boundingSphere = this._bound(b.pos);
+
+    /* 記下來給同一種動物的下一隻（見 BAKES）。 */
+    if (!BAKES.has(this.data)) BAKES.set(this.data, new Map());
+    BAKES.get(this.data).set(this.modelId, {
+      shape: this.shape, box,
+      posRaw: this._posRaw, nrmRaw: this._nrmRaw, boneId: this._boneId, twin: this._twin, posBaked: this._posBaked,
+      attrs: ['position', 'normal', 'aOuter', 'aBakeN', 'aInkW', 'aBone', 'aSway']
+        .map((name) => [name, A[name].array, A[name].itemSize]),
+      index: { [this._bare ? 'bare' : 'full']: this._ix },
+      sphere: this.geometry.boundingSphere.clone(),
+    });
   }
 
   /**

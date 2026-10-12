@@ -29,7 +29,8 @@
     "verify:reach": "node tools/verify-reach.mjs",
     "verify:story": "node tools/verify-story.mjs",
     "verify:sound": "node tools/verify-sound.mjs",
-    "verify:hatless": "node tools/verify-hatless.mjs"
+    "verify:hatless": "node tools/verify-hatless.mjs",
+    "verify:share": "node tools/verify-share.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
