@@ -145,11 +145,16 @@
                     一跳那麼高就停住，緊接著在那裡轉一圈（腰那麼高的圓盤，打 SWING 秒），三下之間沒有僵直；
                     轉完才僵直，僵直的時候停在空中不掉。轉的那一圈打不到站在地上的人，跳上去的才挨。
                     動作是 cleaveWind → cleaveAir → cleaveLand → reapUp → reapSpin → reapRec。
+    36. 甩頭前後不動 甩頭的僵直：先停 STILL.before 秒，甩完回到原本的樣子之後再 STILL.after 秒沒有動作。
+    37. 兩條命      殭屍王兩條命、一樣多血，其他類一條。第一條扣到 0 不算死：不重生、不倒下，帶著擊退
+                    落地；從那一刻到站好打不到（不扣血、不累積破防、破防攻擊瞄不到）、不追人、不放招；
+                    落地 1 秒之後花 2 秒站起來，站好血補滿、第二條命。動作是 slump（空中也是）→ rally。
+                    第二條扣到 0 才死；重生、回到站位都從第一條命開始。
    ------------------------------------------------------------------ */
 
 import { PHYS } from '../public/test/src/walk.js';
 import {
-  MODES, DEFAULT_MODE, LUNGE, STILL, lunging, ARENA, SPAWN, DOG_H, REACH, SWING, REST, KNOCK, KNOCK_SCALE, FAN, WINDOW, KINDS, DAMAGE, hurt, placeMonster,
+  MODES, DEFAULT_MODE, LUNGE, STILL, RALLY, spared, rallied, lunging, ARENA, SPAWN, DOG_H, REACH, SWING, REST, KNOCK, KNOCK_SCALE, FAN, WINDOW, KINDS, DAMAGE, hurt, placeMonster,
   BREAK_AT, BREAK_WINDOW, broken,
   FLY, BREAK_ATK, breaking, breakTarget, startBreak, breakContact, latch, contact, parry, spinStep, separate, armored, attacking,
   makeMonster, monsterStep, touching, bites, knock, inSlash, inFan, inRing, slashTip, fanFrame,
@@ -509,6 +514,7 @@ console.log('10. 名冊與血');
   ok(hurt(mm, DAMAGE.rise) && mm.deaths === 1 && mm.hp === 4, '小怪：第一段加第二段剛好打死，在重生點重生');
   const m = makeMonster(SPAWN.monsters[0]);
   m.hp = 10;                                  // 下面照 10 血的算術走
+  m.life = KINDS.boss.lives;                  // 最後一條命：扣到 0 就死（兩條命見 37）
   ok(DAMAGE.slash === 1 && DAMAGE.rise === 3 && DAMAGE.slam === 2, '三段各扣 1、3、2');
   hurt(m, DAMAGE.slash); hurt(m, DAMAGE.rise); hurt(m, DAMAGE.slam);
   ok(m.hp === 4 && m.deaths === 0, `一整套扣 6，剩 ${m.hp}`);
@@ -524,6 +530,7 @@ console.log('10. 名冊與血');
   ok(m.gauge === 0 && !broken(m), '重生之後破防歸零');
   const own = makeMonster({ kind: 'boss', x: -5, z: 6, yaw: 1 });
   own.hp = 1;
+  own.life = KINDS.boss.lives;
   hurt(own, 1);
   ok(near(own.x, -5) && near(own.z, 6), '每一隻回到的是自己的重生點');
   hurt(m, 3);
@@ -687,7 +694,7 @@ console.log('12. 破防攻擊');
   ok(ma.air && !ma.slide && ma.vy === 0 && near(ma.vz, -BREAK_ATK.push.h), '在空中被定住的：放開之後帶著水平速度落下，垂直速度是 0');
   // 打死的那一下：推開的速度不帶到重生點。
   const md = makeMonster();
-  md.x = 0; md.z = 1; md.hp = DAMAGE.break;
+  md.x = 0; md.z = 1; md.hp = DAMAGE.break; md.life = KINDS.boss.lives;
   const cd = makeCombo();
   cd.dashX = 0; cd.dashZ = -1;
   latch(cd, { ...pa, y: 0.9 }, md);
@@ -3133,6 +3140,55 @@ console.log('36. 甩頭前後不動');
     ok(none(y[1]) && none(z[1]) && near(z[0] - y[0], STILL.after) && near(z[0], T),
       `${name}：${y[0].toFixed(2)} 秒甩完回到原本的樣子，之後 ${STILL.after} 秒沒有動作，${T} 秒僵直結束`);
   }
+}
+
+/* ── 37. 兩條命 ────────────────────────────────────────────── */
+console.log('37. 兩條命');
+{
+  ok(KINDS.boss.lives === 2 && Object.entries(KINDS).every(([k, v]) => k === 'boss' || !v.lives), '殭屍王兩條命，其他類一條');
+  ok(RALLY.wait === 1 && RALLY.rise === 2, '落地 1 秒之後站起來，站 2 秒');
+  const m = makeMonster({ kind: 'boss', x: 0, z: -4, yaw: 0 }), p = body(0, 4);
+  const mo = new Motion();
+  m.hp = 1;
+  m.gauge = BREAK_AT - 1;
+  knock(m, 0, -6, 0, 1);
+  const died = hurt(m, DAMAGE.slash, false);
+  ok(!died && m.deaths === 0 && m.hp === 0 && spared(m) && m.air && m.life === 1, '第一條扣到 0：不算死、帶著擊退在空中、打不到');
+  ok(m.gauge === 0 && !broken(m), '破防歸零');
+  ok(mo._stage(m)[0] === 'slump', '在空中就低頭（slump）');
+  // 站起來之前：怎麼打都不扣、不累積；破防攻擊瞄不到；不放招、不追人。
+  ok(!hurt(m, DAMAGE.break) && m.hp === 0 && m.gauge === 0, '再挨打：不扣血、不累積破防');
+  m.breakT = 1;
+  ok(breakTarget(p, [m]) === null, '破防攻擊瞄不到');
+  m.breakT = 0;
+  m.castT = 0;
+  const w = makeWorld();
+  let t = 0, landed = -1, cast = false, ran = false, risen = -1, lx = 0, lz = 0;
+  const mid = [];
+  while (t < 5) {
+    if (bossStep(m, DT, p, w, () => 0) || m.cast) cast = true;
+    monsterStep(m, DT, p);
+    t += DT;
+    if (landed < 0 && !m.air) { landed = t; lx = m.x; lz = m.z; }
+    if (landed >= 0 && m.rally && (m.x !== lx || m.z !== lz)) ran = true;
+    if (landed >= 0 && m.rally) mid.push([t - landed, mo._stage(m)[0], rallied(m)]);
+    if (risen < 0 && !m.rally) risen = t;
+  }
+  ok(!cast && !ran, '站起來之前不放招、不追人');
+  const at = (u) => mid.find(([s]) => s >= u);
+  ok(at(0.5)[1] === 'slump' && at(0.5)[2] === 0 && at(RALLY.wait + 0.1)[1] === 'rally' && at(RALLY.wait + 1)[2] > 0.4 && at(RALLY.wait + 1)[2] < 0.6,
+    '落地之後低著頭等 1 秒，再站起來（rally），血條跟著補回去');
+  ok(risen > 0 && Math.abs(risen - landed - RALLY.wait - RALLY.rise) < 2 * DT && m.life === 2 && m.hp === KINDS.boss.hp && !spared(m),
+    `落地 ${(risen - landed).toFixed(2)} 秒之後站好：第二條命、血滿`);
+  const keys = KNIGHT_MOVES.rally.keys, last = keys[keys.length - 1];
+  ok(near(last[0], RALLY.rise) && Object.keys(last[1]).length === 0, 'rally 長 2 秒，最後一格回到原本的樣子');
+  // 第二條：扣到 0 才死。重生從第一條命開始。
+  m.hp = 1;
+  m.lunge = null;                             // 追到人在蓄力的話傷害減半（armored），這一下要扣得到
+  ok(hurt(m, DAMAGE.slash) && m.deaths === 1 && m.life === 1 && m.hp === KINDS.boss.hp && !m.rally, '第二條扣到 0：死了，重生回到第一條命');
+  m.life = 2;
+  placeMonster(m);
+  ok(m.life === 1 && !m.rally, '回到站位：第一條命');
 }
 
 console.log(fails ? `\n${fails} 項沒過` : '\n全部通過');

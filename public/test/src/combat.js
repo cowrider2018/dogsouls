@@ -45,7 +45,13 @@
    往下掉，而是三個軸一起照 FLY.drag 減速，停在半空中再回去追。
 
    每一下都會扣血（各段的傷害見 DAMAGE）。血扣到 0 就死，當場在牠自己的
-   重生點重生（血滿、破防歸零），玩家留在原地。被打中還會被擊退：水平往遠離玩家的方向、
+   重生點重生（血滿、破防歸零），玩家留在原地。
+
+   殭屍王有兩條命（KINDS 的 `lives`），兩條一樣多血。第一條扣到 0 不算死、不倒下（RALLY）：
+   那一刻往前低頭（在空中也是），帶著那一下的擊退落地；落地 RALLY.wait 秒之後站起來
+   （RALLY.rise 秒：抬頭、甩頭、回到原本的樣子），站好血補滿、換第二條命（m.life），
+   招換成第二條命的那一套（skills.js 的 RAGE）。從扣到 0 到站好都打不到（spared）：
+   不挨打、不擊退、不累積破防、破防攻擊瞄不到，也不追人、不放招、不衝刺。被打中還會被擊退：水平往遠離玩家的方向、
    垂直往上，兩份動能一起給。
 
    ── 破防 ────────────────────────────────────────────────────────
@@ -173,7 +179,7 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  *
  *   minion  殭屍（綠色的小怪）。血 4——第一段加第二段剛好打死，破不了防。腳程 3.4：
  *           走路是 PHYS.walk（4），所以放開手就會被追上。
- *   boss    殭屍王（畫成兩倍大）。血 20。腳程 4。不會一直追：每 `every` 秒從 `skills`
+ *   boss    殭屍王（畫成兩倍大）。血 20，`lives` 兩條命（見 RALLY）。腳程 4。不會一直追：每 `every` 秒從 `skills`
  *           裡隨機放一招（規則在 skills.js），放招的時候站著不動。`steady`：
  *           衝刺（蓄力與衝）不會被打斷（見 armored）。
  *   ghost   幽靈（半透明的小怪）。血、腳程跟殭屍一樣。`fly`：不受重力，
@@ -200,7 +206,7 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
 export const BREAK_AT = 8;
 export const KINDS = {
   minion: { name: '殭屍', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1 },
-  boss: { name: '殭屍王', hp: 20, speed: 4, breakAt: BREAK_AT, bite: 3, soul: true, steady: true, skills: ['orb', 'leap', 'cone'], every: 3 },
+  boss: { name: '殭屍王', hp: 20, lives: 2, speed: 4, breakAt: BREAK_AT, bite: 3, soul: true, steady: true, skills: ['orb', 'leap', 'cone'], every: 3 },
   ghost: { name: '幽靈', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1, fly: true },
   knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], every: 3 },
   wraith: { name: '幽靈騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
@@ -508,6 +514,8 @@ export function makeMonster(spawn = SPAWN.monsters[0], field = FIELD) {
     hp: 0,
     /** 死過幾次（死了就在重生點重生，見 hurt）。 */
     deaths: 0,
+    /** 第幾條命（1 起；殭屍王有兩條，見 RALLY）。 */
+    life: 1,
     /** 離破防還累積了多少傷害。 */
     gauge: 0,
     /** 破防窗口還剩幾秒（0 = 沒有破防）。 */
@@ -529,6 +537,8 @@ export function placeMonster(m) {
   m.grounded = true;
   m.air = false;
   m.hp = kindOf(m).hp;
+  m.life = 1;
+  m.rally = null;                         // 第一條命扣光、正在站起來（RALLY）
   m.gauge = 0;
   m.breakT = 0;
   m.held = false;
@@ -563,6 +573,46 @@ function shieldStep(m, dt) {
   if (m.shieldT < K.shieldEvery) return;
   m.shields++;
   m.shieldT = 0;
+}
+
+/**
+ * 還有下一條命的那一類（KINDS 的 `lives`）扣光一條命之後：不倒下，往前低頭，落地 wait 秒之後
+ * 花 rise 秒站起來（抬頭、甩頭，monster.js 的 slump 與 rally），站好的那一刻血補滿、進下一條命。
+ * 狀態記在 m.rally：{ t 扣光之後幾秒, down 落地的那一刻（還沒是 null） }。
+ */
+export const RALLY = { wait: 1, rise: 2 };
+
+/** 正在站起來（RALLY）：打不到、不動（見檔頭）。 */
+export const spared = (m) => !!m.rally;
+
+/** 站起來走到哪（0～1）：還沒落地、落地之後等的那 wait 秒都是 0，站好是 1。 */
+export function rallied(m) {
+  const R = m.rally;
+  if (!R) return 1;
+  if (R.down === null) return 0;
+  return Math.min(1, Math.max(0, (R.t - R.down - RALLY.wait) / RALLY.rise));
+}
+
+/** 扣光一條命、還有下一條：放到一半的招與衝刺取消、破防歸零，帶著這一刻的擊退開始 RALLY。 */
+function slump(m) {
+  m.hp = 0;
+  m.cast = null;
+  m.lunge = null;
+  m.stun = 0;
+  resetBreak(m);
+  m.rally = { t: 0, down: null };
+}
+
+/** RALLY 的一幀：記下落地的那一刻（不在空中、沒被推著滑、沒被定住），站好就進下一條命、血補滿。 */
+function rallyStep(m, dt) {
+  const R = m.rally;
+  R.t += dt;
+  if (R.down === null && !busy(m)) R.down = R.t;
+  if (rallied(m) < 1) return;
+  m.rally = null;
+  m.life++;
+  m.hp = kindOf(m).hp;
+  m.castT = kindOf(m).every || 0;
 }
 
 /** 這隻怪物現在是不是破防中（窗口還開著）。 */
@@ -615,9 +665,13 @@ export const taken = (m, dmg) => (armored(m) ? Math.floor(dmg / 2) : dmg);
  * 放招倒數中（armored）傷害減半、無條件捨去（血是整數）：1 → 0、2 → 1、3 → 1、
  * 5 → 2。破防累積的是**實際扣掉**的那一份。
  *
+ * 還有下一條命的（KINDS 的 `lives`）扣到 0 不算死：開始站起來（RALLY），回 false。站起來的時候
+ * （spared）什麼都不扣。
+ *
  * @returns {boolean} 這一下把牠打死了
  */
 export function hurt(m, dmg, respawn = true) {
+  if (spared(m)) return false;
   dmg = taken(m, dmg);
   if (!broken(m)) {
     m.gauge += dmg;
@@ -625,6 +679,7 @@ export function hurt(m, dmg, respawn = true) {
   }
   m.hp -= dmg;
   if (m.hp > 0) return false;
+  if (m.life < (kindOf(m).lives || 1)) { slump(m); return false; }
   m.deaths++;
   if (respawn) placeMonster(m);
   return true;
@@ -641,6 +696,7 @@ export function hurt(m, dmg, respawn = true) {
  * 飛完、滑完，其餘站著不動，不衝也不追。
  */
 export function monsterStep(m, dt, target) {
+  if (m.rally) rallyStep(m, dt);
   if (m.stun > 0) m.stun = Math.max(0, m.stun - dt);
   shieldStep(m, dt);
   // 破防窗口：時間到了還沒用上就是錯過，累積歸零。
@@ -670,8 +726,8 @@ export function monsterStep(m, dt, target) {
     if (!m.air) m.airT = 0;
     return;
   }
-  // 沒有目標、放招中、出招後的僵直（skills.js）：站著不動。
-  if (!target) { m.lunge = null; m.vx = 0; m.vy = 0; m.vz = 0; return; }
+  // 沒有目標、站起來的時候（RALLY）、放招中、出招後的僵直（skills.js）：站著不動。
+  if (!target || m.rally) { m.lunge = null; m.vx = 0; m.vy = 0; m.vz = 0; return; }
   if (m.cast || m.stun > 0) { m.vx = 0; m.vy = 0; m.vz = 0; return; }
   /* 一次衝好幾下的那一類（國王）：這一下衝完、還沒到 `lunges` 下，不發呆，重新蓄力
      朝玩家現在的位置再衝。衝完的那一幀（hot）照常算咬，下一幀才換成下一下。 */
@@ -1213,7 +1269,7 @@ export function breakTarget(p, monsters) {
   const [px, py, pz] = waist(p);
   let best = null, bd = Infinity;
   for (const m of monsters) {
-    if (!broken(m)) continue;
+    if (!broken(m) || spared(m)) continue;
     const [mx, my, mz] = waist(m);
     const d = Math.hypot(mx - px, my - py, mz - pz);
     if (d < bd) { bd = d; best = m; }
@@ -1335,7 +1391,7 @@ export function spinStep(c, p, m, respawn = true) {
   m.vy = 0;
   if (m.y > floorAt(m) + 1e-3 && !kindOf(m).fly) { m.air = true; m.grounded = false; }   // 在空中被定住的：放開就帶著水平速度落下
   else m.slide = true;                                       // 會飛的不落下：在原本的高度滑開
-  const took = taken(m, DAMAGE.break);
+  const took = spared(m) ? 0 : taken(m, DAMAGE.break);
   const died = hurt(m, DAMAGE.break, respawn);
   vault(c, p);
   return { done: true, died, took };

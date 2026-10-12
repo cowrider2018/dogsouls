@@ -55,6 +55,14 @@
            最後那一段飛過去的時候跟衝刺一樣是主角的跳躍動作組（在空中、垂直
            速度照那一條拋物線）；落地俯身緩衝，停一下，然後在僵直裡慢慢站起來。
 
+   ── 殭屍王扣光第一條命 ────────────────────────────────────────────
+   （combat.js 的 RALLY）不倒下：
+
+     slump  扣光的那一刻往前低頭（頭垂到底、上半身往前傾一點、尾巴垂下去），被打飛在空中
+            也是這樣——空中的姿勢照常，低頭疊在上面。落地之後停在那裡 RALLY.wait 秒。
+     rally  站起來（RALLY.rise 秒）：先抬頭（頭抬過原本的樣子、往上看），停 STILL.before 秒，
+            然後甩頭（衝刺僵直那一套甩），一邊甩一邊回到原本的樣子，再 STILL.after 秒沒有動作。
+
    ── 騎士放招的動作 ──────────────────────────────────────────────
      whirl  劍迴旋衝刺：主角第三擊的那一套（moves.js 的 leap 與 slam）。倒數的
             0.5 秒是主角二段跳起來那一下縮成一團、往右擰到底（照 0.5 秒拉長）；
@@ -108,7 +116,7 @@
 
 import * as THREE from '../vendor/three.module.js';
 import { Critter } from './critter.js';
-import { LUNGE, STILL, kindOf } from './combat.js';
+import { LUNGE, STILL, RALLY, kindOf } from './combat.js';
 import { SKILL, UP_AIR, REAP, recoverOf } from './skills.js';
 import { PHYS } from './walk.js';
 import { Mover, MOVES as HERO } from './moves.js';
@@ -288,6 +296,12 @@ function shakeKeys(T, base, lead) {
   return keys;
 }
 
+/* ── 扣光第一條命 ── 低頭是 SLUMP，站起來的時候先抬到 LIFT 再甩。 */
+const SLUMP = { pitch: 0.22, headPitch: 0.95, drop: 0.1, tailPitch: -0.45, front: -0.15, hind: -0.25, knee: -0.4, legs: 0.5, w: 1 };
+const LIFT = { pitch: -0.15, headPitch: -0.35, tailPitch: 0.2, w: 1 };
+/** 抬頭抬多久（秒，站起來的頭一段）。 */
+const LIFT_TIME = 0.7;
+
 /* ── 火球 ── 蓄到最後是 STRETCH_MAX；吐出去的那一刻在 SPIT_MID，甩到底是 SPIT。 */
 const STRETCH = { pitch: -0.35, headPitch: -0.50, drop: -0.06, tailPitch: 0.50, front: -0.20, hind: 0.20, legs: 0.6, w: 1 };
 const STRETCH_MAX = { ...STRETCH, pitch: -0.40, headPitch: -0.62, drop: -0.08, tailPitch: 0.60 };
@@ -377,13 +391,15 @@ const LOOK = { stages: { coneWind: 1, leapWind: 1 }, tau: 0.12, max: 1.0 };
 
 /**
  * 怪物的每一套動作（moves.js 的 MOVES 那一種寫法），鍵就是 Motion 挑的那一段：
- * 衝刺的蓄力、衝、僵直，殭屍王每一招的倒數（…Wind）與出招後的僵直（…Rec）。騎士的跳砍
+ * 衝刺的蓄力、衝、僵直，殭屍王每一招的倒數（…Wind）與出招後的僵直（…Rec）、扣光第一條命的低頭與站起來。騎士的跳砍
  * 沒有 …Rec：落地是 cleaveLand、上挑是 cleaveUp，僵直接著播 cleaveUp 的收尾。
  */
 export const MOVES = {
   windup: { blend: 0.05, keys: [[0, {}], [0.16, CROUCH, 'out'], [LUNGE.windup, { ...CROUCH, headPitch: 0.86, drop: 0.10 }, 'inOut']] },
   dash: { blend: 0.05, keys: [[0, {}]] },
   recover: { blend: 0.04, keys: shakeKeys(LUNGE.recover, BOW, [[0, {}], [BOW_TIME, BOW, 'out']]) },
+  slump: { blend: 0.04, keys: [[0, {}], [0.12, SLUMP, 'out']] },
+  rally: { blend: 0.04, keys: shakeKeys(RALLY.rise, LIFT, [[0, SLUMP], [LIFT_TIME, LIFT, 'inOut']]) },
   orbWind: {
     blend: 0.08,
     keys: [[0, {}], [0.55, STRETCH, 'out'], [SKILL.orb.windup - 0.06, STRETCH_MAX, 'inOut'], [SKILL.orb.windup, SPIT_MID, 'in']],
@@ -550,6 +566,12 @@ export class Motion {
    * 的時候也是——動作淡掉，交回給空中姿勢。
    */
   _stage(m) {
+    // 扣光第一條命（RALLY）：在空中、被推著滑也是低著頭。
+    const R = m.rally;
+    if (R) {
+      const up = R.down === null ? -1 : R.t - R.down - RALLY.wait;
+      return up < 0 ? ['slump', R.t] : ['rally', up];
+    }
     if (m.air || m.held || m.slide) return [null, 0];
     const c = m.cast;
     if (c) {

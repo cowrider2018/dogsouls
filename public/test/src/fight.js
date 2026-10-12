@@ -35,7 +35,7 @@ import {
   dropSoul, soulStep, grabs, bankSouls,
   breaking, broken, breakTarget, startBreak, breakContact, contact, parry, spinStep, separate, placeMonster, monsterStep, bites, knock,
   knockHero, knockLand,
-  inSlash, inFan, inRing, slashTip, makeCombo, comboStep, invulnerable, untouchable, cueing, attacking, taken,
+  inSlash, inFan, inRing, slashTip, makeCombo, comboStep, invulnerable, untouchable, cueing, attacking, taken, spared, rallied,
 } from './combat.js';
 import { makeMonsterCritter, sizeOf, bloodOf, swordOf, helmOf, crownOf, riseLift, Motion, ATTACK_INK, CHOP_LEAD } from './monster.js';
 import { GUARD_INK } from './critter.js';
@@ -613,11 +613,12 @@ export class Fight {
   /**
    * 這一場的 BOSS（站位帶 `boss` 的那一隻，route.js 的 STAGES）：在場上的，或正在從站位底下升上來的
    * （升的時候血是滿的）。`spawn` 是牠的站位——同一次出場從升上來到上場都是同一份，認得出是不是同一隻。
+   * 扣光第一條命、正在站起來（combat.js 的 RALLY）的時候，血照站起來走到哪從 0 補回滿的。
    * 沒有（還沒出生、死了、收起來了）是 null。
    */
   boss() {
     const f = this.foes.find((x) => x.m.spawn.boss);
-    if (f) return { spawn: f.m.spawn, kind: f.m.kind, hp: f.m.hp };
+    if (f) return { spawn: f.m.spawn, kind: f.m.kind, hp: f.m.rally ? KINDS[f.m.kind].hp * rallied(f.m) : f.m.hp };
     const e = this._emerging.find((x) => x.spawn.boss);
     return e ? { spawn: e.spawn, kind: e.spawn.kind, hp: KINDS[e.spawn.kind].hp } : null;
   }
@@ -845,6 +846,7 @@ export class Fight {
     const reach = this._reach[combo.phase];
     const body = this.body(player);
     for (const { m } of foes) {
+      if (spared(m)) continue;                              // 扣光第一條命、站起來的時候（RALLY）：打不到
       if (reach && !combo.hit.has(m) && reach(body, m)) {
         combo.hit.add(m);
         if (parry(m)) { sound.play('parry'); continue; }   // 盾擋掉了（國王）：這一下整個不算
@@ -854,7 +856,8 @@ export class Fight {
         if (hurt(m, DAMAGE[combo.phase], back(m))) dead.add(m);
       }
     }
-    if (dead.size) sound.play('kill');
+    // 扣光第一條命（RALLY 剛開始）也是打死的那一聲。
+    if (dead.size || foes.some(({ m }) => m.rally && m.rally.t === 0)) sound.play('kill');
     if (foes.some(({ m }) => broken(m) && !open.has(m))) sound.play('break');
     for (const m of dead) {
       if (!m.by) kills.push(m.kind);
@@ -962,8 +965,8 @@ export class Fight {
       const mo = motion.step(dt, m, player);
       critter.root.position.set(m.x, m.y + mo.lift, m.z);
       critter.setFacing(Math.atan2(m.aimX, m.aimZ));
-      // 攻擊中墨線紅色：跟不可打斷（armored）同出自 attacking。
-      critter.setInkColor(attacking(m) ? ATTACK_INK : null);
+      // 攻擊中墨線紅色：跟不可打斷（armored）同出自 attacking。站起來的時候（RALLY）打不到：金色，跟主角無敵一樣。
+      critter.setInkColor(spared(m) ? GUARD_INK : attacking(m) ? ATTACK_INK : null);
       // 會飛的一直是飄著的姿勢：不踩地、不走路。
       critter.update(dt, {
         speed: Math.hypot(m.vx, m.vz), grounded: m.grounded && !KINDS[m.kind].fly && !mo.air, vy: mo.vy ?? m.vy,

@@ -579,7 +579,7 @@ function waveHits(st, p) {
  */
 export function bossStep(m, dt, target, world, rng = Math.random) {
   const k = kindOf(m);
-  if (!k.skills || !k.skills.length) return null;
+  if (!k.skills || !k.skills.length || m.rally) return null;   // 站起來的時候（combat.js 的 RALLY）不放招
   if (m.cast && busy(m)) m.cast = null;                // 被打斷
   m.castT -= dt;
   // 衝刺（combat.js 的 LUNGE）打完才挑下一招，兩件事不會疊在一起。
