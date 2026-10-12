@@ -76,22 +76,44 @@ export class Sound {
     this._buf = new Map();
     /** 每一件事上一次播是什麼時候。 */
     this._last = new Map();
+    /** 每一個檔載到（或載不到）的那一刻；解碼中的那幾個。 */
+    this._loads = [];
+    this._decoding = [];
 
     if (!audible) return;
 
     for (const name of new Set(Object.values(CUES).map(([file]) => file))) {
-      fetch(new URL(`${name}.m4a`, BASE))
+      this._loads.push(fetch(new URL(`${name}.m4a`, BASE))
         .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
         .then((bytes) => { this._raw.set(name, bytes); this._decode(); })
-        .catch(() => {});
+        .catch(() => {}));
     }
-    onWake((ctx) => {
-      this._ctx = ctx;
-      this._out = ctx.createGain();
-      this._out.gain.value = MASTER;
-      this._out.connect(ctx.destination);
-      this._decode();
-    });
+    onWake((ctx) => this.attach(ctx));
+  }
+
+  /**
+   * 接到這一個 AudioContext 上（叫醒的時候是 audio.js 那一個；錄影模式重演的時候是離線混音的那一個）。
+   * 解好的檔留著，換一個 AudioContext 也照樣用。
+   */
+  attach(ctx) {
+    this._ctx = ctx;
+    this._out = ctx.createGain();
+    this._out.gain.value = MASTER;
+    this._out.connect(ctx.destination);
+    this._last.clear();
+    this._decode();
+  }
+
+  /** 不出聲了（play 什麼都不做），直到下一次 attach。 */
+  detach() {
+    this._ctx = null;
+    this._out = null;
+  }
+
+  /** 每一個檔都載完、解完（載不到的也算完）的時候。要先 attach 過才解得了。 */
+  async ready() {
+    await Promise.all(this._loads);
+    await Promise.all(this._decoding);
   }
 
   /** 載到了、AudioContext 也有了的檔解碼。 */
@@ -99,7 +121,7 @@ export class Sound {
     if (!this._ctx) return;
     for (const [name, bytes] of this._raw) {
       this._raw.delete(name);
-      this._ctx.decodeAudioData(bytes).then((buf) => this._buf.set(name, buf)).catch(() => {});
+      this._decoding.push(this._ctx.decodeAudioData(bytes).then((buf) => this._buf.set(name, buf)).catch(() => {}));
     }
   }
 
@@ -115,6 +137,6 @@ export class Sound {
     src.playbackRate.value = rate;
     vol.gain.value = gain;
     src.connect(vol).connect(this._out);
-    src.start();
+    src.start(ctx.currentTime);           // 寫明是哪一刻：離線混音的時候 start() 是第 0 秒
   }
 }

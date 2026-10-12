@@ -59,21 +59,35 @@ async function decode(bytes) {
 /** 一份播放器：一首從 offset 秒開始放，接一個自己的音量。停了就丟掉，下一次另起一份。 */
 class Voice {
   constructor(ctx, track, buf, bus, offset) {
+    this.ctx = ctx;
     this.track = track;
     this.gain = ctx.createGain();
     this.gain.gain.value = 0;
     this.src = ctx.createBufferSource();
     this.src.buffer = buf;
     this.src.connect(this.gain).connect(bus);
-    this.src.start(0, offset);
+    // 開始與停下都寫明是哪一刻：離線混音的時候不寫就是第 0 秒。
+    this.src.start(ctx.currentTime, offset);
     /** 曲子的第 0 秒是 AudioContext 的哪一刻：現在放到第幾秒 = currentTime - t0。 */
     this.t0 = ctx.currentTime - offset;
     /** 淡出完的那一刻（AudioContext 的時間），到了就停；0 = 沒在淡出。 */
     this.until = 0;
+    /** 現在這一段淡入淡出：從 a（t0 那一刻）線性走到 b（t1 那一刻）。 */
+    this.ramp = { a: 0, b: 0, t0: 0, t1: 0 };
+  }
+
+  /**
+   * `now` 那一刻的音量。自己算，不讀 gain.value：離線混音還沒算到那裡的時候讀到的不是那一刻的值，
+   * 淡到一半換方向就會從錯的音量接下去。
+   */
+  level(now) {
+    const { a, b, t0, t1 } = this.ramp;
+    if (now >= t1) return b;
+    return a + (b - a) * Math.max(0, (now - t0) / (t1 - t0));
   }
 
   stop() {
-    this.src.stop();
+    this.src.stop(this.ctx.currentTime);
     this.gain.disconnect();
   }
 }
@@ -93,29 +107,53 @@ export class Music {
     this._pos = {};
     /** 換到現在這一首的時候說好淡入幾秒（還沒解好、晚幾幀才真的開始放的時候照它）。 */
     this._sec = SWITCH;
+    /** 每一首載完、解完（或載不到）的那一刻。 */
+    this._loads = [];
 
     if (!audible || !Offline || new URLSearchParams(location.search).get('music') === '0') return;
     for (const t of TRACKS) {
-      fetch(new URL(`${t}.m4a`, BASE))
+      this._loads.push(fetch(new URL(`${t}.m4a`, BASE))
         .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
         .then(decode)
         .then((buf) => { this._buf[t] = buf; })
-        .catch(() => {});
+        .catch(() => {}));
     }
-    onWake((ctx) => {
-      this._ctx = ctx;
-      this._bus = ctx.createGain();
-      this._bus.gain.value = VOLUME;
-      this._bus.connect(ctx.destination);
-    });
+    onWake((ctx) => this.attach(ctx));
   }
+
+  /**
+   * 接到這一個 AudioContext 上（叫醒的時候是 audio.js 那一個；錄影模式重演的時候是離線混音的那一個），
+   * 從安靜開始：沒有正在放的、每一首都從頭。解好的曲子留著，換一個 AudioContext 也照樣用。
+   */
+  attach(ctx) {
+    this._ctx = ctx;
+    this._bus = ctx.createGain();
+    this._bus.gain.value = VOLUME;
+    this._bus.connect(ctx.destination);
+    this._live = [];
+    this._track = null;
+    this._voice = null;
+    this._last = {};
+    this._pos = {};
+    this._sec = SWITCH;
+  }
+
+  /** 不放了（want 什麼都不做），直到下一次 attach。 */
+  detach() {
+    this._ctx = null;
+    this._bus = null;
+  }
+
+  /** 每一首都載完、解完（載不到的也算完）的時候。 */
+  ready() { return Promise.all(this._loads); }
 
   /** 一份播放器的音量從現在的值線性走到 to，花 sec 秒。走到 0 的那一刻停下來（want 裡停）。 */
   _fade(v, to, sec) {
-    const now = this._ctx.currentTime, g = v.gain.gain;
+    const now = this._ctx.currentTime, g = v.gain.gain, from = v.level(now);
     g.cancelScheduledValues(now);
-    g.setValueAtTime(g.value, now);
+    g.setValueAtTime(from, now);
     g.linearRampToValueAtTime(to, now + sec);
+    v.ramp = { a: from, b: to, t0: now, t1: now + sec };
     v.until = to === 0 ? now + sec : 0;
   }
 
