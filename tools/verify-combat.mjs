@@ -986,6 +986,21 @@ console.log('15. 殭屍王放招');
   ok(strikeHits(scf, ang(0, 3, cTop - 0.01)) && !strikeHits(scf, ang(0, 3, cTop + 0.01)) && quakeTop('cone', 1) > 1.4 * PHYS.height,
     `扇形 3 公尺處塵高 ${cTop.toFixed(2)} 公尺：腳高過它躲過；最外圈 ${quakeTop('cone', 1)} 公尺，高過一個狗高 ${PHYS.height} m`);
 
+  // 扇形與跳砸倒數的時候人往旁邊跑：方向與落點是鎖定的，頭也不跟著人轉（跟著轉會讓人以為招也跟著轉）。
+  for (const [name, r] of [['cone', 0.99], ['leap', 0.5]]) {
+    const b = bossAt(0, 0), q = body(0, 2), w = makeWorld(), mo = new Motion();
+    b.castT = 0;
+    let turned = 0, wound = false;
+    for (let t = 0; t < 2; t += DT) {
+      bossStep(b, DT, q, w, () => r);
+      if (b.cast && b.cast.t > 0.1) q.x = 2;
+      const stage = mo._stage(b)[0], move = mo.step(DT, b, q).move;
+      if (stage === `${name}Wind`) { wound = true; turned = Math.max(turned, Math.abs(move.headYaw)); }
+      monsterStep(b, DT, q);
+    }
+    ok(wound && turned < 1e-9, `${name}：人跑到旁邊 45°，倒數裡頭轉了 ${turned.toFixed(3)} 弳（不跟著人轉）`);
+  }
+
   // 三招都挑得到（人在扇形的距離以內）。
   const picked = new Set();
   for (const r of [0, 0.34, 0.5, 0.67, 0.99]) {
