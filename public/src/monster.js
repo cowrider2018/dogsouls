@@ -1,7 +1,7 @@
 /* ── src/monster.js ───────────────────────────────────────────
    怪物的外觀：立耳犬（國王是垂耳狗），紅眼睛。一個系列一件毛，系列裡靠體型分：
 
-     minion  殭屍：純綠色，一般大小。
+     minion  殭屍：灰綠（腐肉那種暗沉、不飽和的綠——太亮太飽和就像哥布林），一般大小。
      boss    殭屍王：同一件綠毛，兩倍大，戴頭盔（helm.js）。
      ghost   幽靈：淡藍白，半透明，一般大小。
      knight  騎士：同一件綠毛，1.2 倍高，嘴裡橫咬一把雙刃劍（blade.js 的 knight），
@@ -130,7 +130,7 @@ import { PHYS } from './walk.js';
 import { Mover, MOVES as HERO } from './moves.js';
 
 /** 毛色：body 身上、face 鼻子與嘴。 */
-const ZOMBIE = { body: [0.24, 0.80, 0.22], face: [0.08, 0.36, 0.08] };
+const ZOMBIE = { body: [0.42, 0.49, 0.36], face: [0.19, 0.23, 0.16] };
 /** 幽靈的毛色與不透明度。靈魂（soul.js）也照這一份畫。 */
 export const GHOST = { body: [0.78, 0.88, 0.98], face: [0.34, 0.44, 0.60] };
 export const GHOST_ALPHA = 0.5;
