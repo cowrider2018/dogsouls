@@ -41,8 +41,9 @@
     15. 殭屍王放招   腳程 4；每 3 秒挑一招，挑的那一刻鎖定玩家的位置，放招中站著
                     不動；被擊退、定住、推開就打斷。球：倒數 0.75 秒、半徑 0.75
                     狗高、每秒 6 公尺、直線、碰到黑牆消失，站著不動會被打中、
-                    倒數裡橫移一步就躲得掉。跳砸：倒數 1.5 秒、最後 0.6 秒起跳、
-                    落在鎖定的點上打半徑 2.5 狗高的一圈，走出圈外或跳起來就躲得過。
+                    倒數裡橫移一步就躲得掉。跳砸：倒數 1.5 秒、最後 0.6 秒起跳，起跳之前落點
+                    一直跟著主角腳下的地板、身體只轉三成、頭正對著主角（左右上下），起跳那一刻
+                    定下來；落在那一點上打半徑 2.5 狗高的一圈，起跳之後走出圈外或跳起來就躲得過。
                     扇形：倒數 1 秒、朝鎖定的方向打 60°、4 狗高長的一片。三招都
                     挑得到；球不限距離，跳砸 6.9 公尺、扇形 3.68 公尺以內才放。倒數中打不退、傷害減半無條件進位，破防攻擊打斷得了。
                     出招後僵直 0.5 秒：站著不動、打得退、傷害照算。
@@ -150,9 +151,10 @@
                     落地；從那一刻到站好打不到（不扣血、不累積破防、破防攻擊瞄不到）、不追人、不放招；
                     落地 1 秒之後花 2 秒站起來，站好血補滿、第二條命。動作是 slump（空中也是）→ rally。
                     第二條扣到 0 才死；重生、回到站位都從第一條命開始。
-    38. 第二條命的跳砸與扇形  扇形半徑 1.5 倍（夠得到的距離跟著變長）、張開到 105°，傷害不變；跳砸的範圍、一下就僵直
-                    跟第一條命一樣，只是起跳之前一直瞄著主角：落點跟著主角腳下的地板走（主角跳起來也落在地板上），
-                    身體轉向主角、頭盯著主角；起跳那一刻定下來，之後主角再走開也砸在那裡。
+    38. 第二條命的跳砸與扇形  扇形半徑 1.5 倍（夠得到的距離跟著變長）、張開到 105°，傷害不變；跳砸的範圍跟第一條命一樣，
+                    連跳兩下，每一下起跳之前都一直瞄著主角（跟第一條命一樣）：落點跟著主角腳下的地板走（主角跳起來
+                    也落在地板上），身體只轉三成、頭左右上下都正對著主角（主角跳起來頭跟著抬）；起跳那一刻定下來、
+                    身體轉正，之後主角再走開也砸在那裡。第一下落地不僵直，第二下落地才僵直。
     39. 第二條命的連吐  倒數完每 0.5 秒吐一顆、連吐三顆；每一顆瞄吐的那一刻主角腳下，照拋物線飛 0.9 秒
                     落地（球底貼地），停一幀才炸掉；站著不動三顆都中，吐出去之後走開就躲得掉；吐完第三顆才僵直。
     40. 國王的第二條命  一直召：每 1 秒升一隻、場上最多 6 隻，滿了才收；打得斷（第一條命照舊）。劈砍是下劈後上挑：劈下去那一刻才瞄第二刀，0.25 秒後
@@ -177,7 +179,7 @@ import {
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
   SOUL, dropSoul, soulStep, grabs, bankSouls, DAZE, daze, dazeStep, knockHero,
 } from '../public/src/combat.js';
-import { SKILL, RAGE, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill, planOf, IDLE, REPEAT, windDown } from '../public/src/skills.js';
+import { SKILL, RAGE, TRACK, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill, planOf, IDLE, REPEAT, windDown } from '../public/src/skills.js';
 import { steer } from '../public/src/walk.js';
 import { DUST, dustOf, dustFade, QUAKE, quakeBands, quakeFade, quakeTop, PLOW, plowPieces, plowClump } from '../public/src/dust.js';
 import { Motion, bloodOf, sizeOf, mirror, riseLift, MOVES as KNIGHT_MOVES } from '../public/src/monster.js';
@@ -894,7 +896,7 @@ console.log('15. 殭屍王放招');
     return { st, at, tookOff, peak, b, q };
   };
   const L = leap(null);
-  ok(L.st && L.st.shape === 'circle' && near(L.st.x, 0) && near(L.st.z, 3), '打在開始那一刻鎖定的點上');
+  ok(L.st && L.st.shape === 'circle' && near(L.st.x, 0) && near(L.st.z, 3), '打在主角站的點上');
   ok(Math.abs(L.at - SKILL.leap.windup) < 2 * DT && Math.abs(L.tookOff - (SKILL.leap.windup - SKILL.leap.air)) < 2 * DT,
     `第 ${L.tookOff.toFixed(2)} 秒起跳、第 ${L.at.toFixed(2)} 秒落地打下去，最高 ${L.peak.toFixed(2)} 公尺`);
   ok(near(L.b.x, 0) && near(L.b.z, 3) && L.b.y === 0 && !L.b.cast, '殭屍王落在目標點上，放完了');
@@ -903,8 +905,11 @@ console.log('15. 殭屍王放招');
   const Lf = swept(L.st);
   ok(strikeHits(Lf, body(SKILL.leap.radius + PHYS.radius - 0.01, 3)) && !strikeHits(Lf, body(SKILL.leap.radius + PHYS.radius + 0.01, 3)),
     '邊界在身體碰到圈的邊');
-  const out = leap((q, b) => { if (b.cast && b.cast.t > 0.2) q.x = 3; });
-  ok(!strikeHits(out.st, out.q), '倒數裡走出圈外 3 公尺：躲過');
+  const LW = SKILL.leap.windup - SKILL.leap.air;
+  const early = leap((q, b) => { if (b.cast && b.cast.t > 0.2 && b.cast.t < LW - 0.1) q.x = 3; });
+  ok(strikeHits(early.st, early.q) && near(early.st.x, 3), '起跳之前走開 3 公尺：落點跟過去，照樣被砸到');
+  const out = leap((q, b) => { if (b.cast && b.cast.t > LW + 0.05) q.x = 3; });
+  ok(near(out.st.x, 0) && !strikeHits(out.st, out.q), '起跳之後走出圈外 3 公尺：落點已經定下來，躲過');
   // 高度：那一道塵鼓多高就打多高，越外面越高（dust.js 的 quakeTop）。
   const topIn = quakeTop('circle', 0), topOut = quakeTop('circle', 1);
   ok(near(topIn, 0.2) && near(topOut, 1.5) && !strikeHits(L.st, body(0, 3, topIn + 0.01)) && strikeHits(L.st, body(0, 3, topIn - 0.01)),
@@ -987,8 +992,8 @@ console.log('15. 殭屍王放招');
   ok(strikeHits(scf, ang(0, 3, cTop - 0.01)) && !strikeHits(scf, ang(0, 3, cTop + 0.01)) && quakeTop('cone', 1) > 1.4 * PHYS.height,
     `扇形 3 公尺處塵高 ${cTop.toFixed(2)} 公尺：腳高過它躲過；最外圈 ${quakeTop('cone', 1)} 公尺，高過一個狗高 ${PHYS.height} m`);
 
-  // 扇形與跳砸倒數的時候人往旁邊跑：方向與落點是鎖定的，頭也不跟著人轉（跟著轉會讓人以為招也跟著轉）。
-  for (const [name, r] of [['cone', 0.99], ['leap', 0.5]]) {
+  // 扇形倒數的時候人往旁邊跑：方向是鎖定的，頭也不跟著人轉（跟著轉會讓人以為招也跟著轉）。
+  for (const [name, r] of [['cone', 0.99]]) {
     const b = bossAt(0, 0), q = body(0, 2), w = makeWorld(), mo = new Motion();
     b.castT = 0;
     let turned = 0, wound = false;
@@ -1000,6 +1005,23 @@ console.log('15. 殭屍王放招');
       monsterStep(b, DT, q);
     }
     ok(wound && turned < 1e-9, `${name}：人跑到旁邊 45°，倒數裡頭轉了 ${turned.toFixed(3)} 弳（不跟著人轉）`);
+  }
+  // 跳砸起跳之前一直瞄著人：人繞到旁邊 60°，身體只轉三成，頭補滿正對著人；起跳那一刻身體轉正。
+  {
+    const b = bossAt(0, 0), q = body(0, 3), w = makeWorld(), mo = new Motion(), LW = SKILL.leap.windup - SKILL.leap.air;
+    b.castT = 0;
+    let body30 = true, head = null, squared = null;
+    for (let t = 0; t < 2 && squared === null; t += DT) {
+      bossStep(b, DT, q, w, () => 0.5);
+      if (b.cast && b.cast.t > 0.1) { q.x = 3 * Math.sin(Math.PI / 3); q.z = 3 * Math.cos(Math.PI / 3); }
+      const c = b.cast, move = mo.step(DT, b, q).move, face = Math.atan2(b.aimX, b.aimZ);
+      if (c?.track && c.t > 0.2 && !near(face, TRACK.body * Math.PI / 3, 1e-9)) body30 = false;
+      if (c?.track && c.t > LW - 1.5 * DT) head = face + move.headYaw;
+      if (c && !c.track) squared = face;
+      monsterStep(b, DT, q);
+    }
+    ok(body30 && near(head, Math.PI / 3, 0.01) && near(squared, Math.PI / 3, 1e-9),
+      `跳砸：人繞到旁邊 60°，身體只轉 ${(TRACK.body * 60).toFixed(0)}°、頭正對著人（${(head * 180 / Math.PI).toFixed(1)}°），起跳那一刻身體轉正`);
   }
 
   // 三招都挑得到（人在扇形的距離以內）。
@@ -3241,7 +3263,7 @@ console.log('37. 兩條命');
 console.log('38. 第二條命的跳砸與扇形');
 {
   const second = (x, z) => { const m = makeMonster({ kind: 'boss', x, z, yaw: 0 }); m.life = 2; m.castT = 0; return m; };
-  ok(RAGE.grow === 1.5 && RAGE.hops === undefined, '第二條命：扇形的半徑 1.5 倍、跳砸只跳一下');
+  ok(RAGE.grow === 1.5 && RAGE.hops === 2, '第二條命：扇形的半徑 1.5 倍、跳砸連跳兩下');
   ok(near(radiusOf(second(0, 0), 'leap'), SKILL.leap.radius) && near(radiusOf(second(0, 0), 'cone'), 1.5 * SKILL.cone.radius)
     && near(radiusOf(makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 }), 'cone'), SKILL.cone.radius), '跳砸的半徑跟第一條命一樣；第一條命的扇形照原本的半徑');
   // 扇形：夠得到的距離跟著長度變長。
@@ -3270,36 +3292,49 @@ console.log('38. 第二條命的跳砸與扇形');
       && strikeHits(sw, ang(52)) && strikeHits(sw, ang(-52)) && !strikeHits(sw, ang(58)),
       '扇形張開 105°（偏 52° 中、58° 不中）；第一條命還是 60°');
   }
-  // 跳砸：起跳之前一直瞄著主角（落點在主角腳下的地板上、身體與頭對著主角），起跳那一刻定下來，砸一下就僵直。
+  // 跳砸：每一下起跳之前一直瞄著主角（落點在主角腳下的地板上、身體與頭對著主角），起跳那一刻定下來；
+  // 第一下落地不僵直、就地再來一下，第二下落地才僵直。
   {
-    const S = SKILL.leap, w = makeWorld(), b = second(0, -3), q = body(0, 3), mo = new Motion();
+    const S = SKILL.leap, W = S.windup - S.air, w = makeWorld(), b = second(0, -3), q = body(0, 3), mo = new Motion();
     const hits = [];
-    let t = 0, stunAt = -1, followed = true, grounded = true, looked = 0, launchAt = null;
-    while (t < 3 && stunAt < 0) {
-      const wind = b.cast && b.cast.t < S.windup - S.air;
-      if (b.cast && b.cast.t > 0.4) { q.x = 2; q.y = 1.2; }            // 倒數到一半，主角往旁邊跳開
-      if (b.cast && b.cast.t > S.windup - S.air + 0.1) { q.x = 4; q.y = 0; }   // 起跳之後再走開
+    let t = 0, stunAt = -1, followed = true, grounded = true, looked = 0, stunBetween = false;
+    const tilt = { low: null, high: null };
+    // 每一下：倒數到 0.4 秒主角往旁邊跳起來，起跳之後落回地上再走開。
+    const plan = [{ x: 2, z: 3 }, { x: -1, z: 1 }];
+    while (t < 5 && stunAt < 0) {
+      const n = hits.length, P = plan[n] || plan[1], c0 = b.cast;
+      if (c0 && c0.t < 0.4) { q.y = 0; }
+      if (c0 && c0.t > 0.4 && c0.t < W) { q.x = P.x; q.z = P.z; q.y = 1.2; }
+      if (c0 && c0.t >= W) { q.x = P.x + 3; q.y = 0; }
       const st = bossStep(b, DT, q, w, () => 0.5);
       if (st) hits.push({ st, t });
-      if (wind && b.cast) {
-        if (!near(b.cast.tx, q.x) || !near(b.cast.tz, q.z)) followed = false;
-        if (!near(b.cast.ty, 0)) grounded = false;
-        const to = Math.atan2(q.x - b.x, q.z - b.z), face = Math.atan2(b.aimX, b.aimZ);
-        if (Math.abs(to - face) > 1e-9) followed = false;
+      const c = b.cast, wind = !!c && c.t < W;
+      if (wind && c.t > DT) {
+        if (!near(c.tx, q.x) || !near(c.tz, q.z)) followed = false;
+        if (!near(c.ty, 0)) grounded = false;
+        let turn = Math.atan2(q.x - b.x, q.z - b.z) - c.yaw0;
+        turn -= 2 * Math.PI * Math.round(turn / (2 * Math.PI));
+        if (Math.abs(c.yaw0 + TRACK.body * turn - Math.atan2(b.aimX, b.aimZ)) > 1e-9) followed = false;
       }
-      if (b.cast && !wind && launchAt === null) launchAt = { x: b.cast.tx, z: b.cast.tz };
-      mo.step(DT, b, q);
-      if (b.cast?.track) looked = mo._look;                         // 還在瞄的最後一幀
+      const move = mo.step(DT, b, q).move;
+      if (c?.track && c.t > W - 1.5 * DT) looked = Math.min(looked || 1, mo._look);   // 每一下還在瞄的最後一幀
+      // 頭的上下：同一下倒數裡，主角站在地上（0.3 秒）與跳起來（倒數最後）各量一次。
+      if (n === 0 && wind && near(c.t, 0.38, DT / 2)) tilt.low = move.headPitch;
+      if (n === 0 && wind && near(c.t, W - DT, DT / 2)) tilt.high = move.headPitch;
       monsterStep(b, DT, q);
-      if (b.stun > 0 && stunAt < 0) stunAt = t;
+      if (hits.length === 1 && b.stun > 0) stunBetween = true;
+      if (hits.length === 2 && b.stun > 0 && stunAt < 0) stunAt = t;
       t += DT;
     }
-    ok(followed && grounded, '起跳之前：落點與身體的朝向每一幀都跟著主角，主角跳起來落點還是在地板上');
+    ok(followed && grounded, '每一下起跳之前：落點每一幀都跟著主角、身體只轉三成，主角跳起來落點還是在地板上');
     ok(looked > 0.9, `起跳之前頭盯著主角（盯的力道 ${looked.toFixed(2)}）`);
-    ok(hits.length === 1 && near(hits[0].st.x, 2) && near(hits[0].st.z, 3) && near(hits[0].st.y, 0),
-      '起跳那一刻定下來：砸在起跳時主角腳下的地板上（主角之後走開了）');
-    ok(near(hits[0].st.r, SKILL.leap.radius) && hits[0].st.dmg === S.damage && stunAt >= 0 && near(stunAt, hits[0].t, 1.5 * DT),
-      '只砸一下、範圍跟第一條命一樣、傷害不變，落地就僵直');
+    ok(tilt.low !== null && tilt.high !== null && tilt.high < tilt.low - 0.1,
+      `主角跳起來頭跟著抬（headPitch ${tilt.low?.toFixed(2)} → ${tilt.high?.toFixed(2)}）`);
+    ok(hits.length === 2 && plan.every((P, k) => near(hits[k].st.x, P.x) && near(hits[k].st.z, P.z) && near(hits[k].st.y, 0)),
+      '兩下都砸在起跳那一刻主角腳下的地板上（主角之後走開了）');
+    ok(hits.every((h) => near(h.st.r, SKILL.leap.radius) && h.st.dmg === S.damage), '兩下的範圍都跟第一條命一樣、傷害不變');
+    ok(!stunBetween && Math.abs(hits[1].t - hits[0].t - S.windup) < 2 * DT && stunAt >= 0 && b.hop === undefined,
+      `兩下之間不僵直（隔 ${(hits[1].t - hits[0].t).toFixed(2)} 秒，跟一下的倒數一樣長），第二下落地才僵直`);
   }
 }
 

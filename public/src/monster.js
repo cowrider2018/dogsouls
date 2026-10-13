@@ -56,9 +56,9 @@
      cone  前肢抬起：整個前半身立起來、兩隻前腳離地收在胸前，頭反過來壓低
            盯著鎖定的方向；倒數最後那一下整隻砸下去，打下去的那一刻前腳踩到地；
            僵直裡再往下一沉，然後慢慢起身。
-     leap  翹屁股縮頭蓄力：前低後高、整隻往後退一截，頭扳回來平視落點——頭比站著的時候縮到
-           更後面、更低，前腳彎著撐住，尾巴翹高，越蓄越翹、越縮（第二條命的落點跟著主角走，頭也
-           跟著主角轉）；
+     leap  翹屁股縮頭蓄力：前低後高、整隻往後退一截，頭扳回來平視前面——頭比站著的時候縮到
+           更後面、更低，前腳彎著撐住，尾巴翹高，越蓄越翹、越縮（落點跟著主角走，頭左右上下都
+           正對著主角）；
            最後那一段飛過去的時候跟衝刺一樣是主角的跳躍動作組（在空中、垂直
            速度照那一條拋物線）；落地俯身緩衝，停一下，然後在僵直裡慢慢站起來。
 
@@ -124,9 +124,9 @@
    衝刺、放招、僵直那幾段（還有收尾沒播完的）不漂，讓給那一套動作。
 
    頭跟著主角現在的位置左右轉（LOOK，最多 LOOK.max）只給真的會追著主角的招：瞪視一直轉向主角，
-   第二條命的跳砸起跳之前一直瞄著主角（skills.js 的 cast.track）。扇形地震與第一條命的跳砸鎖定的是
-   倒數開始那一刻的方向與落點，主角之後怎麼跑都不會變——頭要是跟著主角轉，看起來就像招也跟著轉，
-   玩家會照著頭躲錯地方。所以那兩招的頭盯著鎖定的方向不動。
+   跳砸起跳之前一直瞄著主角（skills.js 的 cast.track；身體只轉 TRACK.body 那麼多，其餘是頭轉的，
+   而且上下也跟——頭正對著主角）。扇形地震鎖定的是倒數開始那一刻的方向，主角之後怎麼跑都不會變——
+   頭要是跟著主角轉，看起來就像招也跟著轉，玩家會照著頭躲錯地方。所以扇形的頭盯著鎖定的方向不動。
    ------------------------------------------------------------------ */
 
 import * as THREE from '../vendor/three.module.js';
@@ -445,10 +445,12 @@ const retime = (mv, T) => {
 };
 
 /**
- * 頭跟著主角轉：哪幾段要盯（值是盯多用力）、多快轉過去與放掉（秒）、最多轉多少（弳）。
+ * 頭跟著主角轉：哪幾段要盯（值是盯多用力）、多快轉過去與放掉（秒）、最多轉多少（弳；一直瞄著主角的招
+ * 身體只轉三成、其餘全靠頭，所以放寬到 trackMax——主角繞過 115° 以內頭都正對著牠）、眼睛在幾個身高
+ * （上下跟的時候從這裡看主角）。
  * 只放招真的跟著主角轉的那幾段（理由見檔頭）；那一招自己說了一直瞄著主角（cast.track）的也盯。
  */
-const LOOK = { stages: { glareWind: 1 }, tau: 0.12, max: 1.0 };
+const LOOK = { stages: { glareWind: 1 }, tau: 0.12, max: 1.0, trackMax: 1.4, eye: 0.75 };
 
 /**
  * 怪物的每一套動作（moves.js 的 MOVES 那一種寫法），鍵就是 Motion 挑的那一段：
@@ -571,6 +573,8 @@ export class Motion {
     this._up = false;
     /** 頭跟著主角轉的那一份現在有多少（0～1，追 LOOK.stages 給的目標）。 */
     this._look = 0;
+    /** 頭跟著主角上下的那一份（0～1，只有一直瞄著主角的招，cast.track）。 */
+    this._tilt = 0;
     /** 漂的力道（0～1，追速度）與擺到哪（弳）。 */
     this._drift = 0;
     this._swing = 0;
@@ -625,19 +629,29 @@ export class Motion {
 
   /**
    * 頭跟著主角轉：主角在身體朝向的哪一邊，頭就再轉那麼多（夾在 ±LOOK.max）。
-   * 轉多少乘上 _look，進出那幾段是追過去的，不是一幀跳過去。頭既然在看人，
+   * 一直瞄著主角的招（cast.track）連上下也跟：頭再仰、再低到正對著主角身體的中間（_tilt），
+   * 主角跳起來頭就跟著抬。
+   * 轉多少乘上 _look（上下乘 _tilt），進出那幾段是追過去的，不是一幀跳過去。頭既然在看人，
    * 就不轉向鏡頭（w 至少是 _look）。播放器的那一份不能改（它下一招從那裡淡），
    * 所以寫在自己的一份上。
    */
   _lookAt(dt, stage, m, player, move) {
-    const goal = LOOK.stages[stage] || (stage && m.cast?.track ? 1 : 0);
-    this._look += (goal - this._look) * (1 - Math.exp(-dt / LOOK.tau));
+    const track = !!stage && !!m.cast?.track;
+    const k = 1 - Math.exp(-dt / LOOK.tau);
+    this._look += ((LOOK.stages[stage] || (track ? 1 : 0)) - this._look) * k;
+    this._tilt += ((track ? 1 : 0) - this._tilt) * k;
     if (this._look < 1e-3 || !player) return move;
+    const lim = track ? LOOK.trackMax : LOOK.max, clamp = (a) => Math.max(-lim, Math.min(lim, a));
     const face = Math.atan2(m.aimX, m.aimZ), to = Math.atan2(player.x - m.x, player.z - m.z);
     let d = to - face;
     d -= 2 * Math.PI * Math.round(d / (2 * Math.PI));
     const pose = Object.assign(this._pose, move);
-    pose.headYaw = move.headYaw + Math.max(-LOOK.max, Math.min(LOOK.max, d)) * this._look;
+    pose.headYaw = move.headYaw + clamp(d) * this._look;
+    if (this._tilt > 1e-3) {
+      // 仰角：從牠的眼睛（LOOK.eye 個身高）看主角身體的中間。headPitch 正的是低頭，所以減。
+      const eye = m.y + LOOK.eye * PHYS.height * sizeOf(m.kind), mid = player.y + PHYS.height / 2;
+      pose.headPitch = move.headPitch - clamp(Math.atan2(mid - eye, Math.hypot(player.x - m.x, player.z - m.z))) * this._tilt;
+    }
     pose.w = Math.max(move.w, this._look);
     return pose;
   }
