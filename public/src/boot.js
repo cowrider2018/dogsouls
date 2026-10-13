@@ -9,12 +9,8 @@
    模式的就在這裡拿掉——拿掉而不是藏起來，各模式的主程式用 id 找元素
    （#keys 兩個模式各一份），留著會找到別人的那一份。
 
-   沒給模式（`?mode=` 空的也算）、或給了不認得的，就是 DEFAULT。
-
-   錄影模式（record）就是完整遊戲，只是同時錄下每一幀吃了什麼、打完可以轉成影片（tape.js、
-   record.js）；replay 是轉檔的時候藏在 iframe 裡重演的那一頁，不是給人開的。這兩個借完整遊戲的
-   版面（`page`）：body 的 data-mode 與 data-for 照 game 算，另外帶 data-tape 說是哪一個；
-   data-for 也認模式自己的名字（轉檔畫面只有 record 有）。
+   沒給模式（`?mode=` 空的也算）、或給了不認得的，就是 DEFAULT。線上（Cloudflare）只有 DEFAULT：
+   其他模式是開發用的，表在 dev-modes.js，只在本機的 npm run dev 拿得到。
    ------------------------------------------------------------------ */
 
 import { installFullscreen } from './fullscreen.js';
@@ -22,29 +18,27 @@ import { installFullscreen } from './fullscreen.js';
 /** 遊戲的名字：完整遊戲的分頁標題（index.html 的 <title> 與 manifest 的 name 是同一句）。 */
 export const TITLE = 'Dogsouls: Revive the Kingdom from Zombie Invasion';
 
-/** 每一個模式：分頁標題、主程式。 */
-export const MODES = {
-  terrain: { title: '試玩場：城堡遺跡', entry: './mode-terrain.js' },
-  combat: { title: '試打場', entry: './mode-combat.js' },
-  flow: { title: '完整流程', entry: './mode-flow.js' },
-  /* 完整遊戲：就是完整流程，但不帶面板、提示字與開發用的鍵，一開始是開始畫面（mode-flow.js 的 GAME）。 */
-  game: { title: TITLE, entry: './mode-flow.js' },
-  /* 錄影：完整遊戲，國王坐上王位之後進轉檔畫面。 */
-  record: { title: TITLE, entry: './mode-flow.js', page: 'game' },
-  /* 轉檔的時候重演的那一頁（record.js 開在 iframe 裡）。 */
-  replay: { title: TITLE, entry: './mode-flow.js', page: 'game' },
-};
-
-/** 沒給模式的時候：完整遊戲——其他幾個是它的零件或開發版，各自拿出來試。 */
+/** 線上只有這一個模式：完整遊戲——完整流程，但不帶面板、提示字與開發用的鍵，一開始是開始畫面（mode-flow.js 的 GAME）。 */
 export const DEFAULT = 'game';
+const GAME = { title: TITLE, entry: './mode-flow.js' };
 
 const asked = new URLSearchParams(location.search).get('mode');
+
+/* 其他模式全在 dev-modes.js，那支跟它們的主程式都列在 public/.assetsignore，不上 Cloudflare。
+   所以只有網址真的要了別的模式才去拿：線上拿不到（404）就當作沒給，照樣是完整遊戲；
+   本機的 npm run dev 不理 .assetsignore，拿得到。沒要的時候一個請求都不多發。 */
+const MODES = { [DEFAULT]: GAME };
+if (asked && asked !== DEFAULT) {
+  try {
+    Object.assign(MODES, (await import('./dev-modes.js')).DEV_MODES);
+  } catch { /* 線上：沒有開發模式 */ }
+}
 const mode = Object.hasOwn(MODES, asked) ? asked : DEFAULT;
 
 const page = MODES[mode].page || mode;
 document.body.dataset.mode = page;
 if (page !== mode) document.body.dataset.tape = mode;
-document.title = MODES[mode].title;
+document.title = MODES[mode].title || TITLE;
 for (const el of document.querySelectorAll('[data-for]')) {
   const fors = el.dataset.for.split(/\s+/);
   if (!fors.includes(page) && !fors.includes(mode)) el.remove();

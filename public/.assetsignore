@@ -1,0 +1,19 @@
+# 不上 Cloudflare 的檔案（wrangler deploy 讀這一支；本機的 npm run dev 不讀，全部照樣送）。
+# 每一行是 public/ 底下的一個路徑。tools/verify-ship.mjs 會檢查：每一行都對得到檔案，
+# 而且上線的檔案沒有一支直接 import 這裡的任何一支。
+
+# 開發模式（src/dev-modes.js 那張表）與只有它們用得到的主程式
+/src/dev-modes.js
+/src/mode-terrain.js
+/src/mode-combat.js
+
+# 錄影模式：轉檔畫面、重演、編碼、混音
+/src/record.js
+/src/replay.js
+/src/reel.js
+/src/film.js
+/vendor/mp4-muxer.mjs
+
+# 音效與音樂的錄音原檔（tools/make-sfx.mjs、make-music.mjs 的輸入，遊戲載的是做好的 .m4a）
+/assets/sfx/recorded/
+/assets/music/recorded/
