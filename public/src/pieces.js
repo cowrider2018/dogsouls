@@ -1127,7 +1127,8 @@ export function well(B, o) {
       });
     }
   }
-  B.add(B.kit.drum(R * 0.78, R * 0.78, 0.1, 12), { p: [o.x, y + 0.05, o.z], color: 0x161310, ink: false });
+  // 井口那片黑。mouth: false 不放：漫畫裡的枯井從上面看進去，井口留紙色。
+  if (o.mouth !== false) B.add(B.kit.drum(R * 0.78, R * 0.78, 0.1, 12), { p: [o.x, y + 0.05, o.z], color: 0x161310, ink: false });
   for (const side of [-1, 1]) {
     B.add(B.kit.brick(0.14, 1.7, 0.14, 0.03), { p: [o.x + side * R * 0.85, y + 0.85, o.z], color: C.wood });
   }
