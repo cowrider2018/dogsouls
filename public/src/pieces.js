@@ -1177,32 +1177,44 @@ export function well(B, o) {
   }
   if (o.dry) {
     /* 枯井：井底的土上塌著幾塊大石磚，從上面看大約遮住一半的井口，另一半露出土。
-       底下五塊斜著、四成沉進土裡（土面 0.1），所以是埋在土裡冒出來的，不是擺在
-       上面；露出來的頂面在 0.2～0.35，低於井圈。另外兩塊疊在上面：一頭擱在下面
-       那一塊的頂上、一頭落在土裡，所以是歪的（三十度上下）——一堆石頭有高有低、
-       互相壓著，才看得出是一堆，不是一塊一塊鋪的。站在井圈上踩的是井圈的圓柱。
-       位置與轉向是排好的：每一塊的角都在井圈的內緣以內，從上面看合起來遮住五成。 */
+       底下五塊靠著井壁一圈，斜著、四成沉進土裡（土面 0.1），所以是埋在土裡冒出來的，
+       不是擺在上面；露出來的頂面在 0.2～0.35，低於井圈。中間留一片土，另外兩塊從那裡
+       斜擱上去：一頭埋在土裡、一頭擱在下面那一塊朝井心的那條邊上，所以是歪的（三十到
+       四十度）——一堆石頭有高有低、互相壓著，才看得出是一堆，不是一塊一塊鋪的。
+       擱的是邊，不是頂面的正中：擱在正中的話，上面那塊的下半截整個插進下面那塊裡。
+       位置與轉向是排好的：每一塊的角都在井圈的內緣以內，疊上去的兩塊不碰到別塊，
+       從上面看合起來遮住五成。站在井圈上踩的是井圈的圓柱。 */
     const rr = rng(o.seed + 7);
-    const k = R / 1.1, tops = [];
-    for (const [dx, dz, s, yaw] of [[-0.36, 0.2, 0.3, 0.4], [0.22, 0.36, 0.25, 1.3], [0.12, -0.34, 0.27, 2.2], [-0.2, -0.42, 0.18, 0.9], [0.5, -0.05, 0.17, 1.9]]) {
+    const k = R / 1.1, base = [];
+    for (const [dx, dz, s, yaw] of [[-0.43, 0.23, 0.25, -1.08], [0.3, 0.44, 0.22, 1.3], [0.17, -0.49, 0.24, 0.1], [-0.42, -0.36, 0.17, 0.9], [0.56, -0.05, 0.19, 1.9]]) {
       const sx = 2.2 * s * k, sz = 1.86 * s * k, sy = s * k * rr.range(1.0, 1.3);
       const cx = o.x + dx * k, cy = y + 0.1 + sy * 0.1, cz = o.z + dz * k;
-      B.add(B.kit.brick(sx, sy, sz, 0.05, chipAt(cx, cy, cz)), {
-        p: [cx, cy, cz], r: [rr.range(-0.25, 0.25), yaw, rr.range(-0.25, 0.25)], color: stoneTone(rr),
-      });
-      tops.push(cy + sy / 2);
+      const rx = rr.range(-0.25, 0.25), rz = rr.range(-0.25, 0.25);
+      B.add(B.kit.brick(sx, sy, sz, 0.05, chipAt(cx, cy, cz)), { p: [cx, cy, cz], r: [rx, yaw, rz], color: stoneTone(rr) });
+      /* 頂面：法線是 (0, 1, 0) 轉過 Rx·Ry·Rz（Euler XYZ），頂面過中心往法線 sy / 2 那一點。 */
+      const n = [
+        -Math.sin(rz) * Math.cos(yaw),
+        Math.cos(rz) * Math.cos(rx) - Math.sin(rz) * Math.sin(yaw) * Math.sin(rx),
+        Math.cos(rz) * Math.sin(rx) + Math.sin(rz) * Math.sin(yaw) * Math.cos(rx),
+      ];
+      const tx = cx + (n[0] * sy) / 2, ty = cy + (n[1] * sy) / 2, tz = cz + (n[2] * sy) / 2;
+      base.push({ cx, cz, hx: sx / 2, hz: sz / 2, yaw, top: (x, z) => ty - (n[0] * (x - tx) + n[2] * (z - tz)) / n[1] });
     }
-    /* 疊上去的兩塊：[壓在第幾塊上, 擱在它頂上的那一點 x, z, 落在土裡的那一點 x, z, 寬]。
-       磚的長軸從土裡那一頭指向擱著的那一頭，繞自己的 z 軸抬起 tilt 再轉到那個方向
-       （Euler XYZ、rx = 0：先 Rz 再 Ry）；兩頭各多出 6 公分，擱著的那一頭壓在下面那塊的頂上。 */
-    for (const [on, hx, hz, lx, lz, w] of [[0, -0.33, 0.17, -0.02, 0.06, 0.32], [2, 0.1, -0.3, 0.2, -0.02, 0.3]]) {
-      const hy = tops[on], ly = y + 0.1, th = 0.17 * k;
-      const ax = (hx - lx) * k, az = (hz - lz) * k, run = Math.hypot(ax, az);
-      const tilt = Math.atan2(hy - ly, run);
-      const cx = o.x + ((hx + lx) / 2) * k, cz = o.z + ((hz + lz) / 2) * k;
-      const cy = (hy + ly) / 2 + (th / 2) * Math.cos(tilt);
-      B.add(B.kit.brick(run / Math.cos(tilt) + 0.12, th, w * k, 0.05, chipAt(cx, cy, cz)), {
-        p: [cx, cy, cz], r: [0, Math.atan2(-az, ax), tilt], color: stoneTone(rr),
+    /* 疊上去的兩塊：[擱在第幾塊上, 埋在土裡那一頭的 x, z, 寬]。從土裡那一點朝下面那塊的中心看過去，
+       碰到它的邊（水平的方框，轉過 yaw）的那一點就是擱著的地方，高度是那一點上它頂面的高度。
+       磚的底面通過這兩點：長軸繞自己的 z 軸抬起 tilt 再轉到那個方向（Euler XYZ、rx = 0：先 Rz
+       再 Ry），土裡那一頭多埋 5 公分，擱著的那一頭過邊 10 公分。 */
+    for (const [on, lx0, lz0, w] of [[0, -0.08, -0.05, 0.3], [2, 0.22, 0.05, 0.28]]) {
+      const b = base[on], lx = o.x + lx0 * k, lz = o.z + lz0 * k, ly = y + 0.1, th = 0.17 * k;
+      const D = Math.hypot(b.cx - lx, b.cz - lz), ux = (b.cx - lx) / D, uz = (b.cz - lz) / D;
+      const u = ux * Math.cos(b.yaw) - uz * Math.sin(b.yaw), v = ux * Math.sin(b.yaw) + uz * Math.cos(b.yaw);
+      const run = D - Math.min(b.hx / Math.abs(u), b.hz / Math.abs(v));
+      const tilt = Math.atan2(b.top(lx + ux * run, lz + uz * run) - ly, run);
+      const c = Math.cos(tilt), sn = Math.sin(tilt);
+      const s0 = -0.05, s1 = run / c + 0.1, mid = (s0 + s1) / 2;
+      const cx = lx + ux * (c * mid - (sn * th) / 2), cy = ly + sn * mid + (c * th) / 2, cz = lz + uz * (c * mid - (sn * th) / 2);
+      B.add(B.kit.brick(s1 - s0, th, w * k, 0.05, chipAt(cx, cy, cz)), {
+        p: [cx, cy, cz], r: [0, Math.atan2(-uz, ux), tilt], color: stoneTone(rr),
       });
     }
   }
