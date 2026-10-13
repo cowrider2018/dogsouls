@@ -45,9 +45,9 @@ const mode = Object.hasOwn(MODES, asked) ? asked : DEFAULT;
 const on = (k) => params.has(k) && params.get(k) !== '0';
 const tape = mode !== DEFAULT ? null : on('replay') ? 'replay' : on('record') ? 'record' : null;
 
-/* 怪物的描線變色（攻擊中紅、打不到金，fight.js 照 body 的 data-tell）：預設關，開發的時候給 `?tell` 打開，
-   哪個模式都行。只在拿得到 dev-modes.js 的地方算數——那支不上 Cloudflare，所以線上給了也開不了。
-   主角無敵的金色描線不歸它管，一直都在。 */
+/* 怪物的狀態提示（fight.js 照 body 的 data-tell）：描線變色（攻擊中紅、打不到金）與地上的技能預告（紅區、
+   球的落點）。預設關，開發的時候給 `?tell` 打開，哪個模式都行。只在拿得到 dev-modes.js 的地方算數——
+   那支不上 Cloudflare，所以線上給了也開不了。主角無敵的金色描線不歸它管，一直都在。 */
 const tell = on('tell') && await import('./dev-modes.js').then(() => true, () => false);
 
 document.body.dataset.mode = mode;

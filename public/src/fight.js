@@ -70,7 +70,8 @@ import { MUTE } from './sound.js';
 import { EyeGlow, Spirit, dazeView } from './glare.js';
 import { random } from './chance.js';
 
-/** 怪物的描線變不變色（攻擊中紅、打不到金）：只有開發的 `?tell`，boot.js 驗過才寫 data-tell。 */
+/** 怪物的狀態提示：描線變色（攻擊中紅、打不到金）與地上的技能預告（紅區、球的落點）。只有開發的 `?tell`，
+ *  boot.js 驗過才寫 data-tell；平常一樣都不畫。主角的金色描線與「現在按」的提示圈不歸它管。 */
 const TELL = globalThis.document?.body?.dataset.tell !== undefined;
 
 /** _compile 記下原本的 scissor 用。 */
@@ -1074,8 +1075,9 @@ export class Fight {
     const floor = supportInfo(this.world.field.cols, player.x, player.z, player.y).y;
     showFx(fx.cue, cueing(combo) ? 0 : Infinity, 1, player.x, floor, player.z, 0);
 
-    // 怪物技能的預告：貼在牠（或跳砸的落點）那一層地板上。
-    for (const f of this.foes) {
+    /* 怪物技能的預告：貼在牠（或跳砸的落點）那一層地板上。只在 `?tell`（TELL）：預告建好就是藏著的，
+       不擺就一直不出來。 */
+    for (const f of TELL ? this.foes : []) {
       const { m, lane, circle, rend, cone, wide, whirl, cleave } = f;
       const c = m.cast;
       this._hew(f);
@@ -1123,7 +1125,7 @@ export class Fight {
 
     // 飛著的球（火球）與拋物線的球的落點。
     this._fire.draw(dt, this.world.shots, camera);
-    this._landing();
+    if (TELL) this._landing();
 
     // 靈魂：頭、光暈、冒出來的小球（soul.js）。
     const souls = this._thrown.length ? [...this.souls, ...this._thrown] : this.souls;
