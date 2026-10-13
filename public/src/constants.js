@@ -1,5 +1,5 @@
 // ── 物理參數（單位：px、秒）─────────────────────────────
-// 這些數值同時被「地形生成器」拿來算最大可跳距離，改動時請一起跑 tools/verify-level.mjs
+// 這些數值是貓的骨架與體型的基準（src/cat/cat.js 讀 PHYS、PLAYER_W、PLAYER_H）
 export const PHYS = {
   gravity: 2000,
   maxFall: 1250,

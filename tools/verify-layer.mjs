@@ -1,7 +1,7 @@
 // CatLayer 的無頭驗證器：一層畫多種動物這件事有沒有接對。
 //
 // 這台機器沒有 GPU，也沒有 headless WebGL，但 CatLayer 需要驗的東西幾乎
-// 都不在 GPU 上。假 gl 在 tools/lib/fake-gl.mjs（跟 verify-showcase 共用），這裡
+// 都不在 GPU 上。假 gl 在 tools/lib/fake-gl.mjs，這裡
 // 拿它跑真的 begin/cat/end，再檢查帳。
 //
 // 驗的是這幾件事：
