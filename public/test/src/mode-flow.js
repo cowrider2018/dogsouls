@@ -699,7 +699,7 @@ function begin() {
   if (TAPE === 'record') {
     deck.tape = blankTape({
       bootSeed: BOOT_SEED, seed: reseed(), look: zoo.look, hat: zoo.hatOn, god: !!player.god, clock,
-      cam: { pitch: cam.pitch, dist: cam.dist }, view: viewNow(), when: Date.now(),
+      cam: { pitch: cam.pitch, dist: cam.dist }, view: viewNow(), dpr: renderer.getPixelRatio(), when: Date.now(),
     });
   }
   startFrom(0);

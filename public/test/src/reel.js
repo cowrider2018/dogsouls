@@ -1,7 +1,7 @@
 /* ── test/src/reel.js ────────────────────────────────────────────────
    把一段重演編成一支 mp4（錄影模式的轉檔，replay.js 用）：畫面一張一張交給 WebCodecs 的
    VideoEncoder，聲音是整段離線混好的一個 AudioBuffer，交給 AudioEncoder；兩條都裝進
-   vendor/mp4-muxer.mjs，整支在記憶體裡做好，最後是一個 Blob。全部在玩家的瀏覽器裡，
+   vendor/mp4-muxer.mjs，邊編邊收成一串 Blob（見下），最後是一支 mp4。全部在玩家的瀏覽器裡，
    不經過伺服器。
 
    ── 格式 ────────────────────────────────────────────────────────
@@ -9,7 +9,14 @@
    都不行才 VP9、AV1。聲音先試 AAC，不行才 Opus（有的播放器不放 mp4 裡的 Opus，但總比沒聲音好）；
    連 AudioEncoder 都沒有的瀏覽器就是沒有聲音的影片。
 
-   碼率照畫面大小與幀率算（BPP 每像素每幀幾個位元）：720p60 大約 3.9 Mbps。
+   碼率照畫面大小與幀率算（BPP 每像素每幀幾個位元）：1280×640、60 幀大約 7.4 Mbps，最多 MAX_RATE。
+   低於 0.1 的時候地上的紋理、遠處的磚縫會被抹平（量過：0.07 的銳利度掉一成，0.15 跟原圖一樣）。
+
+   ── 邊編邊放 ──────────────────────────────────────────────────
+   一段幾分鐘、十幾 Mbps 就是幾百 MB，整支放在 JS 的記憶體裡做（再加上裝箱時的一份）手機撐不住。
+   所以 moov 放在檔尾（fastStart: false）：mdat 照順序往後寫，寫出來的每一塊馬上包成一個 Blob
+   （瀏覽器自己收著，必要時放到磁碟），JS 這邊不留。只有檔頭 HEAD 個位元組留著——收尾的時候
+   muxer 會回頭改 mdat 的大小，那幾個位元組在最前面。
 
    ── 聲音的時鐘 ──────────────────────────────────────────────────
    重演不是即時的（可能比真的快，也可能比真的慢），所以聲音不能邊演邊錄：每一段開一個
@@ -18,12 +25,14 @@
    整段演完再一口氣混出來。
    ------------------------------------------------------------------ */
 
-import { Muxer, ArrayBufferTarget } from '../vendor/mp4-muxer.mjs';
+import { Muxer, StreamTarget } from '../vendor/mp4-muxer.mjs';
 
 /** 聲音的取樣率與聲道。 */
 export const RATE = 48000, CHANNELS = 2;
-/** 每像素每幀幾個位元（碼率 = 寬 × 高 × 幀率 × BPP）。 */
-const BPP = 0.07;
+/** 每像素每幀幾個位元（碼率 = 寬 × 高 × 幀率 × BPP），最多幾 bps。 */
+const BPP = 0.15, MAX_RATE = 20e6;
+/** 檔頭留在記憶體裡的位元組數（見檔頭）。 */
+const HEAD = 1 << 16;
 /** 幾秒一個關鍵幀。 */
 const KEY_EVERY = 2;
 
@@ -47,7 +56,7 @@ export async function pickFormat(width, height, fps) {
   let video = null, audio = null;
   for (const [mux, codec] of VIDEO) {
     const config = {
-      codec, width, height, framerate: fps, bitrate: Math.round(width * height * fps * BPP),
+      codec, width, height, framerate: fps, bitrate: Math.round(Math.min(MAX_RATE, width * height * fps * BPP)),
       latencyMode: 'quality', ...(mux === 'avc' ? { avc: { format: 'avc' } } : {}),
     };
     try {
@@ -98,17 +107,49 @@ function drained(enc, max) {
   });
 }
 
+/**
+ * muxer 寫出來的位元組 → 一串 Blob（見檔頭）。檔頭 HEAD 個位元組留在記憶體裡、可以回頭改；
+ * 之後的只能照順序接在後面。
+ */
+class Sink {
+  constructor() {
+    this.head = new Uint8Array(HEAD);
+    this.headLen = 0;
+    this.parts = [];
+    this.end = HEAD;
+  }
+
+  write(data, pos) {
+    if (pos < HEAD) {
+      const n = Math.min(data.byteLength, HEAD - pos);
+      this.head.set(data.subarray(0, n), pos);
+      this.headLen = Math.max(this.headLen, pos + n);
+      data = data.subarray(n);
+      pos += n;
+      if (!data.byteLength) return;
+    }
+    if (pos !== this.end) throw new Error(`影片的位元組沒有照順序寫（${pos}，應該是 ${this.end}）`);
+    this.parts.push(new Blob([data]));
+    this.end += data.byteLength;
+  }
+
+  blob(type) {
+    return new Blob([this.head.subarray(0, this.headLen), ...this.parts], { type });
+  }
+}
+
 /** 一支影片：先一張一張 frame()，再一次 sound()（可以不給），最後 finish() 拿到 Blob。 */
 export class Reel {
   /** @param {{width: number, height: number, fps: number, format: {video: object, audio: object|null}}} o */
   constructor({ width, height, fps, format }) {
     this.format = format;
     this.error = null;
+    this.sink = new Sink();
     this.muxer = new Muxer({
-      target: new ArrayBufferTarget(),
+      target: new StreamTarget({ onData: (data, pos) => this.sink.write(data, pos), chunked: true, chunkSize: 1 << 21 }),
       video: { codec: format.video.mux, width, height, frameRate: fps },
       ...(format.audio ? { audio: { codec: format.audio.mux, numberOfChannels: CHANNELS, sampleRate: RATE } } : {}),
-      fastStart: 'in-memory',
+      fastStart: false,
       firstTimestampBehavior: 'offset',
     });
     this.video = new VideoEncoder({
@@ -168,7 +209,7 @@ export class Reel {
     this.video.close();
     this._check();
     this.muxer.finalize();
-    return new Blob([this.muxer.target.buffer], { type: 'video/mp4' });
+    return this.sink.blob('video/mp4');
   }
 
   /** 不要了（出錯、玩家走了）：編碼器關掉。 */

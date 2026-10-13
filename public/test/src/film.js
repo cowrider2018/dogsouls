@@ -132,11 +132,19 @@ export class Film {
     this._ready = new WeakMap();
   }
 
-  /** 每個 CSS 像素幾個畫素、畫面在影片裡的位置（畫面大小變了就置中、留黑邊）。 */
+  /**
+   * 每個 CSS 像素幾個畫素（橫、直）、畫面在影片裡的位置。GL 的畫布剛好是影片的大小（replay.js 的
+   * fitTo）就鋪滿、兩個方向各自的比例（差不到 1%）；畫面大小中途變了就等比縮放、置中、留黑邊。
+   * `exact` 是 GL 一個像素對一個像素。
+   */
   _fit() {
-    const w = innerWidth, h = innerHeight;
+    const w = innerWidth, h = innerHeight, v = this.el.view;
+    if (v.width === this.width && v.height === this.height) {
+      const sx = this.width / w, sy = this.height / h;
+      return { w, h, sx, sy, s: (sx + sy) / 2, ox: 0, oy: 0, exact: true };
+    }
     const s = Math.min(this.width / w, this.height / h);
-    return { w, h, s, ox: (this.width - w * s) / 2, oy: (this.height - h * s) / 2 };
+    return { w, h, sx: s, sy: s, s, ox: (this.width - w * s) / 2, oy: (this.height - h * s) / 2, exact: false };
   }
 
   /** 拍這一刻。`t` 是影片的時間（秒），「點一下翻頁」那一行的呼吸照它走。 */
@@ -146,13 +154,15 @@ export class Film {
     g.globalAlpha = 1;
     g.fillStyle = '#000';
     g.fillRect(0, 0, this.width, this.height);
-    g.setTransform(f.s, 0, 0, f.s, f.ox, f.oy);
+    g.imageSmoothingQuality = 'high';
 
-    // GL（倒下醒來那一段是糊的）
+    // GL（倒下醒來那一段是糊的）：大小剛好就原封不動貼上，不經過縮放。
     const blur = blurOf(el.view.style.filter);
     if (blur > 0.01 && FILTER) g.filter = `blur(${blur * f.s}px)`;
-    g.drawImage(el.view, 0, 0, f.w, f.h);
+    if (f.exact) g.drawImage(el.view, 0, 0);
+    else g.drawImage(el.view, f.ox, f.oy, f.w * f.s, f.h * f.s);
     g.filter = 'none';
+    g.setTransform(f.sx, 0, 0, f.sy, f.ox, f.oy);
 
     g.drawImage(el.signpost, 0, 0, f.w, f.h);
     if (el.bossbar) {
@@ -181,7 +191,7 @@ export class Film {
     const sg = this.scratch.getContext('2d');
     sg.setTransform(1, 0, 0, 1, 0, 0);
     sg.clearRect(0, 0, this.width, this.height);
-    sg.setTransform(f.s, 0, 0, f.s, f.ox, f.oy);
+    sg.setTransform(f.sx, 0, 0, f.sy, f.ox, f.oy);
     sg.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
     sg.textBaseline = 'middle';
     sg.fillStyle = cs.color;

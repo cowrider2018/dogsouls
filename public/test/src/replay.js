@@ -24,8 +24,11 @@ import { Reel, pickFormat, canReel, clockedContext, offlineMix } from './reel.js
 import { sceneEnd, sceneSeconds, TAPE_VERSION } from './tape.js';
 import { PAGES } from './comic.js';
 
-/** 影片的長邊、短邊最多幾個畫素；一秒最多幾張。 */
-export const SIZE = { long: 1280, short: 720 }, FPS = 60;
+/**
+ * 影片的大小：照玩家當時畫面的實際解析度（CSS 像素 × renderer 的像素比），像素量超過 MAX_PIXELS
+ * （1080p）才等比縮小；寬高都取 16 的倍數（見 videoSize）。一秒最多 FPS 張。
+ */
+export const MAX_PIXELS = 1920 * 1088, FPS = 60;
 /** 片段開始前幾秒先畫起來（不錄）。 */
 const WARM = 0.5;
 /** 錄的一幀當作快轉的幾幀（進度條的權重：畫、拍、編比只算貴很多）。 */
@@ -34,11 +37,31 @@ const SHOT_COST = 6;
 const post = (msg) => parent.postMessage(msg, location.origin);
 const nap = () => new Promise((r) => setTimeout(r, 0));
 
-/** 影片的大小：照畫面的比例，長邊不超過 SIZE.long、短邊不超過 SIZE.short，寬高都是偶數。 */
-export function videoSize(w, h) {
-  const s = Math.min(SIZE.long / Math.max(w, h), SIZE.short / Math.min(w, h));
-  const even = (v) => Math.max(2, Math.round(v / 2) * 2);
-  return { s, width: even(w * s), height: even(h * s) };
+/**
+ * 影片的大小與畫的像素比：`view` 是當時的畫面（CSS 像素），`dpr` 是當時 renderer 的像素比，
+ * `shrink` 是再縮多少（這個大小編不了的時候往下試）。
+ *
+ * 寬高都取最接近的 16 的倍數：寬不是 4 的倍數的時候，畫布轉成 YUV 那一步整張錯開（量過：幾乎無損地
+ * 編一次只剩 17 dB），不是 16 的倍數的時候硬體 H.264 補邊又掉到 40 dB 上下；16 的倍數是 47 dB 以上。
+ * GL 直接畫成這個大小（fitTo），一個像素對一個像素貼進影片，不再縮放。寬高各自取整，所以兩個方向
+ * 的比例差不到 1%，看不出來。
+ */
+export function videoSize(view, dpr = 2, shrink = 1) {
+  let s = dpr * shrink;
+  const px = view.w * view.h * s * s;
+  if (px > MAX_PIXELS) s *= Math.sqrt(MAX_PIXELS / px);
+  const x16 = (v) => Math.max(16, Math.round(v / 16) * 16);
+  return { s, width: x16(view.w * s), height: x16(view.h * s) };
+}
+
+/** 挑一個這個瀏覽器編得了的大小：當時的解析度先試，不行就縮成 3/4、1/2。 */
+async function pickVideo(view, dpr) {
+  for (const shrink of [1, 0.75, 0.5]) {
+    const size = videoSize(view, dpr, shrink);
+    const format = await pickFormat(size.width, size.height, FPS);
+    if (format.video) return { ...size, format };
+  }
+  return null;
 }
 
 /** 漫畫的每一張圖都載好（書頁要畫進影片，圖還沒到就是空的一格）。 */
@@ -72,8 +95,12 @@ export async function serve(game) {
   }
 }
 
-/** 畫面換成帶子上那一刻的大小與安全區：請上一層把 iframe 調成那樣，操作列、相機照它重擺。 */
-function fitTo(game, view, s) {
+/**
+ * 畫面換成帶子上那一刻的大小與安全區：請上一層把 iframe 調成那樣，操作列、相機照它重擺。
+ * `size` 給了的話（開始的那一個畫面）GL 的畫布剛好是影片的大小（videoSize），一個像素對一個像素；
+ * 之後畫面大小變了（手機轉向）就照影片的框等比縮放，film.js 置中、留黑邊。
+ */
+function fitTo(game, view, s, size = null) {
   const st = document.documentElement.style;
   for (const k of ['l', 'r', 't', 'b']) st.setProperty(`--sa-${k}`, `${view.safe?.[k] || 0}px`);
   const frame = window.frameElement;
@@ -84,19 +111,21 @@ function fitTo(game, view, s) {
   }
   game.renderer.setPixelRatio(s);
   dispatchEvent(new Event('resize'));
+  // 畫布照 CSS 大小 × 像素比取整，跟 16 的倍數差幾個像素：直接釘成影片的大小（多 0.5 免得取整少一個）。
+  if (size) game.renderer.setDrawingBufferSize((size.width + 0.5) / s, (size.height + 0.5) / s, s);
 }
 
 async function replay(game, tape) {
   if (tape?.version !== TAPE_VERSION) throw new Error('帶子的格式不對');
   if (!canReel()) throw new Error('這個瀏覽器不能轉檔（沒有 WebCodecs）');
   const { meta } = tape;
-  const { s, width, height } = videoSize(meta.view.w, meta.view.h);
-  const format = await pickFormat(width, height, FPS);
-  if (!format.video) throw new Error('這個瀏覽器編不了任何一種影片格式');
+  const picked = await pickVideo(meta.view, meta.dpr || Math.min(devicePixelRatio || 1, 2));
+  if (!picked) throw new Error('這個瀏覽器編不了任何一種影片格式');
+  const { s, width, height, format } = picked;
 
-  fitTo(game, meta.view, s);
+  fitTo(game, meta.view, s, { width, height });
   game.deck.tape = tape;
-  game.deck.h.resize = (view) => fitTo(game, view, s);
+  game.deck.h.resize = (view) => fitTo(game, view, Math.min(width / view.w, height / view.h));
 
   // 聲音的檔先解好：音樂自己解；音效要接到一個 AudioContext 才解得了，先接一個用完就丟的。
   await game.music.ready();
@@ -112,6 +141,9 @@ async function replay(game, tape) {
   const shots = scenes.reduce((n, sc) => n + (sc.last - sc.start + 1), 0);
   const total = N + shots * SHOT_COST;
   let done = 0, told = 0;
+  /** 時間花在哪（毫秒）：快轉的幀、畫的幀（世界＋GL）、拍（疊圖層）、等編碼器、混音裝箱；各幾幀。 */
+  const cost = { fast: 0, draw: 0, shoot: 0, encode: 0, mix: 0, fastN: 0, drawN: 0, wall: performance.now() };
+  const clockIn = () => performance.now();
 
   let k = 0;                    // 下一段（或正在錄的那一段）
   let cut = null;               // 正在錄的這一段：{ sc, reel, mix, t, next }
@@ -135,11 +167,17 @@ async function replay(game, tape) {
     // 這一幀要不要畫：片段裡到了下一張的時間才畫；片段前 WARM 秒畫但不錄；其他的不畫。
     const shoot = !!cut && cut.t >= cut.next - 1e-6;
     const draw = shoot || (!!sc && i >= warmFrom[k] && i < sc.start);
+    let t0 = clockIn();
     game.step(real, draw);
+    const t1 = clockIn();
+    if (draw) { cost.draw += t1 - t0; cost.drawN++; } else { cost.fast += t1 - t0; cost.fastN++; }
     done++;
     if (shoot) {
       const pic = film.shoot(cut.t);
+      const t2 = clockIn();
+      cost.shoot += t2 - t1;
       await cut.reel.frame(pic, cut.t);
+      cost.encode += clockIn() - t2;
       cut.next = Math.max(cut.next + 1 / FPS, cut.t);
       done += SHOT_COST;
     } else if (cut) done += SHOT_COST;
@@ -149,9 +187,11 @@ async function replay(game, tape) {
       game.sound.detach();
       game.music.detach();
       post({ type: 'progress', done, total, scene: cut.sc.k, mixing: true });
+      t0 = clockIn();
       const buffer = await cut.mix.startRendering();
       await cut.reel.sound(buffer);
       const blob = await cut.reel.finish();
+      cost.mix += clockIn() - t0;
       post({ type: 'file', k: cut.sc.k, name: game.stages[cut.sc.k], blob });
       cut = null;
       k++;
@@ -163,5 +203,6 @@ async function replay(game, tape) {
     }
     if (k >= scenes.length && !cut) break;
   }
-  post({ type: 'done', drift: game.deck.drift });
+  cost.wall = performance.now() - cost.wall;
+  post({ type: 'done', drift: game.deck.drift, cost, size: [width, height] });
 }

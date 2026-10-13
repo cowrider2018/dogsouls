@@ -105,6 +105,7 @@ export function showReel({ tape, stages, release }) {
         current = null;
       } else if (m.type === 'done') {
         bar.style.width = '100%';
+        console.info('轉檔', m.size, m.cost);
         end(m.drift >= 0
           ? '轉好了，但重演到一半跟你玩的那一次對不上，後面的影片可能跟當時不一樣。'
           : '全部轉好了，影片在瀏覽器的下載資料夾裡。');
