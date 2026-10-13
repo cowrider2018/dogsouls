@@ -841,6 +841,7 @@ export class Build {
    * @param {object} [o] kind：'shell'（預設）／'floor'／'block'／'step'
    *   dome：柱頂再加一個這麼高的圓頂（預設 0 = 平頂，站得住）
    *   slip：圓頂上怎麼滑，'slide'／'fall'，見 walk.js 的 SLIDE
+   *   door：這根圓柱屬於一組門，那一組門開著的時候它不存在（跟 `block` 一樣）。
    *   notch：開在柱身上的門洞，一串 { min, max, door } 方盒。`door` 那一組門
    *     開著、身體的中心在其中一塊裡面的時候，這根圓柱不擋它（walk.js 的
    *     solveXZ）；洞裡擋人的東西另外用 `block()` 登記。鏡頭照舊把圓柱當成實心的。
@@ -856,6 +857,7 @@ export class Build {
       kind: o.kind || 'shell',
       base: o.base === undefined ? y0 : o.base,
       ...(o.notch ? { notch: o.notch } : {}),
+      ...(o.door ? { door: o.door } : {}),
     });
     return this;
   }

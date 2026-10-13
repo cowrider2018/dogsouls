@@ -530,8 +530,8 @@ export function portalDrift(portals, x, y, z, doors = {}) {
  * 只認「不高於 fromY + STEP」的東西：跳上去之前，屋頂不是地板。
  * 什麼都沒有的話就是地面（y = 0）。
  */
-export function supportAt(cols, x, z, fromY) {
-  return supportInfo(cols, x, z, fromY).y;
+export function supportAt(cols, x, z, fromY, doors = {}) {
+  return supportInfo(cols, x, z, fromY, doors).y;
 }
 
 /**
@@ -545,8 +545,11 @@ export function supportAt(cols, x, z, fromY) {
  *            dx:number, dz:number}}
  *   y 支撐高度／on 踩到的碰撞體／slip 滑法（null = 站得住）／
  *   sin 斜面的 sin θ／dx,dz 下坡方向（水平的單位向量）
+ *
+ * `doors` 跟 `solveXZ` 同一份：屬於某一組門的碰撞體，那一組門開著就不是地板（窄巷的井：
+ * 門關著的時候井口上是一根站得住的圓柱，開了就是坑）。沒給就是全部關著。
  */
-export function supportInfo(cols, x, z, fromY) {
+export function supportInfo(cols, x, z, fromY, doors = {}) {
   const pad = PHYS.radius * 0.85;
   const reach = fromY + PHYS.step;
   /* 腳底下是不是一個坑口。是的話，地面（y = 0）與鋪在坑口那一層的東西
@@ -560,6 +563,7 @@ export function supportInfo(cols, x, z, fromY) {
   let y = pit ? pit.bottom : 0, on = null;
   for (const b of cols) {
     if (b.kind === 'bound' || b.kind === 'pit') continue;   // 邊界與坑不是地板
+    if (b.door && doors[b.door]) continue;                   // 那一組門開著：不存在（跟 solveXZ 一樣）
     if (pit && b.max[1] <= pit.top + 0.01) continue;         // 坑口那一層被挖掉了
     if (b.max[1] > reach) continue;                // 連頂點都構不到
     if (!nearXZ(b, x, z, pad)) continue;

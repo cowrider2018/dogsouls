@@ -87,7 +87,7 @@ export function moveHero(p, dt, cols, portals, doors) {
   const prevY = p.y;
   p.vy -= PHYS.gravity * dt;
   p.y += p.vy * dt;
-  const sup = supportInfo(cols, p.x, p.z, prevY);
+  const sup = supportInfo(cols, p.x, p.z, prevY, doors);
   if (p.y <= sup.y && p.vy <= 0) {
     p.y = sup.y;
     p.vy = 0;
