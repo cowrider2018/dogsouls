@@ -5,8 +5,10 @@
    fx.js 與 mode-combat.js 的事，而這一支 node 驗得動（tools/verify-combat.mjs）。
 
    ── 循環 ────────────────────────────────────────────────────────
-   有技能的那一類（KINDS 的 `skills`；第二條命有 `rage` 的照 `rage`，見 skillsOf）每 `every` 秒從自己的技能裡隨機挑一招：帶 `chance` 的招
-   照它的機率（國王的召喚 25%），其他的平分剩下的。
+   有技能的那一類（KINDS 的 `skills`；第二條命有 `rage` 的照 `rage`，見 skillsOf）每 `every` 秒從自己的技能裡挑一招。
+   開場固定：先照順序放完 KINDS 的 `open`（第二條命 `rageOpen`），之後才隨機——帶 `chance` 的招
+   照它的機率（國王的召喚 25%），其他的平分剩下的；再照冷落的時間加權（越久沒放越容易挑中，IDLE），
+   同一招最多連放 REPEAT 次（planOf）。全隨機的話小怪常常死前只放得出一種招。
    挑中的那一刻鎖定玩家的水平位置，之後玩家怎麼跑都不改——預告就是給人躲的。
    放招的這段時間牠不追人（站著，或照那一招自己的路線走）；放完才回去追。
 
@@ -696,14 +698,54 @@ function segGap(px, pz, ax, az, bx, bz) {
 /**
  * 從挑得到的招裡挑一招（r 是 0～1 的亂數）：帶 `chance` 的招照它的機率，沒帶的平分剩下的。
  * 全部都帶 `chance`（或只剩帶的那幾招）的話照比例放大到加起來是 1。
+ * idle（可以沒有）：每一招幾次挑招沒輪到它——權重再乘 1 + IDLE × 它，越久沒放越容易挑中。
  */
-export function pickSkill(can, r) {
+export function pickSkill(can, r, idle = {}) {
   const odds = can.map((s) => SKILL[s].chance);
   const fixed = odds.reduce((a, p) => a + (p ?? 0), 0), free = odds.filter((p) => p === undefined).length;
   const each = free ? Math.max(0, 1 - fixed) / free : 0;
-  let x = r * (fixed + each * free);
-  for (let i = 0; i < can.length; i++) if ((x -= odds[i] ?? each) < 0) return can[i];
+  const w = can.map((s, i) => (odds[i] ?? each) * (1 + IDLE * (idle[s] || 0)));
+  let x = r * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < can.length; i++) if ((x -= w[i]) < 0) return can[i];
   return can[can.length - 1];
+}
+
+/** 冷落的權重：一招每多一次挑招沒輪到它，權重多基礎的這麼多倍（pickSkill）。 */
+export const IDLE = 1;
+
+/** 同一招最多連放幾次：到了就先不挑它，等別招夠得到。 */
+export const REPEAT = 2;
+
+/**
+ * 這隻挑招的記性（m.plan；重生、第二條命站起來的時候 combat.js 清掉，這裡重來）。
+ * open：還沒放的開場招（KINDS 的 `open`，第二條命 `rageOpen`），照順序先放完——類魂的頭目
+ * 開場是固定的，玩家每一次都從同一招開始讀；夠不到就追到夠得到為止，不跳過。
+ * idle：每一招幾次挑招沒輪到它（給 pickSkill）。last、run：上一招是哪一招、連放了幾次（REPEAT）。
+ */
+export function planOf(m) {
+  if (!m.plan) {
+    const k = kindOf(m);
+    m.plan = { open: [...((raging(m) ? k.rageOpen : k.open) || [])], idle: {}, last: null, run: 0 };
+  }
+  return m.plan;
+}
+
+/** 從夠得到的招（can）裡照記性挑一招，記下來。一招都不行（開場招夠不到、只剩連放滿的）是 null。 */
+function choose(m, list, can, rng) {
+  const P = planOf(m);
+  let skill;
+  if (P.open.length) {
+    if (!can.includes(P.open[0])) return null;
+    skill = P.open.shift();
+  } else {
+    const fresh = can.filter((s) => !(s === P.last && P.run >= REPEAT));
+    if (!fresh.length) return null;
+    skill = pickSkill(fresh, rng(), P.idle);
+  }
+  for (const s of list) P.idle[s] = s === skill ? 0 : (P.idle[s] || 0) + 1;
+  P.run = skill === P.last ? P.run + 1 : 1;
+  P.last = skill;
+  return skill;
 }
 
 /**
@@ -763,7 +805,7 @@ function waveHits(st, p) {
  * 什麼都不做。要在 monsterStep 之前叫——放招中的怪物 monsterStep 讓牠站著不動（要走的招
  * 自己在 CAST 裡走）。
  *
- * 挑招只從夠得到的招裡挑（`range`，見檔頭，第二條命的扇形見 RAGE；召喚還要場上沒滿，READY）；一招都挑不到的話不重新計時，下一幀再看。
+ * 挑招只從夠得到的招裡挑（`range`，見檔頭，第二條命的扇形見 RAGE；召喚還要場上沒滿，READY），照記性挑（planOf）；一招都挑不到的話不重新計時，下一幀再看。
  *
  * @param {() => number} rng 挑招用的亂數（離線驗證給固定的）
  * @returns {object|null} 這一幀打下來的範圍攻擊（給 strikeHits），沒有就是 null
@@ -781,9 +823,10 @@ export function bossStep(m, dt, target, world, rng = random) {
   if (!m.cast && m.castT <= 0 && !busy(m) && !(m.stun > 0) && !m.lunge) {
     const gap = Math.hypot(target.x - m.x, target.z - m.z);
     const can = list.filter((s) => gap <= rangeOf(m, s) && (!READY[s] || READY[s](m)));
-    if (can.length) {
+    const skill = can.length ? choose(m, list, can, rng) : null;
+    if (skill) {
       m.castT = k.every;
-      begin(m, pickSkill(can, rng()), target, rng);
+      begin(m, skill, target, rng);
     }
   }
   if (!m.cast) return null;

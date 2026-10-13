@@ -199,6 +199,9 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。衝刺跟小怪一樣一打就取消。每 `every`
  *           秒從 `skills` 裡挑一招（skills.js）。
  *
+ * `open`：開場的那幾招，照順序放完才開始隨機挑（第二條命照 `rageOpen`）；夠不到就追到夠得到為止。
+ * 之後怎麼挑見 skills.js 的 pickSkill。
+ *
  * 碰撞的身體一樣大（同一個 PHYS 的圓柱）；外觀（同一件毛、殭屍王畫兩倍大、騎士 1.2 倍）在 monster.js。
  *
  * `bite` 是衝刺咬到玩家扣幾點血：小怪 1、騎士 2、殭屍王 3。`soul`：死掉的時候掉出一顆靈魂（見 SOUL）——殭屍與幽靈以外都會掉。
@@ -209,11 +212,11 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
 export const BREAK_AT = 8;
 export const KINDS = {
   minion: { name: '殭屍', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1 },
-  boss: { name: '殭屍王', hp: 20, lives: 2, speed: 4, breakAt: BREAK_AT, bite: 3, soul: true, steady: true, skills: ['orb', 'leap', 'cone'], every: 3 },
+  boss: { name: '殭屍王', hp: 20, lives: 2, speed: 4, breakAt: BREAK_AT, bite: 3, soul: true, steady: true, skills: ['orb', 'leap', 'cone'], open: ['orb'], rageOpen: ['orb'], every: 3 },
   ghost: { name: '幽靈', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1, fly: true },
-  knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], every: 3 },
+  knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], open: ['cleave', 'whirl'], every: 3 },
   wraith: { name: '幽靈騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
-  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, skills: ['hew', 'summon', 'gale'], rage: ['hew', 'summon', 'gale', 'glare'], every: 3 },
+  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], every: 3 },
 };
 
 /**
@@ -548,6 +551,7 @@ export function placeMonster(m) {
   m.slide = false;
   m.cast = null;                          // 放到一半的招（skills.js）
   m.castT = kindOf(m).every || 0;         // 離下一招還有幾秒
+  m.plan = null;                          // 挑招的記性（skills.js 的 planOf）：重生從開場招重來
   m.stun = 0;                             // 出招後的僵直還剩幾秒（skills.js）
   m.lunge = null;                         // 衝刺：{ t, n, dirX, dirZ }，見 LUNGE
   m.shields = kindOf(m).shields || 0;     // 還剩幾面盾（國王，見 parry）
@@ -618,6 +622,7 @@ function rallyStep(m, dt) {
   m.life++;
   m.hp = kindOf(m).hp;
   m.castT = kindOf(m).every || 0;
+  m.plan = null;                          // 第二條命從牠的 rageOpen 重來
 }
 
 /** 這隻怪物現在是不是破防中（窗口還開著）。 */

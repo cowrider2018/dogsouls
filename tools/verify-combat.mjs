@@ -159,6 +159,9 @@
                     瞪視（只有第二條命）：蓄力 0.75 秒一直轉向主角，瞪下去一次（不扣血），再瞪 0.5 秒才收招；
                     主角操作停 0.5 秒、被往國王吸過去半個狗高。
     41. 破防之後回神  每一類被破防攻擊推開、滑停（在空中的落地）之後，先甩頭僵直（衝刺衝完那一套）才回去動。
+    42. 挑招的手感  開場固定：騎士跳砍→劍迴旋、殭屍王兩條命都先吐球、國王劈砍→旋風斬→召喚，不管亂數；
+                    開場招夠不到就追著不放別招；重生從頭來。之後照冷落加權（越久沒放越容易挑中），
+                    同一招最多連兩次。
    ------------------------------------------------------------------ */
 
 import { PHYS } from '../public/test/src/walk.js';
@@ -166,11 +169,11 @@ import {
   MODES, DEFAULT_MODE, LUNGE, STILL, RALLY, spared, rallied, lunging, ARENA, SPAWN, DOG_H, REACH, SWING, REST, KNOCK, KNOCK_SCALE, FAN, WINDOW, KINDS, DAMAGE, hurt, placeMonster,
   BREAK_AT, BREAK_WINDOW, broken,
   FLY, BREAK_ATK, breaking, breakTarget, startBreak, breakContact, latch, contact, parry, spinStep, separate, armored, attacking,
-  makeMonster, monsterStep, touching, bites, knock, inSlash, inFan, inRing, slashTip, fanFrame,
+  makeMonster as freshMonster, monsterStep, touching, bites, knock, inSlash, inFan, inRing, slashTip, fanFrame,
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
   SOUL, dropSoul, soulStep, grabs, bankSouls, DAZE, daze, dazeStep, knockHero,
 } from '../public/test/src/combat.js';
-import { SKILL, RAGE, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill } from '../public/test/src/skills.js';
+import { SKILL, RAGE, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill, planOf, IDLE, REPEAT } from '../public/test/src/skills.js';
 import { steer } from '../public/test/src/walk.js';
 import { DUST, dustOf, dustFade, QUAKE, quakeBands, quakeFade, quakeTop, PLOW, plowPieces, plowClump } from '../public/test/src/dust.js';
 import { Motion, bloodOf, sizeOf, mirror, riseLift, MOVES as KNIGHT_MOVES } from '../public/test/src/monster.js';
@@ -211,6 +214,9 @@ const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 const DT = 1 / 60;
 
 const body = (x, z, y = 0, aim = [0, -1]) => ({ x, y, z, aimX: aim[0], aimZ: aim[1] });
+
+// 招式的測試多半用固定的亂數挑某一招：開場的固定招（KINDS 的 open）先拿掉，那一套另外驗（42）。
+const makeMonster = (...a) => { const m = freshMonster(...a); planOf(m).open = []; return m; };
 
 /* ── 1. 站位 ─────────────────────────────────────────────────── */
 console.log('1. 站位');
@@ -3479,6 +3485,63 @@ console.log('41. 破防之後回神');
   const r = run('minion'), z0 = r.m.z;
   for (let i = 0; i < 30; i++) monsterStep(r.m, DT, body(0, 6));
   ok(r.m.z > z0 + 0.5, '甩完才回去追人');
+}
+
+/* ── 42. 挑招的手感 ──────────────────────────────────────────── */
+console.log('42. 挑招的手感');
+{
+  // 挑一招：倒數到了、手上沒招、沒僵直，玩家在 d 公尺外，亂數一律給 r。
+  const next = (m, d, r) => {
+    m.cast = null; m.castT = 0; m.stun = 0;
+    bossStep(m, DT, body(0, m.z + d), makeWorld(), () => r);
+    return m.cast ? m.cast.skill : null;
+  };
+  const opens = (kind, d, r) => {
+    const m = freshMonster({ kind, x: 0, z: 0, yaw: 0 });
+    return KINDS[kind].open.map(() => next(m, d, r)).join();
+  };
+  ok(opens('knight', 2, 0) === 'cleave,whirl' && opens('knight', 2, 0.99) === 'cleave,whirl', `騎士開場：${opens('knight', 2, 0)}（亂數給什麼都一樣）`);
+  ok(opens('boss', 2, 0.99) === 'orb', `殭屍王開場：${opens('boss', 2, 0.99)}`);
+  ok(opens('king', 2, 0.99) === 'hew,gale,summon', `國王開場：${opens('king', 2, 0.99)}`);
+  // 第二條命：殭屍王再從吐球開始；國王沒有 rageOpen，直接隨機。
+  {
+    const b = freshMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 });
+    next(b, 2, 0.99);
+    b.life = 2; b.plan = null;                                     // combat.js 的 rallyStep 站起來那一刻
+    const k = freshMonster({ kind: 'king', x: 0, z: 0, yaw: 0 });
+    k.life = 2;
+    ok(next(b, 2, 0.99) === 'orb' && next(k, 2, 0.99) !== 'hew', '第二條命：殭屍王一樣先吐球，國王直接隨機');
+  }
+  // 開場招夠不到（騎士跳砍 8 公尺）：不放別招，追到夠得到才放。
+  {
+    const m = freshMonster({ kind: 'knight', x: 0, z: 0, yaw: 0 });
+    ok(next(m, 9, 0) === null && next(m, 2.5, 0) === 'cleave', '開場招夠不到：先不放，夠得到才放（不跳過）');
+    placeMonster(m);
+    ok(next(m, 2, 0) === 'cleave', '重生：從開場招重來');
+  }
+  // 冷落加權：沒輪到幾次，權重多幾倍。
+  ok(IDLE === 1 && pickSkill(['whirl', 'cleave'], 0.3) === 'whirl' && pickSkill(['whirl', 'cleave'], 0.3, { cleave: 2 }) === 'cleave',
+    '亂數 0.3：平常挑劍迴旋，跳砍兩次沒輪到（權重 3 倍）就挑跳砍');
+  // 同一招最多連兩次：亂數一律 0（總是挑第一招）也一樣。
+  {
+    const m = makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 }), seq = [];
+    for (let i = 0; i < 30; i++) seq.push(next(m, 2, 0));
+    const runs = seq.join().match(/(\w+)(,\1)*/g).map((r) => r.split(',').length);
+    ok(REPEAT === 2 && Math.max(...runs) === REPEAT, `亂數一律 0：${seq.slice(0, 8).join('、')}…，最長連 ${Math.max(...runs)} 次`);
+    // 只剩連放滿的那一招夠得到：先不放。
+    const far = makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 });
+    ok(next(far, 9, 0) === 'orb' && next(far, 9, 0) === 'orb' && next(far, 9, 0) === null, '遠處只夠得到吐球：連吐兩次之後先不放');
+  }
+  // 真的亂數：騎士兩招，連放同一招的比例比全隨機的一半少。
+  {
+    let s = 7;
+    const rng = () => ((s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 2 ** 32);
+    const m = makeMonster({ kind: 'knight', x: 0, z: 0, yaw: 0 });
+    let same = 0, last = null;
+    const N = 4000;
+    for (let i = 0; i < N; i++) { const k = next(m, 2, rng()); if (k === last) same++; last = k; }
+    ok(same / N < 0.4, `騎士連放同一招的比例 ${(same / N).toFixed(2)}（全隨機是 0.5）`);
+  }
 }
 
 console.log(fails ? `\n${fails} 項沒過` : '\n全部通過');

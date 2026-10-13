@@ -17,7 +17,7 @@
 import { buildRuins } from '../public/test/src/blocks.js';
 import { PHYS, MOUNT, solveXZ, supportInfo, arenaGap } from '../public/test/src/walk.js';
 import { makeMonster, monsterStep, knock, separate, KNOCK, KNOCK_SCALE, KINDS } from '../public/test/src/combat.js';
-import { bossStep, makeWorld } from '../public/test/src/skills.js';
+import { bossStep, makeWorld, planOf } from '../public/test/src/skills.js';
 import { roamMap } from '../public/test/src/roam.js';
 import { STAGES, foesOf } from '../public/test/src/route.js';
 
@@ -170,7 +170,8 @@ for (const [id, skill] of [['alley', 'cleave'], ['courtyard', 'leap']]) {
     for (let j = (i * 13) % 17; j < spots.length; j += 17) {
       const p = spots[j], d = Math.hypot(p.x - c.x, p.z - c.z);
       if (d < range[0] || d > range[1]) continue;
-      Object.assign(m, { x: c.x, y: c.y, z: c.z, cast: null, castT: 0, stun: 0, lunge: null, air: false, held: false, slide: false });
+      Object.assign(m, { x: c.x, y: c.y, z: c.z, cast: null, castT: 0, stun: 0, lunge: null, air: false, held: false, slide: false, plan: null });
+      planOf(m).open = [];                     // 每一點都是第一次挑：不照開場、不記連放（skills.js 的 planOf）
       bossStep(m, 1e-4, p, world, () => (skill === 'leap' ? 0.4 : 0));
       if (!m.cast || m.cast.skill !== skill) continue;
       const [x, y, z] = skill === 'cleave' ? [m.cast.lx, m.cast.ly, m.cast.lz] : [m.cast.tx, m.cast.ty, m.cast.tz];
