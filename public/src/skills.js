@@ -38,8 +38,9 @@
            瞄準主角那時腳下的地板，從嘴（腳上 1.5 個狗高）照拋物線 0.9 秒落到那一點（球底剛好貼地）。
            飛的時候落點上有一圈預告（fight.js），亮色照飛了幾成長滿。落地停一幀（站在落點上的照樣
            被打中）就炸掉；路上撞到場上的東西一樣炸掉。吐完第三顆才僵直。
-     leap  範圍半徑 1.5 倍，而且連跳兩下：第一下落地打下去的那一刻，就地鎖定玩家那時的位置、
-           再倒數一次跳過去（倒數、預告都跟第一下一樣），第二下落地才僵直。
+     leap  範圍與一下就僵直都跟第一條命一樣，只是不鎖定：起跳之前一直瞄著主角——落點跟著主角
+           腳下的地板走（主角跳起來也是落在牠底下那一塊地板上，不跟著往上），身體轉向主角；
+           起跳那一刻才定下來。
      cone  半徑 1.5 倍（長度變長，所以夠得到的距離 `range` 也是 1.5 倍），角度從 60° 張開到 105°。
 
    騎士的招：
@@ -225,10 +226,10 @@ export const gustRise = (t) => GUST.edge + (1 - GUST.edge) * Math.sqrt(Math.max(
 export const RING = { depth: GUST.top - GUST.inner, half: SKILL.gale.wave.half };
 
 /**
- * 殭屍王第二條命的招（見檔頭）。grow：跳砸與扇形的半徑（扇形連 range）放大幾倍；half：扇形的半角；hops：跳砸連跳幾下。
+ * 殭屍王第二條命的招（見檔頭）。grow：扇形的半徑（連 range）放大幾倍；half：扇形的半角。
  * orb：連吐 count 顆拋物線的球，倒數完之後每 every 秒一顆，每一顆從腳上 mouth 那麼高飛 flight 秒落到主角腳下。
  */
-export const RAGE = { grow: 1.5, half: (105 / 2) * (Math.PI / 180), hops: 2, orb: { count: 3, every: 0.5, flight: 0.9, mouth: 1.5 * DOG_H } };
+export const RAGE = { grow: 1.5, half: (105 / 2) * (Math.PI / 180), orb: { count: 3, every: 0.5, flight: 0.9, mouth: 1.5 * DOG_H } };
 
 /** 這隻在第二條命以後了嗎（有 `lives` 的那一類，combat.js 的 RALLY）：招照 RAGE。 */
 export const raging = (m) => (m.life || 1) > 1;
@@ -236,11 +237,8 @@ export const raging = (m) => (m.life || 1) > 1;
 /** 這隻現在挑得到哪幾招：第二條命以後、那一類有 `rage` 的話照它（國王多了瞪視），其餘照 `skills`。 */
 export const skillsOf = (m) => (raging(m) && kindOf(m).rage) || kindOf(m).skills || [];
 
-/** 第二條命放大的那幾招。 */
-const GROWN = new Set(['leap', 'cone']);
-
-/** 這隻放這一招的半徑：第二條命的跳砸與扇形是 RAGE.grow 倍。 */
-export const radiusOf = (m, skill) => SKILL[skill].radius * (raging(m) && GROWN.has(skill) ? RAGE.grow : 1);
+/** 這隻放這一招的半徑：第二條命的扇形是 RAGE.grow 倍。 */
+export const radiusOf = (m, skill) => SKILL[skill].radius * (raging(m) && skill === 'cone' ? RAGE.grow : 1);
 
 /** 這隻放扇形的半角：第二條命張開到 RAGE.half。 */
 export const halfOf = (m) => (raging(m) ? RAGE.half : SKILL.cone.half);
@@ -338,18 +336,29 @@ export function wavesStep(world, dt) {
 /* 不能開始放招的狀態（combat.js 的 busy）。倒數中不會被擊退（見 armored），
    所以放到一半會碰上的只有「被定住」——破防攻擊打斷得了。 */
 
-/** 開始一招：鎖定玩家現在的水平位置，面向它，停下來。 */
-function begin(m, skill, target, rng) {
+/**
+ * 瞄準玩家現在的水平位置：寫進這一招的方向與目標點，面向它。回傳離玩家多遠。
+ * 第二條命的跳砸起跳之前每一幀都瞄一次（`track`），其他招只在開始的那一刻瞄（鎖定）。
+ */
+function aimAt(m, c, target) {
   const dx = target.x - m.x, dz = target.z - m.z;
   const d = Math.hypot(dx, dz);
-  const [dirX, dirZ] = d > 1e-6 ? [dx / d, dz / d] : [m.aimX, m.aimZ];
+  if (d > 1e-6) { c.dirX = dx / d; c.dirZ = dz / d; }
   /* 目標點的地板：玩家可能在空中，跳砸落在牠腳下那一塊的頂上。 */
   const ty = supportInfo(m.field.cols, target.x, target.z, target.y).y;
-  m.cast = { skill, t: 0, dirX, dirZ, tx: target.x, tz: target.z, ty, x0: m.x, y0: m.y, z0: m.z };
   /* 跳砸落在那一點上：玩家站得到、怪物不准待的地方（比 MOUNT 高的台子）就落在旁邊最近准許的
      那一格（allowed）。其他招的 tx / tz 是「鎖定的那一點」（召喚的朝向、跳砍的方向），不動。 */
-  if (skill === 'leap') [m.cast.tx, m.cast.ty, m.cast.tz] = allowed(m, target.x, ty, target.z);
-  m.aimX = dirX; m.aimZ = dirZ;
+  [c.tx, c.ty, c.tz] = c.skill === 'leap' ? allowed(m, target.x, ty, target.z) : [target.x, ty, target.z];
+  m.aimX = c.dirX; m.aimZ = c.dirZ;
+  return d;
+}
+
+/** 開始一招：瞄準玩家現在的水平位置（aimAt），面向它，停下來。 */
+function begin(m, skill, target, rng) {
+  m.cast = { skill, t: 0, dirX: m.aimX, dirZ: m.aimZ, x0: m.x, y0: m.y, z0: m.z };
+  const d = aimAt(m, m.cast, target);
+  // 第二條命的跳砸不鎖定：起跳之前一直瞄著主角（CAST.leap），起跳那一刻 track 收掉。
+  if (skill === 'leap' && raging(m)) m.cast.track = true;
   m.vx = 0; m.vz = 0;
   if (skill === 'cleave' || REAP[skill]) aimCleave(m, d);
   if (skill === 'summon') {
@@ -435,12 +444,16 @@ const CAST = {
   },
 
   /* 倒數的前 0.9 秒站著，最後 `air` 秒沿直線飛向目標、高度是一條拋物線（頂點
-     g·air²/8，0.6 秒大約 1 公尺）。倒數到 0 那一幀落在目標點上，打那一圈。第二條命還沒跳滿
-     RAGE.hops 下的話，落地的那一刻就地對著玩家現在的位置再開始一下（`hop` 是第幾下），不收招。 */
+     g·air²/8，0.6 秒大約 1 公尺）。倒數到 0 那一幀落在目標點上，打那一圈。第二條命（`track`）
+     站著的那 0.9 秒每一幀重新瞄主角，起跳的那一刻定下來。 */
   leap(m, world, target) {
     const c = m.cast, S = SKILL.leap;
     const s = (c.t - (S.windup - S.air)) / S.air;
-    if (s < 0) return null;
+    if (s < 0) {
+      if (c.track) aimAt(m, c, target);
+      return null;
+    }
+    c.track = false;
     if (s < 1) {
       m.x = c.x0 + (c.tx - c.x0) * s;
       m.z = c.z0 + (c.tz - c.z0) * s;
@@ -451,8 +464,6 @@ const CAST = {
     m.x = c.tx; m.z = c.tz; m.y = c.ty;
     m.grounded = true;
     m.cast = null;
-    const hop = c.hop || 1;
-    if (raging(m) && hop < RAGE.hops) { begin(m, 'leap', target); m.cast.hop = hop + 1; }
     return { shape: 'circle', x: c.tx, y: c.ty, z: c.tz, r: radiusOf(m, 'leap'), dmg: S.damage };
   },
 
@@ -823,8 +834,7 @@ function waveHits(st, p) {
  *
  * 挑招只從夠得到的招裡挑（`range`，見檔頭，第二條命的扇形見 RAGE；召喚還要場上沒滿，READY），照記性挑（planOf）；一招都挑不到的話不重新計時，下一幀再看。
  *
- * calm：主角倒下了（windDown 收過一次），target 是牠倒下的地方。不挑新招，放到一半的照常播完，
- * 播完不接下一下（第二條命的跳砸）。
+ * calm：主角倒下了（windDown 收過一次），target 是牠倒下的地方。不挑新招，放到一半的照常播完。
  *
  * @param {() => number} rng 挑招用的亂數（離線驗證給固定的）
  * @returns {object|null} 這一幀打下來的範圍攻擊（給 strikeHits），沒有就是 null
@@ -853,7 +863,6 @@ export function bossStep(m, dt, target, world, rng = random, calm = false) {
   c.t += dt;
   const skill = c.skill;
   const hit = CAST[skill](m, world, target) || null;
-  if (calm && m.cast !== c) m.cast = null;
   if (!m.cast) m.stun = recoverOf(skill);              // 出完了：僵直
   // 地震：打下去的這一刻是震波的起點，之後由 wavesStep 一圈一圈往外推，不是一次打完。
   if (hit && QUAKE[hit.shape]) world.waves.push(Object.assign(hit, { t: 0, from: 0, to: 0, fresh: true, done: false }));

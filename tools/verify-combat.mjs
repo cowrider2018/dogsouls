@@ -150,8 +150,9 @@
                     落地；從那一刻到站好打不到（不扣血、不累積破防、破防攻擊瞄不到）、不追人、不放招；
                     落地 1 秒之後花 2 秒站起來，站好血補滿、第二條命。動作是 slump（空中也是）→ rally。
                     第二條扣到 0 才死；重生、回到站位都從第一條命開始。
-    38. 第二條命的跳砸與扇形  半徑都是 1.5 倍（扇形夠得到的距離跟著變長）、扇形張開到 105°，傷害不變；跳砸連跳兩下：
-                    第一下落地不僵直，就地鎖定主角那時的位置再跳，第二下落地才僵直。
+    38. 第二條命的跳砸與扇形  扇形半徑 1.5 倍（夠得到的距離跟著變長）、張開到 105°，傷害不變；跳砸的範圍、一下就僵直
+                    跟第一條命一樣，只是起跳之前一直瞄著主角：落點跟著主角腳下的地板走（主角跳起來也落在地板上），
+                    身體轉向主角、頭盯著主角；起跳那一刻定下來，之後主角再走開也砸在那裡。
     39. 第二條命的連吐  倒數完每 0.5 秒吐一顆、連吐三顆；每一顆瞄吐的那一刻主角腳下，照拋物線飛 0.9 秒
                     落地（球底貼地），停一幀才炸掉；站著不動三顆都中，吐出去之後走開就躲得掉；吐完第三顆才僵直。
     40. 國王的第二條命  一直召：每 1 秒升一隻、場上最多 6 隻，滿了才收；打得斷（第一條命照舊）。劈砍是下劈後上挑：劈下去那一刻才瞄第二刀，0.25 秒後
@@ -3240,9 +3241,9 @@ console.log('37. 兩條命');
 console.log('38. 第二條命的跳砸與扇形');
 {
   const second = (x, z) => { const m = makeMonster({ kind: 'boss', x, z, yaw: 0 }); m.life = 2; m.castT = 0; return m; };
-  ok(RAGE.grow === 1.5 && RAGE.hops === 2, '第二條命：跳砸與扇形的半徑 1.5 倍、跳砸連跳兩下');
-  ok(near(radiusOf(second(0, 0), 'leap'), 1.5 * SKILL.leap.radius) && near(radiusOf(second(0, 0), 'cone'), 1.5 * SKILL.cone.radius)
-    && near(radiusOf(makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 }), 'leap'), SKILL.leap.radius), '第一條命照原本的半徑');
+  ok(RAGE.grow === 1.5 && RAGE.hops === undefined, '第二條命：扇形的半徑 1.5 倍、跳砸只跳一下');
+  ok(near(radiusOf(second(0, 0), 'leap'), SKILL.leap.radius) && near(radiusOf(second(0, 0), 'cone'), 1.5 * SKILL.cone.radius)
+    && near(radiusOf(makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 }), 'cone'), SKILL.cone.radius), '跳砸的半徑跟第一條命一樣；第一條命的扇形照原本的半徑');
   // 扇形：夠得到的距離跟著長度變長。
   const picks = (d) => {
     const got = new Set();
@@ -3269,25 +3270,36 @@ console.log('38. 第二條命的跳砸與扇形');
       && strikeHits(sw, ang(52)) && strikeHits(sw, ang(-52)) && !strikeHits(sw, ang(58)),
       '扇形張開 105°（偏 52° 中、58° 不中）；第一條命還是 60°');
   }
-  // 跳砸：第一下落在鎖定的點、不僵直，就地對著主角那時的位置再跳一下，第二下落地才僵直。
+  // 跳砸：起跳之前一直瞄著主角（落點在主角腳下的地板上、身體與頭對著主角），起跳那一刻定下來，砸一下就僵直。
   {
-    const w = makeWorld(), b = second(0, -3), q = body(0, 3);
+    const S = SKILL.leap, w = makeWorld(), b = second(0, -3), q = body(0, 3), mo = new Motion();
     const hits = [];
-    let t = 0, stunAt = -1, stunBetween = false;
-    while (t < 4 && stunAt < 0) {
-      if (!hits.length && b.cast && b.cast.t > 1) q.x = 2;               // 第一下倒數到一半，主角往旁邊走
+    let t = 0, stunAt = -1, followed = true, grounded = true, looked = 0, launchAt = null;
+    while (t < 3 && stunAt < 0) {
+      const wind = b.cast && b.cast.t < S.windup - S.air;
+      if (b.cast && b.cast.t > 0.4) { q.x = 2; q.y = 1.2; }            // 倒數到一半，主角往旁邊跳開
+      if (b.cast && b.cast.t > S.windup - S.air + 0.1) { q.x = 4; q.y = 0; }   // 起跳之後再走開
       const st = bossStep(b, DT, q, w, () => 0.5);
       if (st) hits.push({ st, t });
-      if (hits.length === 1 && b.stun > 0) stunBetween = true;
+      if (wind && b.cast) {
+        if (!near(b.cast.tx, q.x) || !near(b.cast.tz, q.z)) followed = false;
+        if (!near(b.cast.ty, 0)) grounded = false;
+        const to = Math.atan2(q.x - b.x, q.z - b.z), face = Math.atan2(b.aimX, b.aimZ);
+        if (Math.abs(to - face) > 1e-9) followed = false;
+      }
+      if (b.cast && !wind && launchAt === null) launchAt = { x: b.cast.tx, z: b.cast.tz };
+      mo.step(DT, b, q);
+      if (b.cast?.track) looked = mo._look;                         // 還在瞄的最後一幀
       monsterStep(b, DT, q);
-      if (hits.length === 2 && b.stun > 0) stunAt = t;
+      if (b.stun > 0 && stunAt < 0) stunAt = t;
       t += DT;
     }
-    ok(hits.length === 2 && near(hits[0].st.x, 0) && near(hits[0].st.z, 3) && near(hits[1].st.x, 2) && near(hits[1].st.z, 3),
-      '第一下砸在一開始鎖定的點（主角已經走開了）、第二下砸在第一下落地那一刻主角在的地方');
-    ok(hits.every((h) => near(h.st.r, 1.5 * SKILL.leap.radius) && h.st.dmg === SKILL.leap.damage), '兩下都是 1.5 倍半徑、傷害不變');
-    ok(!stunBetween && Math.abs(hits[1].t - hits[0].t - SKILL.leap.windup) < 2 * DT && stunAt >= 0 && b.hop === undefined,
-      `兩下之間不僵直（隔 ${(hits[1].t - hits[0].t).toFixed(2)} 秒，跟一下的倒數一樣長），第二下落地才僵直`);
+    ok(followed && grounded, '起跳之前：落點與身體的朝向每一幀都跟著主角，主角跳起來落點還是在地板上');
+    ok(looked > 0.9, `起跳之前頭盯著主角（盯的力道 ${looked.toFixed(2)}）`);
+    ok(hits.length === 1 && near(hits[0].st.x, 2) && near(hits[0].st.z, 3) && near(hits[0].st.y, 0),
+      '起跳那一刻定下來：砸在起跳時主角腳下的地板上（主角之後走開了）');
+    ok(near(hits[0].st.r, SKILL.leap.radius) && hits[0].st.dmg === S.damage && stunAt >= 0 && near(stunAt, hits[0].t, 1.5 * DT),
+      '只砸一下、範圍跟第一條命一樣、傷害不變，落地就僵直');
   }
 }
 
