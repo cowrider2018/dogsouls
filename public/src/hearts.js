@@ -67,8 +67,18 @@ function heartTexture(full) {
   g.lineWidth = 2.2;
   g.strokeStyle = INK_CSS;
   g.stroke();
-  const tex = new THREE.CanvasTexture(c);
+  /* 畫好當場把像素讀出來，貼圖吃的是這一份，不是畫布。CanvasTexture 要等第一次真的畫到
+     才從畫布上傳，而轉檔的時候那是快轉了好幾分鐘之後、在藏起來的 iframe 裡、上一層剛把 GL
+     還掉的時候：手機上畫布在 GPU 那一份可能已經被收走，傳上去的是空的或破的，影片裡的心就
+     不見或破圖。讀出來的列是由上往下，貼圖的 v 是由下往上，所以倒過來放。 */
+  const src = g.getImageData(0, 0, 128, 128).data, rows = new Uint8Array(src.length), row = 128 * 4;
+  for (let y = 0; y < 128; y++) rows.set(src.subarray(y * row, (y + 1) * row), (127 - y) * row);
+  const tex = new THREE.DataTexture(rows, 128, 128);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
   return tex;
 }
 
