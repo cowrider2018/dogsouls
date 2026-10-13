@@ -472,6 +472,7 @@ export class Build {
     this.portals = [];       // 感測區：走進去就被送到別的地方（見 `portal()`）
     this.arrivals = [];      // 到達點：感測區送人去的地方（見 `arrive()`）
     this.pieces = [];        // 不進合併緩衝區的幾何（門的兩種狀態，見 `detach()`）
+    this.dirt = [];          // 一片一片的土：跟地面同一顆材質，stage.js 鋪（見 `dirtDisc()`）
     /* 會壓在地上的那幾塊，在頂點緩衝區裡的範圍（兩個數一組：起點、終點，
        單位是 pos 的索引）。ao.js 拿它找出「石頭跟地面接觸的那一圈」——
        記範圍而不是記座標，因為區塊砌完才整段平移（blocks.js 的 shift），
@@ -801,6 +802,17 @@ export class Build {
   }
 
   /**
+   * 一片土：中心 (x, z)、半徑 r 的水平圓，面在 y。只登記，不進合併的那一份：
+   * 它要跟地面是同一顆材質（stage.js 的地面——同一個顏色、同一片斑點），
+   * 而合併那一份的材料編號只放得下 0～7，地面那一種（SURF.dirt）放不進去。
+   * 斑點照世界座標鋪，所以井底的土跟井外的地面是同一張圖接下去的。
+   */
+  dirtDisc(x, z, r, y) {
+    this.dirt.push({ x, z, r, y });
+    return this;
+  }
+
+  /**
    * 空氣牆：擋身體、不擋鏡頭、不畫任何東西。
    *
    * 給「站在高處、外面是空的」的場地用（城牆步道）：黑牆是場地的外框，
@@ -911,6 +923,7 @@ export class Build {
       portals: this.portals,
       arrivals: this.arrivals,
       pieces,
+      dirt: this.dirt,
       feet: this.feet,
       tris: this.pos.length / 9,
       inkLines: this.ink.length / 6,

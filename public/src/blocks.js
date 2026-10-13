@@ -1481,7 +1481,7 @@ export function buildRuins(opts = {}) {
   const doors = Object.fromEntries(DOORS.map((d) => [d.id, d.open]));
   _colCursor = _inkCursor = _flameCursor = 0;   // 同一個行程裡砌第二遍也要對
   _partCursor = _wallCursor = _floorCursor = _portalCursor = 0;
-  _arriveCursor = _pieceCursor = 0;
+  _arriveCursor = _pieceCursor = _dirtCursor = 0;
 
   for (const b of BLOCKS) {
     const [ox, oz] = b.origin;
@@ -1543,7 +1543,7 @@ export function buildRuins(opts = {}) {
    記著——比重算一次整個區塊便宜，也不必讓每個零件都去接一個 offset。 */
 let _colCursor = 0, _inkCursor = 0, _flameCursor = 0;
 let _partCursor = 0, _wallCursor = 0, _floorCursor = 0, _portalCursor = 0;
-let _arriveCursor = 0, _pieceCursor = 0;
+let _arriveCursor = 0, _pieceCursor = 0, _dirtCursor = 0;
 
 /** 砌在區塊 `block` 裡的東西屬於門 `door`（沒有就不查）：那扇門要在名冊上，而且連著這個區塊。 */
 function mine(door, block) {
@@ -1618,4 +1618,6 @@ function shift(B, fromPos, ox, oz, flames, id) {
     q.block = id;
   }
   _pieceCursor = B.pieces.length;
+  for (let i = _dirtCursor; i < B.dirt.length; i++) { B.dirt[i].x += ox; B.dirt[i].z += oz; }
+  _dirtCursor = B.dirt.length;
 }

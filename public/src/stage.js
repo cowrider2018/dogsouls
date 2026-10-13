@@ -140,6 +140,13 @@ export function buildStage(scene, renderer) {
   const ruins = buildRuins();
   const stoneMat = toonVC({ surf: SURF_ON }), inkMat = inkLine();
   scene.add(new THREE.Mesh(ruins.geometry, stoneMat), new THREE.LineSegments(ruins.ink, inkMat));
+  /* 地圖裡一片一片的土（枯井的井底）：跟地面同一顆材質，所以顏色與斑點都是地面那一張。 */
+  for (const d of ruins.dirt) {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(d.r, 24), ground.material);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(d.x, d.y, d.z);
+    scene.add(m);
+  }
   const COLS = ruins.colliders;
 
   /* ── 門 ──────────────────────────────────────────────────────────
