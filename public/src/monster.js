@@ -30,8 +30,8 @@
    衝刺（combat.js 的 LUNGE）照 m.lunge.t 切成三段，各有一套動作，用主角
    那一個播放器播（moves.js 的 Mover，招與招之間一樣是淡進淡出）：
 
-     windup   翹屁股縮頭：前低後高、整隻往後退一截，頭扳回來平視前面——頭比站著的時候
-              縮到更後面、更低，前腳彎著撐住，尾巴翹高——壓住的彈簧，眼睛盯著前面。
+     windup   後傾低頭：身體往後坐、前半身仰起來，頭反過來壓低，後腿收到
+              肚子底下、膝蓋彎著，尾巴垂下去——壓住的彈簧，眼睛盯著前面。
      dash     主角的跳躍動作組：不疊動作，而是跟 Critter 說「在空中」，垂直
               速度從往上換成往下，所以是跳起來前腿前伸、過頂點換成找地板、
               落地那一沉（critter.js 的 airPose）。身體畫得跳起一點點（DASH_HOP）
@@ -56,7 +56,8 @@
      cone  前肢抬起：整個前半身立起來、兩隻前腳離地收在胸前，頭反過來壓低
            盯著鎖定的方向；倒數最後那一下整隻砸下去，打下去的那一刻前腳踩到地；
            僵直裡再往下一沉，然後慢慢起身。
-     leap  俯身看落點蓄力：壓低身子、膝蓋彎到底、頭抬起來盯著鎖定的落點，越蓄越低；
+     leap  翹屁股縮頭蓄力：前低後高、整隻往後退一截，頭扳回來平視鎖定的落點——頭比站著的
+           時候縮到更後面、更低，前腳彎著撐住，尾巴翹高，越蓄越翹、越縮；
            最後那一段飛過去的時候跟衝刺一樣是主角的跳躍動作組（在空中、垂直
            速度照那一條拋物線）；落地俯身緩衝，停一下，然後在僵直裡慢慢站起來。
 
@@ -276,14 +277,11 @@ function paint(c, coat, eyes = RED) {
 
 /* ── 衝刺的動作 ── */
 
-/** 蓄力：翹屁股縮頭。pitch 正的是前低後高（屁股翹起來），整隻往後退（back），headPitch 再把頭扳回來
-    平視前面——頭比站著的時候縮到更後面、更低；前腳彎著撐住，尾巴翹高。 */
-const POUNCE = {
-  pitch: 0.75, headPitch: -1.20, drop: 0.30, back: 1.20, tailPitch: 1.10,
-  front: -0.60, hind: 0.40, knee: -0.70, legs: 1, w: 1,
+/** 蓄力：後傾低頭。pitch 是整個上半身（連頭），headPitch 再把頭壓回去、壓過頭。 */
+const CROUCH = {
+  pitch: -0.30, headPitch: 0.78, drop: 0.08, tailPitch: -0.40,
+  front: -0.35, hind: -0.50, knee: -0.60, legs: 0.8, w: 1,
 };
-/** 蓄滿（衝出去的前一刻）：再翹、再縮一點。 */
-const POUNCE_MAX = { ...POUNCE, pitch: 0.85, headPitch: -1.32, back: 1.40, drop: 0.36 };
 
 /** 僵直的前 BOW_TIME 秒：低頭垂到底（之後停在這裡 STILL.before 秒才甩）。 */
 const BOW = { pitch: 0.15, headPitch: 0.55, tailPitch: -0.25, w: 1 };
@@ -354,11 +352,14 @@ const STOMP = {
   front: -0.40, hind: 0.20, knee: -0.30, legs: 0.8, w: 1,
 };
 
-/* ── 跳砸 ── 蓄力是 COIL，落地緩衝是 LAND。 */
-const COIL = {
-  pitch: 0.70, headPitch: -1.05, drop: 0.90, back: 0.50, tailPitch: 0.80,
-  front: -1.10, hind: -0.80, knee: -1.40, legs: 1, w: 1,
+/* ── 跳砸 ── 蓄力是 POUNCE（蓄滿是 POUNCE_MAX），落地緩衝是 LAND。
+   蓄力是翹屁股縮頭：pitch 正的是前低後高（屁股翹起來），整隻往後退（back），headPitch 再把頭扳回來
+   平視前面——頭比站著的時候縮到更後面、更低；前腳彎著撐住，尾巴翹高。蓄滿（飛出去的前一刻）再翹、再縮一點。 */
+const POUNCE = {
+  pitch: 0.75, headPitch: -1.20, drop: 0.30, back: 1.20, tailPitch: 1.10,
+  front: -0.60, hind: 0.40, knee: -0.70, legs: 1, w: 1,
 };
+const POUNCE_MAX = { ...POUNCE, pitch: 0.85, headPitch: -1.32, back: 1.40, drop: 0.36 };
 const LAND = {
   pitch: 0.40, headPitch: 0.10, drop: 0.25, tailPitch: 0.40,
   front: -0.30, hind: -0.50, knee: -0.80, legs: 0.9, w: 1,
@@ -452,7 +453,7 @@ const LOOK = { stages: { glareWind: 1 }, tau: 0.12, max: 1.0 };
  * 沒有 …Rec：落地是 cleaveLand、上挑是 cleaveUp，僵直接著播 cleaveUp 的收尾。
  */
 export const MOVES = {
-  windup: { blend: 0.05, keys: [[0, {}], [0.16, POUNCE, 'out'], [LUNGE.windup, POUNCE_MAX, 'inOut']] },
+  windup: { blend: 0.05, keys: [[0, {}], [0.16, CROUCH, 'out'], [LUNGE.windup, { ...CROUCH, headPitch: 0.86, drop: 0.10 }, 'inOut']] },
   dash: { blend: 0.05, keys: [[0, {}]] },
   recover: { blend: 0.04, keys: shakeKeys(LUNGE.recover, BOW, [[0, {}], [BOW_TIME, BOW, 'out']]) },
   slump: { blend: 0.04, keys: [[0, {}], [0.12, SLUMP, 'out']] },
@@ -475,7 +476,7 @@ export const MOVES = {
     ],
   },
   coneRec: { blend: 0.02, keys: [[0, STOMP], [0.08, { ...STOMP, pitch: 0.36, drop: 0.16 }, 'out'], [SKILL.recover, {}, 'inOut']] },
-  leapWind: { blend: 0.1, keys: [[0, {}], [0.35, COIL, 'out'], [LEAP_WIND, { ...COIL, drop: 1.05, knee: -1.55 }, 'inOut']] },
+  leapWind: { blend: 0.1, keys: [[0, {}], [0.35, POUNCE, 'out'], [LEAP_WIND, POUNCE_MAX, 'inOut']] },
   leapAir: { blend: 0.06, keys: [[0, {}]] },
   leapRec: { blend: 0.03, keys: [[0, {}], [0.08, LAND, 'out'], [0.18, LAND, 'lin'], [SKILL.recover, {}, 'inOut']] },
   whirlWind: wring(retime(HERO.leap, SKILL.whirl.windup)),
