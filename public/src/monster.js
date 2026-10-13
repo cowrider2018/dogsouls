@@ -395,10 +395,10 @@ const SPIN_END = (() => {
 
 /* ── 瞪視 ── 蓄力壓低到 GLARE（身體往前探，頭扳回來抬平，臉對著前面），瞪下去的那一刻頭往前一頂（GLARE_HIT）。 */
 const GLARE = {
-  pitch: 0.35, headPitch: -0.33, drop: 0.55, tailPitch: -0.80,
-  front: -0.50, hind: -0.40, knee: -0.90, legs: 1, w: 1,
+  pitch: 0.10, headPitch: -0.04, drop: 0.06, tailPitch: -0.35,
+  front: -0.12, hind: -0.18, knee: -0.30, legs: 0.6, w: 1,
 };
-const GLARE_HIT = { ...GLARE, pitch: 0.48, headPitch: -0.44, drop: 0.45 };
+const GLARE_HIT = { ...GLARE, pitch: 0.18, headPitch: -0.12, drop: 0.03 };
 
 /** 跳砸站著蓄力的那一段有多長（之後 SKILL.leap.air 秒在飛）。 */
 const LEAP_WIND = SKILL.leap.windup - SKILL.leap.air;
@@ -534,7 +534,7 @@ export const MOVES = {
   glareWind: {
     blend: 0.08,
     keys: [
-      [0, {}], [0.3, GLARE, 'out'], [SKILL.glare.windup, { ...GLARE, drop: 0.70, knee: -1.10 }, 'inOut'],
+      [0, {}], [0.3, GLARE, 'out'], [SKILL.glare.windup, { ...GLARE, drop: 0.09, knee: -0.4 }, 'inOut'],
       [SKILL.glare.windup + 0.06, GLARE_HIT, 'out'], [SKILL.glare.windup + SKILL.glare.hold, GLARE_HIT, 'lin'],
     ],
   },
