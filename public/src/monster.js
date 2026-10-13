@@ -30,8 +30,8 @@
    衝刺（combat.js 的 LUNGE）照 m.lunge.t 切成三段，各有一套動作，用主角
    那一個播放器播（moves.js 的 Mover，招與招之間一樣是淡進淡出）：
 
-     windup   後傾低頭：身體往後坐、前半身仰起來，頭反過來壓低，後腿收到
-              肚子底下、膝蓋彎著，尾巴垂下去——壓住的彈簧，眼睛盯著前面。
+     windup   翹屁股縮頭：前低後高、整隻往後退一截，頭扳回來平視前面——頭比站著的時候
+              縮到更後面、更低，前腳彎著撐住，尾巴翹高——壓住的彈簧，眼睛盯著前面。
      dash     主角的跳躍動作組：不疊動作，而是跟 Critter 說「在空中」，垂直
               速度從往上換成往下，所以是跳起來前腿前伸、過頂點換成找地板、
               落地那一沉（critter.js 的 airPose）。身體畫得跳起一點點（DASH_HOP）
@@ -45,6 +45,9 @@
    ── 殭屍王放招的動作 ──────────────────────────────────────────────
    放招（skills.js 的 m.cast）照 cast.t 播倒數那一套，出招之後的僵直（m.stun）
    播那一招的收尾——僵直本身不記是哪一招，Motion 記著上一次在放哪一招。
+
+   地上的技能預告只在開發的 `?tell` 才有（fight.js），平常玩家讀招只能看倒數的動作。所以每一套
+   蓄力都做得很大：遠遠看、從正面看都要一眼分得出是哪一招——寧可誇張，不要含蓄。
 
      orb   仰頭伸展蓄力：胸口挺起、頭往後仰到朝天、尾巴翹起來，越蓄越仰；
            倒數最後那一下頭往前甩，球出去的那一刻正甩到一半——吐出去的；
@@ -273,11 +276,14 @@ function paint(c, coat, eyes = RED) {
 
 /* ── 衝刺的動作 ── */
 
-/** 蓄力：後傾低頭。pitch 是整個上半身（連頭），headPitch 再把頭壓回去、壓過頭。 */
-const CROUCH = {
-  pitch: -0.30, headPitch: 0.78, drop: 0.08, tailPitch: -0.40,
-  front: -0.35, hind: -0.50, knee: -0.60, legs: 0.8, w: 1,
+/** 蓄力：翹屁股縮頭。pitch 正的是前低後高（屁股翹起來），整隻往後退（back），headPitch 再把頭扳回來
+    平視前面——頭比站著的時候縮到更後面、更低；前腳彎著撐住，尾巴翹高。 */
+const POUNCE = {
+  pitch: 0.75, headPitch: -1.20, drop: 0.30, back: 1.20, tailPitch: 1.10,
+  front: -0.60, hind: 0.40, knee: -0.70, legs: 1, w: 1,
 };
+/** 蓄滿（衝出去的前一刻）：再翹、再縮一點。 */
+const POUNCE_MAX = { ...POUNCE, pitch: 0.85, headPitch: -1.32, back: 1.40, drop: 0.36 };
 
 /** 僵直的前 BOW_TIME 秒：低頭垂到底（之後停在這裡 STILL.before 秒才甩）。 */
 const BOW = { pitch: 0.15, headPitch: 0.55, tailPitch: -0.25, w: 1 };
@@ -333,15 +339,15 @@ const LIFT = { pitch: -0.15, headPitch: -0.35, tailPitch: 0.2, w: 1 };
 const LIFT_TIME = 0.7;
 
 /* ── 火球 ── 蓄到最後是 STRETCH_MAX；吐出去的那一刻在 SPIT_MID，甩到底是 SPIT。 */
-const STRETCH = { pitch: -0.35, headPitch: -0.50, drop: -0.06, tailPitch: 0.50, front: -0.20, hind: 0.20, legs: 0.6, w: 1 };
-const STRETCH_MAX = { ...STRETCH, pitch: -0.40, headPitch: -0.62, drop: -0.08, tailPitch: 0.60 };
+const STRETCH = { pitch: -0.50, headPitch: -0.70, back: 0.50, tailPitch: 0.90, front: -0.40, hind: 0.20, legs: 0.8, w: 1 };
+const STRETCH_MAX = { ...STRETCH, pitch: -0.62, headPitch: -0.86, back: 0.70, tailPitch: 1.10 };
 const SPIT = { pitch: 0.20, headPitch: 0.45, drop: 0.04, tailPitch: -0.20, w: 1 };
 const SPIT_MID = { pitch: -0.10, headPitch: -0.08, drop: -0.02, tailPitch: 0.20, front: -0.10, hind: 0.10, legs: 0.3, w: 1 };
 
 /* ── 扇形地震 ── 立起來是 REAR，砸下去是 STOMP。 */
 const REAR = {
-  pitch: -0.80, headPitch: 0.95, drop: -0.12, tailPitch: 0.40,
-  front: -1.10, knee: 0.70, hind: -0.20, legs: 1, w: 1,
+  pitch: -1.10, headPitch: 1.25, back: 0.60, tailPitch: 0.70,
+  front: -1.40, knee: 0.90, hind: -0.20, legs: 1, w: 1,
 };
 const STOMP = {
   pitch: 0.30, headPitch: 0.10, drop: 0.12, tailPitch: 0.20,
@@ -350,8 +356,8 @@ const STOMP = {
 
 /* ── 跳砸 ── 蓄力是 COIL，落地緩衝是 LAND。 */
 const COIL = {
-  pitch: 0.50, headPitch: -0.70, drop: 0.34, tailPitch: 0.45,
-  front: -0.90, hind: -0.60, knee: -1.00, legs: 1, w: 1,
+  pitch: 0.70, headPitch: -1.05, drop: 0.90, back: 0.50, tailPitch: 0.80,
+  front: -1.10, hind: -0.80, knee: -1.40, legs: 1, w: 1,
 };
 const LAND = {
   pitch: 0.40, headPitch: 0.10, drop: 0.25, tailPitch: 0.40,
@@ -360,8 +366,8 @@ const LAND = {
 /* ── 跳砍 ── 舉劍是 RAISE，跳到最高是 HIGH，劈到一半是 CHOP_MID，劈到底是 CHOP。
    headTilt −1.1 讓劍立起來；立起來之後 headPitch 負的是往後舉、正的是往前劈。 */
 const RAISE = {
-  headTilt: -1.10, lean: -0.22, headPitch: -0.75, pitch: 0.30, drop: 0.30, tailPitch: 0.45,
-  front: -0.70, hind: -0.55, knee: -0.90, legs: 1, w: 1,
+  headTilt: -1.10, lean: -0.32, headPitch: -1.05, pitch: 0.30, drop: 0.70, back: 0.50, tailPitch: 0.80,
+  front: -0.90, hind: -0.70, knee: -1.20, legs: 1, w: 1,
 };
 const HIGH = {
   headTilt: -1.10, lean: -0.22, headPitch: -0.50, pitch: -0.35, tailPitch: 0.30,
@@ -374,7 +380,7 @@ const CHOP = {
 };
 
 /** 跳砍倒數到最後、蓄滿的那一格：劍舉到最後面、蹲到最低。國王的直線劈砍也從這裡劈下去。 */
-const WOUND = { ...RAISE, headPitch: -0.85, drop: 0.34, knee: -0.98 };
+const WOUND = { ...RAISE, headPitch: -1.25, drop: 0.85, back: 0.65, knee: -1.35 };
 
 /** 跳砍落地前頭往前甩的那一下多長（秒）：落地那一刻劍正劈到一半。劍光（fight.js）從這一下開始掃。 */
 export const CHOP_LEAD = 0.08;
@@ -388,10 +394,10 @@ const SPIN_END = (() => {
 
 /* ── 瞪視 ── 蓄力壓低到 GLARE（身體往前探，頭扳回來抬平，臉對著前面），瞪下去的那一刻頭往前一頂（GLARE_HIT）。 */
 const GLARE = {
-  pitch: 0.10, headPitch: -0.04, drop: 0.06, tailPitch: -0.35,
-  front: -0.12, hind: -0.18, knee: -0.30, legs: 0.6, w: 1,
+  pitch: 0.35, headPitch: -0.33, drop: 0.55, tailPitch: -0.80,
+  front: -0.50, hind: -0.40, knee: -0.90, legs: 1, w: 1,
 };
-const GLARE_HIT = { ...GLARE, pitch: 0.18, headPitch: -0.12, drop: 0.03 };
+const GLARE_HIT = { ...GLARE, pitch: 0.48, headPitch: -0.44, drop: 0.45 };
 
 /** 跳砸站著蓄力的那一段有多長（之後 SKILL.leap.air 秒在飛）。 */
 const LEAP_WIND = SKILL.leap.windup - SKILL.leap.air;
@@ -415,6 +421,19 @@ const twice = (mv) => ({
   keys: mv.keys.map(([t, pose, ease]) => [t, pose.yaw > Math.PI ? { ...pose, yaw: pose.yaw + 2 * Math.PI } : pose, ease]),
 });
 
+/**
+ * 迴旋的蓄力（騎士劍迴旋、國王旋風斬）：主角二段跳那一下縮成一團往右擰，只是站在地上、擰得更深——
+ * 轉得多 WRING.yaw 倍、上半身扭得多 WRING.twist 倍，蹲低（drop、knee），讓人一眼看得出要轉。
+ */
+const WRING = { yaw: 1.5, twist: 1.5, tailYaw: 1.4, drop: 0.60, knee: -1.10 };
+const wring = (mv) => ({
+  blend: mv.blend,
+  keys: mv.keys.map(([t, pose, ease]) => [t, pose.yaw === undefined ? pose : {
+    ...pose, yaw: pose.yaw * WRING.yaw, twist: pose.twist * WRING.twist, tailYaw: pose.tailYaw * WRING.tailYaw,
+    drop: WRING.drop, knee: WRING.knee,
+  }, ease]),
+});
+
 /** 主角的一招照 T 秒重新排時間（關鍵影格等比例壓縮或拉長）。 */
 const retime = (mv, T) => {
   const k = T / mv.keys[mv.keys.length - 1][0];
@@ -433,7 +452,7 @@ const LOOK = { stages: { glareWind: 1 }, tau: 0.12, max: 1.0 };
  * 沒有 …Rec：落地是 cleaveLand、上挑是 cleaveUp，僵直接著播 cleaveUp 的收尾。
  */
 export const MOVES = {
-  windup: { blend: 0.05, keys: [[0, {}], [0.16, CROUCH, 'out'], [LUNGE.windup, { ...CROUCH, headPitch: 0.86, drop: 0.10 }, 'inOut']] },
+  windup: { blend: 0.05, keys: [[0, {}], [0.16, POUNCE, 'out'], [LUNGE.windup, POUNCE_MAX, 'inOut']] },
   dash: { blend: 0.05, keys: [[0, {}]] },
   recover: { blend: 0.04, keys: shakeKeys(LUNGE.recover, BOW, [[0, {}], [BOW_TIME, BOW, 'out']]) },
   slump: { blend: 0.04, keys: [[0, {}], [0.12, SLUMP, 'out']] },
@@ -451,15 +470,15 @@ export const MOVES = {
     blend: 0.1,
     keys: [
       [0, {}], [0.6, REAR, 'out'],
-      [SKILL.cone.windup - 0.14, { ...REAR, pitch: -0.88, headPitch: 1.02, drop: -0.14 }, 'inOut'],
+      [SKILL.cone.windup - 0.14, { ...REAR, pitch: -1.22, headPitch: 1.36, back: 0.75 }, 'inOut'],
       [SKILL.cone.windup, STOMP, 'in'],
     ],
   },
   coneRec: { blend: 0.02, keys: [[0, STOMP], [0.08, { ...STOMP, pitch: 0.36, drop: 0.16 }, 'out'], [SKILL.recover, {}, 'inOut']] },
-  leapWind: { blend: 0.1, keys: [[0, {}], [0.35, COIL, 'out'], [LEAP_WIND, { ...COIL, drop: 0.38, knee: -1.05 }, 'inOut']] },
+  leapWind: { blend: 0.1, keys: [[0, {}], [0.35, COIL, 'out'], [LEAP_WIND, { ...COIL, drop: 1.05, knee: -1.55 }, 'inOut']] },
   leapAir: { blend: 0.06, keys: [[0, {}]] },
   leapRec: { blend: 0.03, keys: [[0, {}], [0.08, LAND, 'out'], [0.18, LAND, 'lin'], [SKILL.recover, {}, 'inOut']] },
-  whirlWind: retime(HERO.leap, SKILL.whirl.windup),
+  whirlWind: wring(retime(HERO.leap, SKILL.whirl.windup)),
   whirlDash: twice(HERO.slam),
   cleaveWind: {
     blend: 0.08,
@@ -507,14 +526,14 @@ export const MOVES = {
   summonRec: { blend: 0.02, keys: [[0, STRETCH_MAX], [0.12, STRETCH_MAX, 'lin'], [recoverOf('summon'), {}, 'inOut']] },
   /* 國王的旋風斬：蓄力是騎士劍迴旋的那一套（主角二段跳那一下，照 1 秒拉長），轉是主角落地那一下
      （一圈），僵直是甩頭——停在轉完的那一格不動，再一邊甩一邊回來。 */
-  galeWind: retime(HERO.leap, SKILL.gale.windup),
+  galeWind: wring(retime(HERO.leap, SKILL.gale.windup)),
   galeSpin: HERO.slam,
   galeRec: { blend: 0.02, keys: shakeKeys(recoverOf('gale'), SPIN_END, [[0, SPIN_END]]) },
   /* 國王的瞪視：倒數壓低身子瞪著，瞪下去那一刻頭往前一頂，停在那裡瞪到收招（hold），僵直裡回來。 */
   glareWind: {
     blend: 0.08,
     keys: [
-      [0, {}], [0.3, GLARE, 'out'], [SKILL.glare.windup, { ...GLARE, drop: 0.09, knee: -0.4 }, 'inOut'],
+      [0, {}], [0.3, GLARE, 'out'], [SKILL.glare.windup, { ...GLARE, drop: 0.70, knee: -1.10 }, 'inOut'],
       [SKILL.glare.windup + 0.06, GLARE_HIT, 'out'], [SKILL.glare.windup + SKILL.glare.hold, GLARE_HIT, 'lin'],
     ],
   },

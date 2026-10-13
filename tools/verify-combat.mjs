@@ -1264,7 +1264,8 @@ console.log('17. 幽靈');
     w.m.lunge = { t: 0 };
     let last;
     for (let t = 0; t < LUNGE.windup - DT / 2; t += DT) { last = w.mo.step(DT, w.m, null).move; w.m.lunge.t += DT; }
-    ok(Math.abs(last.legs - 0.8) < 0.01, `衝刺蓄力到最後：腿是蓄力那一套的 ${last.legs.toFixed(3)}，漂已經收掉`);
+    const wound = KNIGHT_MOVES.windup.keys.at(-1)[1].legs;
+    ok(Math.abs(last.legs - wound) < 0.01, `衝刺蓄力到最後：腿是蓄力那一套的 ${last.legs.toFixed(3)}（${wound}），漂已經收掉`);
   }
 }
 
@@ -2926,8 +2927,12 @@ console.log('33. 旋風斬');
   ok([...a.stages].join() === 'galeWind,galeSpin,galeRec', `動作：${[...a.stages].join(' → ')}`);
   {
     const KM = KNIGHT_MOVES, gw = KM.galeWind.keys, gr = KM.galeRec.keys, end = HERO_MOVES.slam.keys[1];
-    ok(near(gw[gw.length - 1][0], S.windup) && gw.every(([, p], i) => p === HERO_MOVES.leap.keys[i][1]) && KM.galeSpin === HERO_MOVES.slam,
-      '蓄力是主角二段跳那一下拉長到 1 秒，轉是主角落地那一下（一圈）');
+    const deeper = gw.every(([, p], i) => {
+      const h = HERO_MOVES.leap.keys[i][1];
+      return h.yaw === undefined ? p === h : p.yaw < h.yaw && p.twist < h.twist && p.drop > 0 && p.headPitch === h.headPitch;
+    });
+    ok(near(gw[gw.length - 1][0], S.windup) && deeper && KM.galeSpin === HERO_MOVES.slam,
+      '蓄力是主角二段跳那一下拉長到 1 秒、擰得更深、蹲在地上，轉是主角落地那一下（一圈）');
     const yaw = (p) => p.yaw || 0;
     ok(near(end[0], S.spin) && near(yaw(gr[0][1]), end[1].yaw - 2 * Math.PI) && gr[0][1].pitch === end[1].pitch,
       '僵直從轉完的那一格接下去（轉過的一整圈拿掉，不會倒轉回去）');

@@ -1769,6 +1769,7 @@ function airPose(rig, w, rise, dip) {
      headYaw／headPitch／headTilt   頭再多轉多少（正值：往左、低頭、左耳朝上）
      tailYaw／tailPitch            尾巴的擺與抬（正值：往右、往上）
      drop       身體往下沉多少（模型單位）
+     back       整隻往後退多少（模型單位，沿著牠自己的前後）：蓄力時往後縮
      front／hind／knee／legs       腿不是加的：四條腿換成 front／hind／knee
                 那個姿勢，legs 是換多少（0 = 照原本的步態或空中姿勢）
      w          這個動作佔多少（0～1）。頭轉向鏡頭的那一份讓掉這麼多
@@ -1801,4 +1802,5 @@ function moveOverlay(rig, m) {
     for (const b of [B.kneeA, B.kneeB]) mix(b * 3, v('knee'));
   }
   rig.position[B.root * 3 + 1] -= v('drop');
+  rig.position[B.root * 3 + 2] -= v('back');
 }
