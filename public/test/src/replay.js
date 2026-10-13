@@ -97,8 +97,8 @@ export async function serve(game) {
 
 /**
  * 畫面換成帶子上那一刻的大小與安全區：請上一層把 iframe 調成那樣，操作列、相機照它重擺。
- * `size` 給了的話（開始的那一個畫面）GL 的畫布剛好是影片的大小（videoSize），一個像素對一個像素；
- * 之後畫面大小變了（手機轉向）就照影片的框等比縮放，film.js 置中、留黑邊。
+ * `size` 給了的話 GL 的畫布剛好是影片的大小（videoSize），一個像素對一個像素；沒給就照 `s` 畫，
+ * film.js 等比縮進影片的框、置中、留黑邊。
  */
 function fitTo(game, view, s, size = null) {
   const st = document.documentElement.style;
@@ -119,13 +119,51 @@ async function replay(game, tape, pick, fps) {
   if (tape?.version !== TAPE_VERSION) throw new Error('帶子的格式不對');
   if (!canReel()) throw new Error('這個瀏覽器不能轉檔（沒有 WebCodecs）');
   const { meta } = tape;
-  const picked = await pickVideo(meta.view, meta.dpr || Math.min(devicePixelRatio || 1, 2), fps);
-  if (!picked) throw new Error('這個瀏覽器編不了任何一種影片格式');
-  const { s, width, height, format } = picked;
+  const dpr = meta.dpr || Math.min(devicePixelRatio || 1, 2);
+  const keyOf = (v) => `${v.w}x${v.h}`;
 
-  fitTo(game, meta.view, s, { width, height });
+  /* 每一場一支影片，每一支照那一場自己的畫面定大小與方向：按下開始的那一刻畫面不一定是玩的時候的樣子
+     （開始畫面直拿、玩的時候才轉橫；按開始的那一下才進全螢幕，畫面過幾幀才變大）。一段裡畫面變過的話
+     照佔最久的那一個，其他的那幾段等比縮進來、留黑邊。 */
+  const scenes = tape.scenes.filter((sc) => pick.has(sc.k)).map((sc) => {
+    const last = sceneEnd(tape, sc);
+    let from = sc.start, t = 0;
+    while (from > 0 && t < WARM) t += tape.dt[--from];
+    return { ...sc, last, from, seconds: sceneSeconds(tape, sc) };
+  });
+  scenes.forEach((sc, n) => {
+    if (n) sc.from = Math.max(sc.from, scenes[n - 1].last + 1);        // 暖身不伸進上一段
+    const time = new Map();
+    let view = meta.view, at = 0;
+    for (; at < tape.views.length && tape.views[at][0] <= sc.from; at++) view = tape.views[at][1];
+    for (let i = sc.from; i <= sc.last; i++) {
+      for (; at < tape.views.length && tape.views[at][0] <= i; at++) view = tape.views[at][1];
+      const key = keyOf(view), slot = time.get(key) || { view, t: 0 };
+      slot.t += tape.dt[i];
+      time.set(key, slot);
+    }
+    sc.view = [...time.values()].sort((a, b) => b.t - a.t)[0].view;
+  });
+  const sizes = new Map();
+  for (const sc of scenes) {
+    const key = keyOf(sc.view);
+    if (!sizes.has(key)) sizes.set(key, await pickVideo(sc.view, dpr, fps));
+    sc.size = sizes.get(key);
+    if (!sc.size) throw new Error('這個瀏覽器編不了任何一種影片格式');
+  }
+
+  /* 現在的畫面（帶子說的）與正在畫的那一場（暖身或錄）：那一場用的畫面就讓 GL 剛好是影片的大小，
+     不是的話等比縮進那一場的框；不在任何一場裡就照當時的解析度畫（反正不錄）。 */
+  let view = meta.view, filming = null;
+  const apply = () => {
+    if (!filming) return fitTo(game, view, videoSize(view, dpr).s);
+    const { s, width, height } = filming.size;
+    if (keyOf(view) === keyOf(filming.view)) fitTo(game, view, s, { width, height });
+    else fitTo(game, view, Math.min(width / view.w, height / view.h));
+  };
   game.deck.tape = tape;
-  game.deck.h.resize = (view) => fitTo(game, view, Math.min(width / view.w, height / view.h));
+  game.deck.h.resize = (v) => { view = v; apply(); };
+  apply();
 
   // 聲音的檔先解好：音樂自己解；音效要接到一個 AudioContext 才解得了，先接一個用完就丟的。
   await game.music.ready();
@@ -135,9 +173,7 @@ async function replay(game, tape, pick, fps) {
   await comicLoaded();
 
   game.rewind(meta);
-  const film = new Film(width, height);
-  const scenes = tape.scenes.filter((sc) => pick.has(sc.k))
-    .map((sc) => ({ ...sc, last: sceneEnd(tape, sc), seconds: sceneSeconds(tape, sc) }));
+  let film = null;
   // 最後一場要轉的錄完就停：之後的不必再快轉。
   const N = scenes.length ? scenes[scenes.length - 1].last + 1 : 0;
   const shots = scenes.reduce((n, sc) => n + (sc.last - sc.start + 1), 0);
@@ -149,17 +185,17 @@ async function replay(game, tape, pick, fps) {
 
   let k = 0;                    // 下一段（或正在錄的那一段）
   let cut = null;               // 正在錄的這一段：{ sc, reel, mix, t, next }
-  // 每一段開始前 WARM 秒的那一幀
-  const warmFrom = scenes.map((sc) => {
-    let i = sc.start, t = 0;
-    while (i > 0 && t < WARM) t += tape.dt[--i];
-    return i;
-  });
 
   for (let i = 0; i < N; i++) {
     const sc = scenes[k];
+    // 暖身開始（片段開始前 WARM 秒）：畫面換成這一場的大小。
+    if (sc && i === sc.from) {
+      filming = sc;
+      film = new Film(sc.size.width, sc.size.height);
+      apply();
+    }
     if (sc && i === sc.start) {
-      const mix = offlineMix(sc.seconds);
+      const mix = offlineMix(sc.seconds), { width, height, format } = sc.size;
       cut = { sc, reel: new Reel({ width, height, fps, format }), mix, t: 0, next: 0 };
       const clock = clockedContext(mix, () => cut.t);
       game.sound.attach(clock);
@@ -168,7 +204,7 @@ async function replay(game, tape, pick, fps) {
     const real = tape.dt[i];
     // 這一幀要不要畫：片段裡到了下一張的時間才畫；片段前 WARM 秒畫但不錄；其他的不畫。
     const shoot = !!cut && cut.t >= cut.next - 1e-6;
-    const draw = shoot || (!!sc && i >= warmFrom[k] && i < sc.start);
+    const draw = shoot || (!!sc && i >= sc.from && i < sc.start);
     let t0 = clockIn();
     game.step(real, draw);
     const t1 = clockIn();
@@ -196,6 +232,8 @@ async function replay(game, tape, pick, fps) {
       cost.mix += clockIn() - t0;
       post({ type: 'file', k: cut.sc.k, name: game.stages[cut.sc.k], blob });
       cut = null;
+      filming = null;
+      apply();
       k++;
     }
     if (done - told > total / 400 || i === N - 1) {
@@ -206,5 +244,5 @@ async function replay(game, tape, pick, fps) {
     if (k >= scenes.length && !cut) break;
   }
   cost.wall = performance.now() - cost.wall;
-  post({ type: 'done', drift: game.deck.drift, cost, size: [width, height] });
+  post({ type: 'done', drift: game.deck.drift, cost, size: scenes.map((sc) => [sc.size.width, sc.size.height]) });
 }
