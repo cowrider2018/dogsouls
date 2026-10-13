@@ -20,7 +20,7 @@
 
 import { stone, drum, spike, blob, ring, cloth, gablePrism, cap, rng, hashAt } from './geom.js';
 import { C } from './palette.js';
-import { BLOCK_TOP, TRIP } from './walk.js';
+import { TRIP } from './walk.js';
 
 /* ── 幾何快取 ────────────────────────────────────────────────────
    尺寸四捨五入到 2 cm 當 key。石造物的尺寸本來就是「幾種磚」而不是
@@ -1111,7 +1111,7 @@ export function deadTree(B, o) {
   }
 }
 
-/** 井。一圈石、兩根柱、一根橫木、一只吊桶。 */
+/** 井。一圈石、兩根柱、一根橫木、一只吊桶。dry: 井口裡堆著大石（枯井）。 */
 export function well(B, o) {
   const r = rng(o.seed);
   const y = o.y || 0, R = o.r || 1.1;
@@ -1153,10 +1153,28 @@ export function well(B, o) {
     }
     B.pit(o.x, o.z, R * 0.78, y, y - 8);
   } else {
-    /* 井口的石圈是障礙，不是矮台。半徑取石塊往外凸出來的那一圈
-       （R + 0.21，石塊是 0.42 深、擺在 R 上），不是 R 本身。 */
-    const wh = BLOCK_TOP + 0.1;
-    B.round(o.x, o.z, R + 0.21, y, y + wh, { kind: 'block', base: y });
+    /* 碰撞照看得到的形狀登記。井圈是一根圓柱：半徑取石塊往外凸出來的那一圈
+       （R + 0.21，石塊是 0.42 深、擺在 R 上），頂面在第二皮的頂（0.7），跳得上去、
+       站得住。以前是一根 BLOCK_TOP 高的障礙，比畫面上的井圈高了 40 公分，
+       而木架整個沒有碰撞——走得穿柱子。 */
+    B.round(o.x, o.z, R + 0.21, y, y + 0.7, { kind: 'floor', base: y });
+    /* 木架（兩根柱、一根橫木）是一片薄牆：寬到兩根柱的外緣、厚一根柱、
+       從地面立到橫木頂。跳不過（1.77 高過 MOUNT），站在井圈上也被它隔成兩半。 */
+    const half = R * 0.85 + 0.07, top = 1.7 + 0.065;
+    B.block(o.x, y + top / 2, o.z, half * 2, top, 0.14, { base: y });
+  }
+  if (o.dry) {
+    /* 枯井：井口裡填幾塊大石，從上面看大約遮住一半的井口，另一半露出底下
+       那片黑——看得出是石頭堆在井底，不是蓋住了。石頭坐在井口那片黑上
+       （0.1），頂面在 0.4～0.55，低於井圈。站在井圈上踩的是井圈的圓柱。 */
+    const rr = rng(o.seed + 7);
+    for (const [dx, dz, s] of [[-0.36, 0.2, 0.3], [0.22, 0.36, 0.25], [0.12, -0.34, 0.27], [-0.2, -0.42, 0.18], [0.5, -0.05, 0.17]]) {
+      const k = R / 1.1, h = s * rr.range(1.3, 1.6);
+      B.add(B.kit.blob(s * k, 1), {
+        p: [o.x + dx * k, y + 0.1 + h * 0.42, o.z + dz * k], r: [rr.range(-0.3, 0.3), rr() * 3, rr.range(-0.3, 0.3)],
+        s: [1.25, h / (s * k) * 0.5, 1.05], color: stoneTone(rr),
+      });
+    }
   }
 }
 

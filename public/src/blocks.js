@@ -196,8 +196,8 @@ function courtyard(B, flames, seed, A) {
     });
   }
 
-  // 井、枯樹、火盆、碎石。全部在半徑 6 以外。
-  well(B, { x: -9.3, z: 7.4, y: 0, r: 1.15, seed: seed + 120 });
+  // 井（枯的：主角在這裡找不到水，才去窄巷）、枯樹、火盆、碎石。全部在半徑 6 以外。
+  well(B, { x: -9.3, z: 7.4, y: 0, r: 1.15, seed: seed + 120, dry: true });
   deadTree(B, { x: 7.4, z: 7.8, y: 0, s: 1.15, seed: seed + 121 });
   deadTree(B, { x: -8.4, z: -6.2, y: 0, s: 0.85, seed: seed + 122 });
   /* 火盆。z 一律對著拱廊的墩柱（±2.03）而不是拱洞（0、±4.05、±8.1）：
