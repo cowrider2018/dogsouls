@@ -1,5 +1,5 @@
 /* ── tools/verify-flow.mjs ───────────────────────────────────────────
-   /test/?mode=flow 的離線驗證：路線表（public/test/src/route.js）接不接得上。
+   /?mode=flow 的離線驗證：路線表（public/src/route.js）接不接得上。
 
    路線錯了的樣子是「玩到一半卡死」：某一步少開一扇門，玩家就被關在一張圖裡，
    只剩重玩；多開一扇，就走得到還沒輪到的那一場。兩種都要實際走一遍才會發現，
@@ -41,18 +41,18 @@
    跑法：node tools/verify-flow.mjs
    ------------------------------------------------------------------ */
 
-import { buildRuins, BLOCKS } from '../public/test/src/blocks.js';
-import { PHYS, arenaGap, solveXZ, supportInfo } from '../public/test/src/walk.js';
+import { buildRuins, BLOCKS } from '../public/src/blocks.js';
+import { PHYS, arenaGap, solveXZ, supportInfo } from '../public/src/walk.js';
 import {
   STAGES, START, SOULS, roomOf, roomName, signposts, foesOf, entranceOf, inStage, makeRun, doorsFor, openPortals, portalRoom, restAt,
-} from '../public/test/src/route.js';
-import { KINDS } from '../public/test/src/combat.js';
-import { FOLK, walkCells, plan } from '../public/test/src/folk.js';
-import { GAZE, Gaze, aimHead } from '../public/test/src/gaze.js';
-import { portalGap } from '../public/test/src/walk.js';
-import { THRONE, COFFINS, GRAVE } from '../public/test/src/blocks.js';
-import { LivingKing, KING, thronePath, pathGap } from '../public/test/src/king.js';
-import { HIT, makeMeter, meterSet, meterStep } from '../public/test/src/bossbar.js';
+} from '../public/src/route.js';
+import { KINDS } from '../public/src/combat.js';
+import { FOLK, walkCells, plan } from '../public/src/folk.js';
+import { GAZE, Gaze, aimHead } from '../public/src/gaze.js';
+import { portalGap } from '../public/src/walk.js';
+import { THRONE, COFFINS, GRAVE } from '../public/src/blocks.js';
+import { LivingKing, KING, thronePath, pathGap } from '../public/src/king.js';
+import { HIT, makeMeter, meterSet, meterStep } from '../public/src/bossbar.js';
 
 let fails = 0;
 const ok = (cond, msg) => {

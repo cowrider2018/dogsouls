@@ -4,7 +4,7 @@
 
    這一頁不在網站上：它是畫漫畫的工具，跟著 tools/ 走、不部署。make-comic.mjs 起的伺服器把
    public/ 與這個資料夾（在 /studio/ 底下）一起供出來，所以角色、著色、王冠這些直接 import
-   遊戲本身的那幾支（/test/src/…），不是抄一份。
+   遊戲本身的那幾支（/src/…），不是抄一份。
 
    角色是遊戲那幾隻本人（critter.js 的 Critter：同一份 cat.bin、同一副骨架、同一個三階
    著色、同一條墨線），不是另外畫的——漫畫裡的主角跟遊戲裡的主角是同一隻。姿勢是
@@ -45,19 +45,19 @@
      render(id)      擺好、拍下來，回傳 PNG 的 data URL
    ------------------------------------------------------------------ */
 
-import * as THREE from '/test/vendor/three.module.js';
-import { loadZoo, Critter, LIGHT_DIR } from '/test/src/critter.js';
-import { Crown } from '/test/src/crown.js';
-import { Helm } from '/test/src/helm.js';
-import { ShieldRing } from '/test/src/shield.js';
-import { SoulLook } from '/test/src/soul.js';
-import { Blood } from '/test/src/blood.js';
-import { makeMonsterCritter, sizeOf, GHOST_ALPHA } from '/test/src/monster.js';
-import { Blade } from '/test/src/blade.js';
-import * as Pieces from '/test/src/pieces.js';
-import { Build } from '/test/src/geom.js';
-import { C, INK, KEY_POS, U_KEYDIR } from '/test/src/palette.js';
-import * as shadowLight from '/test/src/light/shadow.js';
+import * as THREE from '/vendor/three.module.js';
+import { loadZoo, Critter, LIGHT_DIR } from '/src/critter.js';
+import { Crown } from '/src/crown.js';
+import { Helm } from '/src/helm.js';
+import { ShieldRing } from '/src/shield.js';
+import { SoulLook } from '/src/soul.js';
+import { Blood } from '/src/blood.js';
+import { makeMonsterCritter, sizeOf, GHOST_ALPHA } from '/src/monster.js';
+import { Blade } from '/src/blade.js';
+import * as Pieces from '/src/pieces.js';
+import { Build } from '/src/geom.js';
+import { C, INK, KEY_POS, U_KEYDIR } from '/src/palette.js';
+import * as shadowLight from '/src/light/shadow.js';
 import { Driver, Sway } from '/src/cat/pose.js';
 import { SHOTS } from './shots.js';
 import { drawFace } from './faces.js';

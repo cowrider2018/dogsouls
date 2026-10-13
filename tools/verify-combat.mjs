@@ -1,5 +1,5 @@
 /* ── tools/verify-combat.mjs ────────────────────────────────────
-   /test/?mode=combat 的離線驗證。
+   /?mode=combat 的離線驗證。
 
    戰鬥的規則全都是「看不出來有沒有壞」的那一種：範圍差十度、視窗差
    0.1 秒、擊退落地前碰到算不算——畫面上都是一片亮光與一隻飛起來的狗，
@@ -164,7 +164,7 @@
                     同一招最多連兩次。
    ------------------------------------------------------------------ */
 
-import { PHYS } from '../public/test/src/walk.js';
+import { PHYS } from '../public/src/walk.js';
 import {
   MODES, DEFAULT_MODE, LUNGE, STILL, RALLY, spared, rallied, lunging, ARENA, SPAWN, DOG_H, REACH, SWING, REST, KNOCK, KNOCK_SCALE, FAN, WINDOW, KINDS, DAMAGE, hurt, placeMonster,
   BREAK_AT, BREAK_WINDOW, broken,
@@ -172,38 +172,38 @@ import {
   makeMonster as freshMonster, monsterStep, touching, bites, knock, inSlash, inFan, inRing, slashTip, fanFrame,
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
   SOUL, dropSoul, soulStep, grabs, bankSouls, DAZE, daze, dazeStep, knockHero,
-} from '../public/test/src/combat.js';
-import { SKILL, RAGE, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill, planOf, IDLE, REPEAT } from '../public/test/src/skills.js';
-import { steer } from '../public/test/src/walk.js';
-import { DUST, dustOf, dustFade, QUAKE, quakeBands, quakeFade, quakeTop, PLOW, plowPieces, plowClump } from '../public/test/src/dust.js';
-import { Motion, bloodOf, sizeOf, mirror, riseLift, MOVES as KNIGHT_MOVES } from '../public/test/src/monster.js';
-import { MOVES as HERO_MOVES } from '../public/test/src/moves.js';
-import { TRAILS, PIECE, BANDS, sweepAt, fadeAt, sideAt, qiAt, along, hullOf } from '../public/test/src/trail.js';
-import { bladeAt } from '../public/test/src/trail.js';
-import { BLEED, LUMP, SPLAT, STYLE, dropSize, dropCount, volumeOf, sizeRange, speedOf, hitFrame, burstFrame, lumpFrame, hurtFrame, spurtOf, floorUnder, splatScale, bleedStep, GATHER } from '../public/test/src/bleed.js';
-import { taken } from '../public/test/src/combat.js';
-import { OFFER, makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, flySoul } from '../public/test/src/offer.js';
-import { iconOf, ICONS, SOUL_SHAPE, bodySpan } from '../public/test/src/pad.js';
+} from '../public/src/combat.js';
+import { SKILL, RAGE, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill, planOf, IDLE, REPEAT } from '../public/src/skills.js';
+import { steer } from '../public/src/walk.js';
+import { DUST, dustOf, dustFade, QUAKE, quakeBands, quakeFade, quakeTop, PLOW, plowPieces, plowClump } from '../public/src/dust.js';
+import { Motion, bloodOf, sizeOf, mirror, riseLift, MOVES as KNIGHT_MOVES } from '../public/src/monster.js';
+import { MOVES as HERO_MOVES } from '../public/src/moves.js';
+import { TRAILS, PIECE, BANDS, sweepAt, fadeAt, sideAt, qiAt, along, hullOf } from '../public/src/trail.js';
+import { bladeAt } from '../public/src/trail.js';
+import { BLEED, LUMP, SPLAT, STYLE, dropSize, dropCount, volumeOf, sizeRange, speedOf, hitFrame, burstFrame, lumpFrame, hurtFrame, spurtOf, floorUnder, splatScale, bleedStep, GATHER } from '../public/src/bleed.js';
+import { taken } from '../public/src/combat.js';
+import { OFFER, makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, flySoul } from '../public/src/offer.js';
+import { iconOf, ICONS, SOUL_SHAPE, bodySpan } from '../public/src/pad.js';
 import { readFileSync } from 'node:fs';
-import * as THREE from '../public/test/vendor/three.module.js';
-import { loadZoo } from '../public/test/src/critter.js';
-import { makeMonsterCritter, helmOf, ATTACK_INK } from '../public/test/src/monster.js';
-import { Helm, HELM, EAR_COLOR } from '../public/test/src/helm.js';
-import { litOf } from '../public/test/src/palette.js';
+import * as THREE from '../public/vendor/three.module.js';
+import { loadZoo } from '../public/src/critter.js';
+import { makeMonsterCritter, helmOf, ATTACK_INK } from '../public/src/monster.js';
+import { Helm, HELM, EAR_COLOR } from '../public/src/helm.js';
+import { litOf } from '../public/src/palette.js';
 import { BAND_KEY as CAT_BAND_KEY, BAND_AMB as CAT_BAND_AMB, SHADE_KEY_GAIN, SHADE_AMB_GAIN } from '../public/src/cat/cat.js';
 import { skyAt, acesTone } from '../public/src/gfx/daycycle.js';
-import { Crown, CROWN } from '../public/test/src/crown.js';
-import { crownOf } from '../public/test/src/monster.js';
-import { ShieldRing, SHIELD } from '../public/test/src/shield.js';
-import { Blade } from '../public/test/src/blade.js';
-import { swordOf } from '../public/test/src/monster.js';
+import { Crown, CROWN } from '../public/src/crown.js';
+import { crownOf } from '../public/src/monster.js';
+import { ShieldRing, SHIELD } from '../public/src/shield.js';
+import { Blade } from '../public/src/blade.js';
+import { swordOf } from '../public/src/monster.js';
 import { Rig } from '../public/src/cat/rig.js';
-import { shadeOf, reachAt, pieceAt, farthestOf, bakeShade, faceRuns, alongRun } from '../public/test/src/occlude.js';
-import { Scars } from '../public/test/src/scar.js';
-import { ringsStep, ringHits, ringDepth, RING } from '../public/test/src/skills.js';
-import { blockerAt } from '../public/test/src/skills.js';
-import { roundTop, supportInfo } from '../public/test/src/walk.js';
-import { buildRuins } from '../public/test/src/blocks.js';
+import { shadeOf, reachAt, pieceAt, farthestOf, bakeShade, faceRuns, alongRun } from '../public/src/occlude.js';
+import { Scars } from '../public/src/scar.js';
+import { ringsStep, ringHits, ringDepth, RING } from '../public/src/skills.js';
+import { blockerAt } from '../public/src/skills.js';
+import { roundTop, supportInfo } from '../public/src/walk.js';
+import { buildRuins } from '../public/src/blocks.js';
 
 let fails = 0;
 const ok = (cond, msg) => {

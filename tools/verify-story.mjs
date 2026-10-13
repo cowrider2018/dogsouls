@@ -1,6 +1,6 @@
 /* ── tools/verify-story.mjs ──────────────────────────────────────────
-   場與場之間那一段劇情（public/test/src/story.js）的時間軸與漫畫的頁表
-   （public/test/src/comic.js），不開瀏覽器：
+   場與場之間那一段劇情（public/src/story.js）的時間軸與漫畫的頁表
+   （public/src/comic.js），不開瀏覽器：
 
      1. 沒在演   世界照正常速度走，操作不收。
      2. 戰後頁   斬殺之後到書頁蓋住之前，世界是 STORY.scale 倍、操作收起來；蓋住之後
@@ -21,9 +21,9 @@
    跑法：node tools/verify-story.mjs
    ------------------------------------------------------------------ */
 
-import { Story, STORY, PANEL, builtIn } from '../public/test/src/story.js';
-import { PAGES, SCRIPT, pagesOf } from '../public/test/src/comic.js';
-import { STAGES } from '../public/test/src/route.js';
+import { Story, STORY, PANEL, builtIn } from '../public/src/story.js';
+import { PAGES, SCRIPT, pagesOf } from '../public/src/comic.js';
+import { STAGES } from '../public/src/route.js';
 
 let fails = 0;
 const ok = (cond, msg) => {

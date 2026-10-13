@@ -215,7 +215,7 @@
 
 ## 跟遊戲的對應
 
-劇本的流程已經接進 `?mode=flow`；15 頁的漫畫都畫好了，每一格的圖是 `public/test/src/comic.js` 那一格的 `src`（怎麼畫見 `tools/comic/README.md`）。
+劇本的流程已經接進 `?mode=flow`；15 頁的漫畫都畫好了，每一格的圖是 `public/src/comic.js` 那一格的 `src`（怎麼畫見 `tools/comic/README.md`）。
 
 | 項目 | 狀態 | 在哪 |
 | --- | --- | --- |
@@ -224,7 +224,7 @@
 | 開場頁（進房間就播，翻走才生怪；同一輪只播一次） | 完成 | `mode-flow.js`、`comic.js` |
 | 墓室打完連翻三頁（第 10～12 頁），第一頁蓋住時傳送到中庭 | 完成 | `comic.js`、`route.js` 的 `warp` |
 | 3、4、5 格的版面（橫向、直向） | 完成 | `index.html` 的 `#story` |
-| 漫畫本身 | 完成 | 每一格的 `src`，圖在 `public/test/comic/` |
+| 漫畫本身 | 完成 | 每一格的 `src`，圖在 `public/comic/` |
 | 素材缺口：騎士幽靈、活著的國王、復活的人民、回憶的畫面處理 | 完成（拼的） | 攝影棚的 `knightGhost`、`king`、`folk`，回憶格是 `memory` |
 | 靈魂：殭屍王、騎士會掉（殭屍、幽靈、國王不掉），撿起來最大血量 +1 | 完成 | `combat.js` 的 `soul` |
 

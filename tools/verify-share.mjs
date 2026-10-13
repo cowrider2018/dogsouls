@@ -14,13 +14,13 @@
 // 用法：node tools/verify-share.mjs
 
 import { readFileSync } from 'node:fs';
-import { loadZoo, Critter } from '../public/test/src/critter.js';
+import { loadZoo, Critter } from '../public/src/critter.js';
 import { parseCat } from '../public/src/cat/rig.js';
 import { speciesModels } from '../public/src/cat/species.js';
-import { makeMonsterCritter, makeLivingKing, makeGhostCritter } from '../public/test/src/monster.js';
-import { footprint } from '../public/test/src/death.js';
-import { Helm } from '../public/test/src/helm.js';
-import { KINDS } from '../public/test/src/combat.js';
+import { makeMonsterCritter, makeLivingKing, makeGhostCritter } from '../public/src/monster.js';
+import { footprint } from '../public/src/death.js';
+import { Helm } from '../public/src/helm.js';
+import { KINDS } from '../public/src/combat.js';
 
 let fails = 0;
 const ok = (cond, msg) => {

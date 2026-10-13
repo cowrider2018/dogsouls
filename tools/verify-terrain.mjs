@@ -1,12 +1,12 @@
 /* ── tools/verify-terrain.mjs ──────────────────────────────────────
-   /test/?mode=terrain 的離線驗證。
+   /?mode=terrain 的離線驗證。
 
    這一頁的設計規則有三條是「用眼睛看不出來有沒有壞」的：
 
      1. 中心夠空曠   每個區塊中央那片空地上，每一格的支撐高度都必須等於
                      鋪面的高度，而且站在上面不會被任何碰撞盒推開。
                      少一塊鋪面、多一顆會絆腳的大石頭，這一項就會紅。
-     2. 走得到       從出生點真的走到中心去——用的是 public/test/
+     2. 走得到       從出生點真的走到中心去——用的是 public/
                      src/walk.js 那一份物理，不是另寫一份。路上任何一個
                      看不見的盒子都會讓狗卡住。
      3. 烘焙接上了    部位表量到了、畫的就是烘出來的幾何、墨線那一推只
@@ -64,22 +64,22 @@
    跑法：node tools/verify-terrain.mjs
    ------------------------------------------------------------------ */
 
-import * as THREE from '../public/test/vendor/three.module.js';
-import { buildRuins, BLOCKS, DOORS, PITCH } from '../public/test/src/blocks.js';
+import * as THREE from '../public/vendor/three.module.js';
+import { buildRuins, BLOCKS, DOORS, PITCH } from '../public/src/blocks.js';
 import {
   PHYS, SLIDE, APEX, solveXZ, supportAt, supportInfo, roundTop, roundSin, portalAt, portalDrift, portalGap, REPEL,
   steer, slideDrift, slideAccel, arenaGap, clampArena, boomLimit, BLOCK_TOP, TRIP, MOUNT,
-} from '../public/test/src/walk.js';
-import { VEIL, buildVeil, outline } from '../public/test/src/veil.js';
-import { toonVC, toon, inkLine, BAND_EDGE, BAND_KEY } from '../public/test/src/palette.js';
-import { SURF, SURF_DEF, TEX_N, MOSS, surfacePixels, mossAt } from '../public/test/src/surface.js';
-import { stone } from '../public/test/src/geom.js';
-import { CAM, makeCam, updateCam } from '../public/test/src/camera.js';
+} from '../public/src/walk.js';
+import { VEIL, buildVeil, outline } from '../public/src/veil.js';
+import { toonVC, toon, inkLine, BAND_EDGE, BAND_KEY } from '../public/src/palette.js';
+import { SURF, SURF_DEF, TEX_N, MOSS, surfacePixels, mossAt } from '../public/src/surface.js';
+import { stone } from '../public/src/geom.js';
+import { CAM, makeCam, updateCam } from '../public/src/camera.js';
 import { readFileSync } from 'node:fs';
-import { loadZoo, TURN_RATE } from '../public/test/src/critter.js';
-import { Pad, REST_ICON, GIVE, SOUL_SHAPE, SOUL_OUTLINE, bodySpan } from '../public/test/src/pad.js';
-import { railTier } from '../public/test/src/hud.js';
-import { roomOf, signposts } from '../public/test/src/route.js';
+import { loadZoo, TURN_RATE } from '../public/src/critter.js';
+import { Pad, REST_ICON, GIVE, SOUL_SHAPE, SOUL_OUTLINE, bodySpan } from '../public/src/pad.js';
+import { railTier } from '../public/src/hud.js';
+import { roomOf, signposts } from '../public/src/route.js';
 
 let fails = 0;
 const ok = (cond, label, detail = '') => {

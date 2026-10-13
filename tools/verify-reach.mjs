@@ -14,12 +14,12 @@
    跑法：node tools/verify-reach.mjs
    ------------------------------------------------------------------ */
 
-import { buildRuins } from '../public/test/src/blocks.js';
-import { PHYS, MOUNT, solveXZ, supportInfo, arenaGap } from '../public/test/src/walk.js';
-import { makeMonster, monsterStep, knock, separate, KNOCK, KNOCK_SCALE, KINDS } from '../public/test/src/combat.js';
-import { bossStep, makeWorld, planOf } from '../public/test/src/skills.js';
-import { roamMap } from '../public/test/src/roam.js';
-import { STAGES, foesOf } from '../public/test/src/route.js';
+import { buildRuins } from '../public/src/blocks.js';
+import { PHYS, MOUNT, solveXZ, supportInfo, arenaGap } from '../public/src/walk.js';
+import { makeMonster, monsterStep, knock, separate, KNOCK, KNOCK_SCALE, KINDS } from '../public/src/combat.js';
+import { bossStep, makeWorld, planOf } from '../public/src/skills.js';
+import { roamMap } from '../public/src/roam.js';
+import { STAGES, foesOf } from '../public/src/route.js';
 
 let fails = 0;
 const ok = (cond, msg) => {

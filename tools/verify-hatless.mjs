@@ -14,9 +14,9 @@
 // 用法：node tools/verify-hatless.mjs
 
 import { readFileSync } from 'node:fs';
-import { loadZoo, Critter } from '../public/test/src/critter.js';
-import { makeMonsterCritter, makeLivingKing, makeGhostCritter } from '../public/test/src/monster.js';
-import { KINDS } from '../public/test/src/combat.js';
+import { loadZoo, Critter } from '../public/src/critter.js';
+import { makeMonsterCritter, makeLivingKing, makeGhostCritter } from '../public/src/monster.js';
+import { KINDS } from '../public/src/combat.js';
 
 let fails = 0;
 const ok = (cond, msg) => {

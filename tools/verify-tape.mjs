@@ -1,5 +1,5 @@
 /* ── tools/verify-tape.mjs ───────────────────────────────────────────
-   錄影模式的帶子（public/test/src/tape.js）與世界的亂數（chance.js），不開瀏覽器：
+   錄影模式的帶子（public/src/tape.js）與世界的亂數（chance.js），不開瀏覽器：
 
      1. 亂數       同一顆種子抽出同一串；reseed 之後從頭抽起；不同的種子不一樣。
      2. 錄放       一個假的世界（位置照操作與 dt 積分、偶爾抽籤）錄一遍再放一遍：每一幀的 dt、
@@ -13,8 +13,8 @@
    跑法：node tools/verify-tape.mjs
    ------------------------------------------------------------------ */
 
-import { Deck, blankTape, fingerprint, sceneEnd, sceneSeconds, SUM_EVERY } from '../public/test/src/tape.js';
-import { random, reseed } from '../public/test/src/chance.js';
+import { Deck, blankTape, fingerprint, sceneEnd, sceneSeconds, SUM_EVERY } from '../public/src/tape.js';
+import { random, reseed } from '../public/src/chance.js';
 
 let fails = 0;
 const ok = (cond, msg) => {

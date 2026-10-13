@@ -1,6 +1,6 @@
 # 畫漫畫
 
-完整流程模式（`/test/?mode=flow`）場與場之間的劇情是一頁一頁的漫畫，翻在一大張書頁上（`public/test/src/story.js`）。這個資料夾是畫漫畫用的全部工具；這份文件是**畫風的規則**與**畫一格的做法**。規則是使用者定的，不要自己放寬；覺得哪一條擋路，先問。
+完整流程模式（`/?mode=flow`）場與場之間的劇情是一頁一頁的漫畫，翻在一大張書頁上（`public/src/story.js`）。這個資料夾是畫漫畫用的全部工具；這份文件是**畫風的規則**與**畫一格的做法**。規則是使用者定的，不要自己放寬；覺得哪一條擋路，先問。
 
 畫漫畫的工具都在這裡、不在網站上：攝影棚由 `make-comic.mjs` 自己的伺服器供出來，不會被部署。遊戲執行時用得到的（書頁、15 頁的資料、拍好的圖）才在 `public/`。
 
@@ -9,7 +9,7 @@
 | 項目 | 狀態 |
 | --- | --- |
 | 劇本 | `STORY.md`：15 頁、每一格的畫面、鏡頭、字 |
-| 第 1～15 頁 | 全部畫好了：`public/test/comic/p<頁>-<格>.png`，第 15 頁第 4 格是三條細長條 `p15-4a`～`c` |
+| 第 1～15 頁 | 全部畫好了：`public/comic/p<頁>-<格>.png`，第 15 頁第 4 格是三條細長條 `p15-4a`～`c` |
 | 版面 | 照格數；第 13 頁 `big: 4`、第 15 頁 `big: 5` 讓那一格最大，第 15 頁第 4 格用 `strips` 拆成三條 |
 | 背景剪影 | 零件見 `studio.js` 的 `PIECES` |
 
@@ -51,15 +51,15 @@
   README.md                    這份：規則與做法
   shots.js                     每一格怎麼拍：誰、站哪、姿勢、表情、鏡頭、光、道具
   faces.js                     漫畫的表情（2D，畫在拍好的圖上）
-  studio.html／studio.js       攝影棚：擺角色、拍、網點、畫表情、出 PNG（import 遊戲的 /test/src/…）
-  make-comic.mjs               起伺服器、開無頭 Chrome 進攝影棚，把每一格存成 public/test/comic/<id>.png
+  studio.html／studio.js       攝影棚：擺角色、拍、網點、畫表情、出 PNG（import 遊戲的 /src/…）
+  make-comic.mjs               起伺服器、開無頭 Chrome 進攝影棚，把每一格存成 public/comic/<id>.png
 
 遊戲裡——畫出來的東西放哪、怎麼翻
   STORY.md                     劇本（頁、格、畫面、鏡頭、字）
-  public/test/src/comic.js     15 頁的資料：每一格的 note、say、src、focus、capAt、memory；SCRIPT 是哪一刻翻哪幾頁
-  public/test/comic/           拍好的圖（<id>.png）
-  public/test/src/story.js     書頁：滑進來、分格一格一格拼上去、翻頁
-  public/test/index.html       #story 底下的 CSS：版面（3／4／5 格，橫向／直向）、字、回憶格
+  public/src/comic.js     15 頁的資料：每一格的 note、say、src、focus、capAt、memory；SCRIPT 是哪一刻翻哪幾頁
+  public/comic/           拍好的圖（<id>.png）
+  public/src/story.js     書頁：滑進來、分格一格一格拼上去、翻頁
+  public/index.html       #story 底下的 CSS：版面（3／4／5 格，橫向／直向）、字、回憶格
 ```
 
 ## 畫一格的流程
@@ -68,11 +68,11 @@
 2. **想鏡頭**：特寫還是中景、裁到哪裡、從哪個角度、用哪個表情，對照上面的規則 3、4、6。
 3. **寫 `tools/comic/shots.js`**：加一筆 `{ id: 'p<頁>-<格>', ... }`。欄位見下一節。
 4. **拍**：在 repo 根目錄跑 `node tools/comic/make-comic.mjs p2-1`（不給 id 就全部重拍），一格大約 3 秒。想用瀏覽器邊調邊看：`node tools/comic/make-comic.mjs --serve`，打開它印出來的網址（← → 換一格），改了 `shots.js` 重新整理就好。
-5. **看圖**：用 Read 打開 `public/test/comic/p2-1.png`。透明的地方在檢視器裡可能顯示成黑或白，都是正常的。不滿意就回到第 3 步。
+5. **看圖**：用 Read 打開 `public/comic/p2-1.png`。透明的地方在檢視器裡可能顯示成黑或白，都是正常的。不滿意就回到第 3 步。
 6. **接進書頁**：在 `comic.js` 那一格加 `src: 'comic/p2-1.png'`，需要的話加 `focus`、`capAt`、`memory`。
-7. **看整頁**：開 `/test/?mode=flow`，在主控台跑下面這段，橫向、直向都看（直向會照 `focus` 裁）：
+7. **看整頁**：開 `/?mode=flow`，在主控台跑下面這段，橫向、直向都看（直向會照 `focus` 裁）：
    ```js
-   const c = await import('/test/src/comic.js');
+   const c = await import('/src/comic.js');
    flowArea.story.start(c.pagesOf([2]));
    ```
 8. **檢查、提交**：跑 `node tools/verify-story.mjs` 與 `node tools/verify-flow.mjs`，然後 commit。一頁畫完提交一次；改了攝影棚或 `faces.js` 的能力，另外先提交。

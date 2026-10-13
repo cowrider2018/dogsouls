@@ -3,7 +3,7 @@
    面朝哪、什麼姿勢，鏡頭在哪、看哪，背後有哪些剪影。剪影以外是透明的——書頁上看到的是紙。
 
    每一格：
-     id     圖檔名（public/test/comic/<id>.png），也是 comic.js 那一格的 src
+     id     圖檔名（public/comic/<id>.png），也是 comic.js 那一格的 src
      size   出圖的像素（寬、高）。比例照它在橫向版面裡那一格（四格頁：a 約 2.9、b 1.3、c 1.7、d 2.6 比 1）；
             直向或別的比例由書頁照 comic.js 的 focus 裁
      cast   在場的角色（同一種可以好幾隻）：

@@ -1,5 +1,5 @@
 /* ── tools/comic/make-comic.mjs ──────────────────────────────────────
-   把漫畫的每一格拍成圖：public/test/comic/<id>.png（id 是 shots.js 那一格）。
+   把漫畫的每一格拍成圖：public/comic/<id>.png（id 是 shots.js 那一格）。
 
    拍照的是攝影棚（studio.html／studio.js，就在這個資料夾），它用的是遊戲本身的渲染器——
    角色、著色、墨線跟遊戲裡一模一樣。這台機器沒有 headless WebGL 給 node 用，所以開一個
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 /** 這個資料夾（攝影棚在這裡），與遊戲的 public/。 */
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..', 'public');
-const OUT = path.join(ROOT, 'test', 'comic');
+const OUT = path.join(ROOT, 'comic');
 const PORT = 9333;
 
 const TYPES = {
