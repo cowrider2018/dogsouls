@@ -359,13 +359,14 @@ const STOMP = {
    下方送出去（headFwd、headDrop）——頭往前、屁股往後，兩個拉開，從屁股到頭是一條往前斜下去的線。
    頭只搬位置不低頭：headPitch 剛好抵掉身體的前傾，臉一直是平的、正對著主角（頭另外跟著主角轉，Motion
    的 LOOK）。頭留在原位的話身體一壓它就頂在背上、跟身體疊在一起，看起來成了往後仰、立起來。
-   前腳彎著撐住，尾巴翹高。蓄滿（飛出去的前一刻）再翹、再拉開一點。
+   前腳彎著撐住，尾巴翹高。蓄滿（飛出去的前一刻）再翹、再拉開一點。幅度到下巴離地還有一點空為止：
+   再壓深，頭就埋進地板裡。
    不往下沉（沒有 drop）：前壓的支點在屁股那一端，再沉的話屁股就陷進地板裡。 */
 const POUNCE = {
-  pitch: 0.58, headPitch: -0.58, headFwd: 1.50, headDrop: 0.75, back: 1.90, tailPitch: 1.10,
+  pitch: 0.44, headPitch: -0.44, headFwd: 1.13, headDrop: 0.56, back: 1.41, tailPitch: 1.10,
   front: -0.60, hind: 0.40, knee: -0.50, legs: 1, w: 1,
 };
-const POUNCE_MAX = { ...POUNCE, pitch: 0.62, headPitch: -0.62, headFwd: 1.60, headDrop: 0.80, back: 2.00 };
+const POUNCE_MAX = { ...POUNCE, pitch: 0.47, headPitch: -0.47, headFwd: 1.20, headDrop: 0.60, back: 1.50 };
 const LAND = {
   pitch: 0.40, headPitch: 0.10, drop: 0.25, tailPitch: 0.40,
   front: -0.30, hind: -0.50, knee: -0.80, legs: 0.9, w: 1,
