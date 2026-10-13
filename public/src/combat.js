@@ -36,9 +36,9 @@
    `shieldEvery` 秒沒再挨打，補回一面，補到滿為止。
 
    攻擊中（attacking：放招、或衝刺的蓄力加衝，不含之後的僵直）被打會怎樣看類別
-   （KINDS 的 `steady`）：小怪一打就取消；殭屍王不會被打斷——跟放招的倒數一樣
-   打不退、傷害減半（armored）。畫面上攻擊中墨線變紅，跟 armored 出自同一個
-   attacking，所以殭屍王的不可打斷與紅色永遠是同一段。
+   （KINDS 的 `steady`）：小怪一打就取消；殭屍王與國王不會被打斷——跟放招的倒數一樣
+   打不退、傷害減半（armored）。國王兩下之間的重新蓄力也算在裡面，兩下連著打不斷。
+   畫面上攻擊中墨線變紅，跟 armored 出自同一個 attacking，所以不可打斷與紅色永遠是同一段。
 
    幽靈（KINDS 的 `fly`）不受重力、會飛：y 跟 x、z 是同一回事。追人是朝玩家
    的腳在三維裡追、衝刺朝三維的方向衝；被擊退的時候速度一樣照那一段給，但不
@@ -196,7 +196,7 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  *           衝刺咬人照常。
  *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3.8，走路、
  *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺衝兩下才僵直（見 LUNGE）。`shields`：身邊幾面盾，
- *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。衝刺跟小怪一樣一打就取消。每 `every`
+ *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。`steady`：衝刺跟殭屍王一樣不會被打斷。每 `every`
  *           秒從 `skills` 裡挑一招（skills.js）。
  *
  * `open`：開場的那幾招，照順序放完才開始隨機挑（第二條命照 `rageOpen`）；夠不到就追到夠得到為止。
@@ -216,7 +216,7 @@ export const KINDS = {
   ghost: { name: '幽靈', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1, fly: true },
   knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], open: ['cleave', 'whirl'], every: 3 },
   wraith: { name: '幽靈騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
-  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 3 },
+  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 3 },
 };
 
 /**
@@ -655,7 +655,7 @@ export const attacking = (m) => !busy(m)
 /**
  * 不可打斷：不會被擊退，受到的傷害減半。就是攻擊中——只有
  *   · 放招（m.cast）算，打得斷的招（`frail`：國王第二條命的召喚，skills.js）除外；
- *   · 衝刺只有 `steady` 那一類（殭屍王）算。小怪的衝刺一打就取消。
+ *   · 衝刺只有 `steady` 的那幾類（殭屍王、國王）算。小怪的衝刺一打就取消。
  */
 export const armored = (m) => attacking(m) && (m.cast ? !m.cast.frail : !!kindOf(m).steady);
 

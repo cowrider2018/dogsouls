@@ -2299,8 +2299,8 @@ console.log('27. 王冠');
 console.log('28. 國王');
 {
   const K = KINDS.king;
-  ok(K.hp === 40 && K.speed === 3.8 && K.bite === 2 && !K.fly && !K.steady && !K.soul,
-    '國王：血 40、腳程 3.8、咬 2、走路受重力、衝刺打得斷、不掉靈魂');
+  ok(K.hp === 40 && K.speed === 3.8 && K.bite === 2 && !K.fly && K.steady && !K.soul,
+    '國王：血 40、腳程 3.8、咬 2、走路受重力、衝刺跟殭屍王一樣打不斷、不掉靈魂');
   const king = () => makeMonster({ kind: 'king', x: 0, z: 0, yaw: 0 });
   const hero = (x, z) => ({ ...body(x, z), hp: 10, max: 10, guard: 0 });
 
@@ -2346,8 +2346,11 @@ console.log('28. 國王');
     const m = king(), p = hero(0, 1.5);
     for (let i = 0; i < 40 && !(m.lunge && m.lunge.n === 2); i++) monsterStep(m, DT, p);
     m.shields = 0;
+    const L = m.lunge;
     knock(m, 0, 3, 0, -1);
-    ok(m.lunge === null && m.air, '第二下蓄力中被打（沒盾）：整套取消、被擊退');
+    hurt(m, DAMAGE.rise);
+    ok(m.lunge === L && !m.air && m.hp === K.hp - Math.ceil(DAMAGE.rise / 2),
+      '第二下蓄力中被打（沒盾）：不取消、不擊退、傷害減半');
   }
 
   /* 盾：照 fight.js 的順序打——先問盾，擋掉就什麼都不做。 */
@@ -2365,7 +2368,11 @@ console.log('28. 國王');
     const r = [strike(m, DAMAGE.rise), strike(m, DAMAGE.rise), strike(m, DAMAGE.rise)];
     ok(r.every((x) => x === 'parried') && m.shields === 0, '前三下各用掉一面盾');
     ok(m.hp === K.hp && m.gauge === 0 && !m.air && m.lunge === L, '擋掉的三下：不扣血、不累積破防、不擊退、衝刺照走');
-    ok(strike(m, DAMAGE.rise) === 'hit' && m.hp === K.hp - DAMAGE.rise && m.air && m.gauge === DAMAGE.rise, '盾用完了：第四下照常扣血、擊退、累積破防');
+    const half = Math.ceil(DAMAGE.rise / 2);
+    ok(strike(m, DAMAGE.rise) === 'hit' && m.hp === K.hp - half && !m.air && m.lunge === L && m.gauge === half,
+      '盾用完了、還在衝刺：第四下扣一半、累積破防，不擊退、衝刺照走');
+    m.lunge = null;
+    ok(strike(m, DAMAGE.rise) === 'hit' && m.hp === K.hp - half - DAMAGE.rise && m.air, '沒在攻擊：第五下照常扣血、擊退');
     placeMonster(m);
     ok(m.shields === 3 && m.shieldT === 0, '回到站位（死了重生也是）：盾補滿');
   }
