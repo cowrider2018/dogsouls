@@ -3,19 +3,19 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>試玩場</title>
+<title>Dogsouls: Revive the Kingdom from Zombie Invasion</title>
 <meta name="theme-color" content="#1e1810" />
-<meta name="robots" content="noindex" />
 <!-- 加到主畫面：manifest 是 display: fullscreen，從圖示開就沒有網址列。
      iOS 不認 fullscreen，退成 standalone，狀態列半透明疊在畫面上（安全區已經讓開了）。 -->
 <link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" href="./icons/icon-192.png" />
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="試玩場" />
+<meta name="apple-mobile-web-app-title" content="Dogsouls" />
 <!--
-  試玩場：城堡遺跡、遊戲的那幾隻動物、戰鬥系統。一頁幾個模式，網址後綴選：
+  Dogsouls: Revive the Kingdom from Zombie Invasion——城堡遺跡、遊戲的那幾隻動物、戰鬥系統。一頁幾個模式，網址後綴選：
 
     ?mode=terrain  地形：四個城堡遺跡關卡區塊，走上去看看（src/mode-terrain.js）
     ?mode=combat   戰鬥：一塊黑牆圍起來的空地，試打怪物（src/mode-combat.js）
@@ -35,7 +35,7 @@
   ——rail / barT / barB / ctrl 由 src/pad.js 算、各模式的主程式寫進 CSS 變數，
   所以 DOM 的面板跟畫布上的搖桿永遠對齊在同一條列裡。
 
-  ── 這一頁是獨立的計畫，不是遊戲的一部分 ────────────────────────
+  ── 關卡與動物 ──────────────────────────────────────────────────
   關卡是它自己的一套幾何與材質，用 three.js（vendor/ 底下那一份，跟著
   Workers Static Assets 一起送出去，不打 CDN）。分階著色的做法抄自
   src/cat/cat.js——石頭分五階（斜面多，三階會把倒角與柱稜壓成一塊平色），
@@ -49,7 +49,7 @@
   跟過來的是那台正交側視相機與 depthRange 的分段遮擋，理由見
   src/critter.js。
 
-  操作元件也是遊戲那一套：src/pad.js 是 public/src/pad.js 的搬移，
+  操作元件也是遊戲那一套：src/pad.js 是 2D 跑酷那一支手把的搬移，
   水的配方（blobPath／fillLiquid／waveAt／tint）與彈簧常數都是原文，
   唯一的差別是軌道從膠囊變成圓的——這一頁是 3D，要八個方向。
 

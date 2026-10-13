@@ -252,7 +252,7 @@ export function showReel({ tape, stages, release }) {
         say.textContent = `${Math.floor(pct)}%`;
         if (m.scene !== null) mark(m.scene, m.mixing ? '裝箱' : '轉檔中', 'now');
       } else if (m.type === 'file') {
-        download(m.blob, `coparkour-${m.k + 1}-${m.name}.mp4`);
+        download(m.blob, `dogsouls-${m.k + 1}-${m.name}.mp4`);
         mark(m.k, '已下載', 'saved');
       } else if (m.type === 'done') {
         bar.style.width = '100%';

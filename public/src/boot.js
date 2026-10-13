@@ -19,17 +19,20 @@
 
 import { installFullscreen } from './fullscreen.js';
 
+/** 遊戲的名字：完整遊戲的分頁標題（index.html 的 <title> 與 manifest 的 name 是同一句）。 */
+export const TITLE = 'Dogsouls: Revive the Kingdom from Zombie Invasion';
+
 /** 每一個模式：分頁標題、主程式。 */
 export const MODES = {
   terrain: { title: '試玩場：城堡遺跡', entry: './mode-terrain.js' },
   combat: { title: '試打場', entry: './mode-combat.js' },
   flow: { title: '完整流程', entry: './mode-flow.js' },
   /* 完整遊戲：就是完整流程，但不帶面板、提示字與開發用的鍵，一開始是開始畫面（mode-flow.js 的 GAME）。 */
-  game: { title: 'Coparkour', entry: './mode-flow.js' },
+  game: { title: TITLE, entry: './mode-flow.js' },
   /* 錄影：完整遊戲，國王坐上王位之後進轉檔畫面。 */
-  record: { title: 'Coparkour', entry: './mode-flow.js', page: 'game' },
+  record: { title: TITLE, entry: './mode-flow.js', page: 'game' },
   /* 轉檔的時候重演的那一頁（record.js 開在 iframe 裡）。 */
-  replay: { title: 'Coparkour', entry: './mode-flow.js', page: 'game' },
+  replay: { title: TITLE, entry: './mode-flow.js', page: 'game' },
 };
 
 /** 沒給模式的時候：完整遊戲——其他幾個是它的零件或開發版，各自拿出來試。 */
