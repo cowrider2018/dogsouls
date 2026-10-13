@@ -1299,9 +1299,11 @@ function alley(B, flames, seed, A) {
   /* 這一口井是開的：井口是一個坑，跳上井圈再往裡走就掉下去。掉到地下三公尺
      就碰到感測區，送到水窖——從水窖的半空中掉下來。井底沒有路上來，這條路
      是單向的：人掉進去的那一瞬間是整個畫面一片黑，那一片黑就是這條通道。 */
-  well(B, { x: 0, z: WZ, y: 0, r: 1.15, seed: seed + 3, open: true });
+  /* 井口是一扇門（`alley-well`）：這一場的怪物還沒死光的時候關著，井圈與木架照擋路的井
+     登記（跟中庭的井一樣，跳上去站得住、掉不下去）；死光之後開，就是上面說的開井。 */
+  well(B, { x: 0, z: WZ, y: 0, r: 1.15, seed: seed + 3, open: true, door: 'alley-well' });
   // 路標指井口（井的中心、地面那麼高）：感測區在地下三公尺，指那裡箭頭會插進地裡。
-  B.portal(0, WZ, 1.15 * 0.78, -8.5, -3, 'cistern.well', { oneWay: true, aim: { x: 0, y: 0, z: WZ } });
+  B.portal(0, WZ, 1.15 * 0.78, -8.5, -3, 'cistern.well', { oneWay: true, door: 'alley-well', aim: { x: 0, y: 0, z: WZ } });
   /* 從水窖的殘階爬上來的地方：井的南邊、離井心 2.4，面朝井。 */
   B.arrive('stair', 0, 0, WZ - 2.4, 0);
   /* 巷子南端沒入黑霧的那一截：一塊橫過巷子的感測區，從黑牆往裡 0.5（跟城牆那條
@@ -1434,13 +1436,15 @@ export const BLOCKS = [
    這一頭的門扇與那一頭的門扇、兩頭的感測區都是同一筆，一起開關。所以門
    不會只開一頭（走得過去、走不回來，或這邊的閘升起、那邊的還放著）。單向的路
    （井、殘階）不是門，不登記。門扇、門洞裡屬於它的碰撞、感測區，砌的時候
-   都寫這個 `id`（`{ door: 'wallwalk-tower' }`）。
+   都寫這個 `id`（`{ door: 'wallwalk-tower' }`）。窄巷的井是例外：路是單向的，但井口
+   要等那一場打完才開，所以也登記。
 
      name    叫什麼，給看的人（提示、任務的字）。
      blocks  它在哪幾個區塊裡。屬於它的東西只准砌在這幾個區塊裡，而且每一個
              區塊裡都要有一個屬於它的感測區——`buildRuins()` 兩件都查，不對就丟錯。
      open    一開始開著嗎。執行時的狀態另外放（stage.js 的 `doors`，由 setDoor
-             改），不是地圖的版本。 */
+             改），不是地圖的版本。
+     hatch   掉下去的門（井口）：沒有門口、不是走進去的，感測區在坑底。 */
 export const DOORS = [
   // 中庭門樓的鐵閘 ↔ 王座廳南端那堆亂石。
   { id: 'courtyard-throne', name: '王座廳正門', blocks: ['courtyard', 'throne'], open: false },
@@ -1450,6 +1454,9 @@ export const DOORS = [
   { id: 'courtyard-alley', name: '中庭西拱洞', blocks: ['courtyard', 'alley'], open: false },
   // 水窖朝南的鐵閘 ↔ 墓室南端樓梯頂的鐵閘。
   { id: 'cistern-crypt', name: '水窖與墓室間的鐵閘', blocks: ['cistern', 'crypt'], open: false },
+  /* 窄巷的井口：關著的時候井口上是站得住的井圈與木架的牆，開著才掉得下去（送到水窖）。路是
+     單向的，但井口要等騎士打完才開，所以登記成門；什麼時候開跟別的門同一套（route.js 的 doorsFor）。 */
+  { id: 'alley-well', name: '窄巷的井', blocks: ['alley'], open: false, hatch: true },
   // 圓塔腳與塔頂的兩扇門，都在城牆步道裡。一開始關著：兵營走不上牆。
   { id: 'wallwalk-tower', name: '圓塔的兩扇門', blocks: ['wallwalk'], open: false },
 ];

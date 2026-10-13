@@ -1148,27 +1148,40 @@ head('坑都有出口');
 /* 坑（開著的井）底下沒有路上來，出口是感測區：碰到就被送走。兩件事要成立：
    每一個坑的坑底都在某一個感測區裡（不然掉下去就只剩按 R），以及用 mode-terrain.js
    那一套垂直積分真的從坑口掉下去，會在幾秒內碰到它、被送到一個站得住的地方。
-   坑底的感測區不屬於任何一組門（門關著的話掉下去就出不來），所以這裡不給門的狀態。 */
+   坑底的感測區可以屬於一組門（窄巷的井，`hatch`），那樣的話這兩件是門開著的時候：
+   門關著，坑口上是站得住的井圈——從坑口上方掉下來停在坑口以上，碰不到感測區
+   （不然掉下去就出不來：感測區關著）。 */
 {
   const pits = COLS.filter((c) => c.kind === 'pit');
+  const OPEN = Object.fromEntries(DOORS.map((d) => [d.id, true]));
   ok(pits.length > 0, '有登記坑', `${pits.length} 個`);
-  for (const c of pits) {
-    const gate = portalAt(R.portals, c.x, c.bottom, c.z);
-    const name = gate ? BLOCKS.find((q) => q.id === gate.dest.block).name : '';
-    ok(!!gate, '坑底在一個感測區裡', gate ? `送到 ${name}（${gate.to}）` : `(${c.x.toFixed(1)}, ${c.z.toFixed(1)}) 底下什麼都沒有`);
-    if (!gate) continue;
+  /** 從坑口上方 1.2 公尺放下去，走 4 秒：碰到感測區就停。回傳碰到的那一個、花了幾秒、停在哪。 */
+  const drop = (c, doors) => {
     const dt = 1 / 60;
     const p = { x: c.x, y: c.top + 1.2, z: c.z, vy: 0 };
     let hit = null, t = 0;
     for (; t < 4 && !hit; t += dt) {
-      const [sx, sz] = solveXZ(COLS, p.x, p.z, p.y);
+      const [sx, sz] = solveXZ(COLS, p.x, p.z, p.y, doors);
       p.x = sx; p.z = sz;
       const prevY = p.y;
       p.vy -= PHYS.gravity * dt;
       p.y += p.vy * dt;
-      const sup = supportAt(COLS, p.x, p.z, prevY);
+      const sup = supportAt(COLS, p.x, p.z, prevY, doors);
       if (p.y <= sup && p.vy <= 0) { p.y = sup; p.vy = 0; }
-      hit = portalAt(R.portals, p.x, p.y, p.z);
+      hit = portalAt(R.portals, p.x, p.y, p.z, doors);
+    }
+    return { hit, t, p };
+  };
+  for (const c of pits) {
+    const gate = portalAt(R.portals, c.x, c.bottom, c.z, OPEN);
+    const name = gate ? BLOCKS.find((q) => q.id === gate.dest.block).name : '';
+    ok(!!gate, '坑底在一個感測區裡', gate ? `送到 ${name}（${gate.to}）` : `(${c.x.toFixed(1)}, ${c.z.toFixed(1)}) 底下什麼都沒有`);
+    if (!gate) continue;
+    const { hit, t, p } = drop(c, OPEN);
+    if (gate.door) {
+      const shut = drop(c, {});
+      ok(!shut.hit && shut.p.y >= c.top, `${gate.door}：門關著，坑口上站得住、掉不下去`,
+        shut.hit ? `碰到感測區 ${shut.hit.to}` : `停在 y ${shut.p.y.toFixed(2)}`);
     }
     ok(!!hit, '從坑口掉下去會碰到感測區', hit ? `${t.toFixed(2)} 秒，碰到時在 y ${p.y.toFixed(1)}` : `4 秒後停在 y ${p.y.toFixed(1)}`);
     if (hit) {
@@ -1379,7 +1392,9 @@ head('門');
     const nOpen = mine.filter((q) => q.open).length, nShut = mine.length - nOpen;
     ok(nOpen === nShut, `${g}：有門扇的門兩種狀態各一塊`, `開 ${nOpen}、關 ${nShut}`);
     const gates = R.portals.filter((p) => p.door === g);
-    ok(gates.length >= 1 && gates.every((p) => p.mouth), `${g}：開著的時候有感測區，每一個都登記了門口`,
+    // 掉下去的門（`hatch`：窄巷的井）沒有門口、不是走進去的，它的兩種狀態在「坑都有出口」那一項驗。
+    const hatch = DOORS.find((d) => d.id === g).hatch;
+    ok(gates.length >= 1 && (hatch || gates.every((p) => p.mouth)), `${g}：開著的時候有感測區，每一個都登記了門口`,
       `${gates.length} 個感測區`);
     // 一扇門可以連著兩個區塊：每一塊門扇量的是它自己所在那個區塊的黑牆。
     const arenaOf = (id) => R.arenas.find((a) => a.id === id);
