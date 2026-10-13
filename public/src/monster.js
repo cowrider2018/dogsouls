@@ -356,12 +356,13 @@ const STOMP = {
 
 /* ── 跳砸 ── 蓄力是 POUNCE（蓄滿是 POUNCE_MAX），落地緩衝是 LAND。
    蓄力是翹屁股縮頭：pitch 正的是前低後高（屁股翹起來），整隻往後退（back），headPitch 再把頭扳回來
-   平視前面——頭比站著的時候縮到更後面、更低；前腳彎著撐住，尾巴翹高。蓄滿（飛出去的前一刻）再翹、再縮一點。 */
+   平視前面——頭比站著的時候縮到更後面、更低；前腳彎著撐住，尾巴翹高。蓄滿（飛出去的前一刻）再翹、再縮一點。
+   不往下沉（沒有 drop）：前壓的支點在屁股那一端，再沉的話屁股就陷進地板裡。 */
 const POUNCE = {
-  pitch: 0.75, headPitch: -1.20, drop: 0.30, back: 1.20, tailPitch: 1.10,
-  front: -0.60, hind: 0.40, knee: -0.70, legs: 1, w: 1,
+  pitch: 0.55, headPitch: -1.00, back: 1.20, tailPitch: 1.10,
+  front: -0.60, hind: 0.40, knee: -0.50, legs: 1, w: 1,
 };
-const POUNCE_MAX = { ...POUNCE, pitch: 0.85, headPitch: -1.32, back: 1.40, drop: 0.36 };
+const POUNCE_MAX = { ...POUNCE, pitch: 0.62, headPitch: -1.08, back: 1.35 };
 const LAND = {
   pitch: 0.40, headPitch: 0.10, drop: 0.25, tailPitch: 0.40,
   front: -0.30, hind: -0.50, knee: -0.80, legs: 0.9, w: 1,
