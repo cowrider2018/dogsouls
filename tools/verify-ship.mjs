@@ -9,6 +9,7 @@
         而本機的 npm run dev 什麼都送，看不出來）
      3. index.html 載的 script、manifest、圖示都是上線的檔案
      4. 開發模式的表（src/dev-modes.js）沒有上線，boot.js 只動態 import 它
+     5. 怪物描線變色（`?tell`）只在拿得到 dev-modes.js 的時候開，線上開不了
 
    動態 import（`import('./x.js')`）可以指到被排除的檔案：那是開發模式才走得到的路
    （boot.js 拿 dev-modes.js），線上拿不到會退回。
@@ -66,6 +67,10 @@ console.log('\n開發模式');
 ok(!shipped.has('/src/dev-modes.js'), 'src/dev-modes.js 不上線');
 const boot = fs.readFileSync(path.join(ROOT, 'src/boot.js'), 'utf8');
 ok(/await import\('\.\/dev-modes\.js'\)/.test(boot) && /catch/.test(boot), 'boot.js 動態 import dev-modes.js，拿不到就退回完整遊戲');
+ok(/const tell = on\('tell'\) && await import\('\.\/dev-modes\.js'\)\.then\(\(\) => true, \(\) => false\)/.test(boot),
+  '?tell 只在拿得到 dev-modes.js 的時候算數（線上怪物描線不變色）');
+const fight = fs.readFileSync(path.join(ROOT, 'src/fight.js'), 'utf8');
+ok(/critter\.setInkColor\(!TELL \? null :/.test(fight), 'fight.js 的怪物描線變色只看 TELL');
 
 console.log(failed ? `\n${failed} 項沒過` : '\n全部通過');
 process.exit(failed ? 1 : 0);

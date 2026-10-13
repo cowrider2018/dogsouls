@@ -70,6 +70,9 @@ import { MUTE } from './sound.js';
 import { EyeGlow, Spirit, dazeView } from './glare.js';
 import { random } from './chance.js';
 
+/** 怪物的描線變不變色（攻擊中紅、打不到金）：只有開發的 `?tell`，boot.js 驗過才寫 data-tell。 */
+const TELL = globalThis.document?.body?.dataset.tell !== undefined;
+
 /** _compile 記下原本的 scissor 用。 */
 const _scissor = new THREE.Vector4();
 
@@ -1015,8 +1018,9 @@ export class Fight {
       critter.root.position.set(m.x, m.y + mo.lift, m.z);
       critter.setFacing(Math.atan2(m.aimX, m.aimZ));
       /* 攻擊中墨線紅色：跟不可打斷（armored）同出自 attacking。打不到的時候金色，跟主角無敵一樣：站起來的時候
-         （RALLY），與還有盾的時候（國王，下一下會被盾擋掉）。兩樣都有的時候紅色優先。 */
-      critter.setInkColor(attacking(m) ? ATTACK_INK : spared(m) || m.shields > 0 ? GUARD_INK : null);
+         （RALLY），與還有盾的時候（國王，下一下會被盾擋掉）。兩樣都有的時候紅色優先。
+         只在開發的 `?tell` 才變色（boot.js 的 data-tell，線上開不了）；平常怪物的墨線一直是原色。 */
+      critter.setInkColor(!TELL ? null : attacking(m) ? ATTACK_INK : spared(m) || m.shields > 0 ? GUARD_INK : null);
       // 會飛的一直是飄著的姿勢：不踩地、不走路。
       critter.update(dt, {
         speed: Math.hypot(m.vx, m.vz), grounded: m.grounded && !KINDS[m.kind].fly && !mo.air, vy: mo.vy ?? m.vy,
