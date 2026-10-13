@@ -56,9 +56,9 @@
      cone  前肢抬起：整個前半身立起來、兩隻前腳離地收在胸前，頭反過來壓低
            盯著鎖定的方向；倒數最後那一下整隻砸下去，打下去的那一刻前腳踩到地；
            僵直裡再往下一沉，然後慢慢起身。
-     leap  翹屁股縮頭蓄力：前低後高、整隻往後退一截，頭扳回來平視前面——頭比站著的時候縮到
-           更後面、更低，前腳彎著撐住，尾巴翹高，越蓄越翹、越縮（落點跟著主角走，頭左右上下都
-           正對著主角）；
+     leap  往前伸脖子的鞠躬：前低後高、屁股翹起來、整隻往後退一截，頭跟身體差不多平行往前伸，
+           前腳彎著撐住，尾巴翹高；0.3 秒滑順地蹲下去，之後停在最低直到起跳（落點跟著主角走，
+           頭左右上下都正對著主角）；
            最後那一段飛過去的時候跟衝刺一樣是主角的跳躍動作組（在空中、垂直
            速度照那一條拋物線）；落地俯身緩衝，停一下，然後在僵直裡慢慢站起來。
 
@@ -355,14 +355,15 @@ const STOMP = {
 };
 
 /* ── 跳砸 ── 蓄力是 POUNCE（蓄滿是 POUNCE_MAX），落地緩衝是 LAND。
-   蓄力是翹屁股縮頭：pitch 正的是前低後高（屁股翹起來），整隻往後退（back），headPitch 再把頭扳回來
-   平視前面——頭比站著的時候縮到更後面、更低；前腳彎著撐住，尾巴翹高。蓄滿（飛出去的前一刻）再翹、再縮一點。
+   蓄力是往前伸脖子的鞠躬：pitch 正的是前低後高（屁股翹起來），整隻往後退（back），頭幾乎不扳回來
+   （headPitch 只抬一點點），跟身體差不多平行——從屁股到頭是一條往前斜下去的線。頭要是扳回來平視前面，
+   看起來就成了往後仰、立起來。前腳彎著撐住，尾巴翹高。蓄滿（飛出去的前一刻）再翹、再縮一點。
    不往下沉（沒有 drop）：前壓的支點在屁股那一端，再沉的話屁股就陷進地板裡。 */
 const POUNCE = {
-  pitch: 0.55, headPitch: -1.00, back: 1.20, tailPitch: 1.10,
+  pitch: 0.58, headPitch: -0.14, back: 1.28, tailPitch: 1.10,
   front: -0.60, hind: 0.40, knee: -0.50, legs: 1, w: 1,
 };
-const POUNCE_MAX = { ...POUNCE, pitch: 0.62, headPitch: -1.08, back: 1.35 };
+const POUNCE_MAX = { ...POUNCE, pitch: 0.62, headPitch: -0.12, back: 1.35 };
 const LAND = {
   pitch: 0.40, headPitch: 0.10, drop: 0.25, tailPitch: 0.40,
   front: -0.30, hind: -0.50, knee: -0.80, legs: 0.9, w: 1,
@@ -403,8 +404,9 @@ const GLARE = {
 };
 const GLARE_HIT = { ...GLARE, pitch: 0.18, headPitch: -0.12, drop: 0.03 };
 
-/** 跳砸站著蓄力的那一段有多長（之後 SKILL.leap.air 秒在飛）。 */
+/** 跳砸站著蓄力的那一段有多長（之後 SKILL.leap.air 秒在飛）；頭 LEAP_LOW 秒蹲下去，其餘停在最低。 */
 const LEAP_WIND = SKILL.leap.windup - SKILL.leap.air;
+const LEAP_LOW = 0.3;
 
 /** 左右向的欄位（整隻轉、上半身扭與側倒、頭的轉與側、尾巴的擺）：鏡像的時候反號。 */
 const SIDEWAYS = ['yaw', 'twist', 'lean', 'headYaw', 'headTilt', 'tailYaw'];
@@ -481,7 +483,8 @@ export const MOVES = {
     ],
   },
   coneRec: { blend: 0.02, keys: [[0, STOMP], [0.08, { ...STOMP, pitch: 0.36, drop: 0.16 }, 'out'], [SKILL.recover, {}, 'inOut']] },
-  leapWind: { blend: 0.1, keys: [[0, {}], [0.35, POUNCE, 'out'], [LEAP_WIND, POUNCE_MAX, 'inOut']] },
+  /* 跳砸的蓄力：LEAP_LOW 秒滑順地（inOut）蹲到快最低，之後停在最低、慢慢再壓深一點點直到起跳——蹲在最低的時間長。 */
+  leapWind: { blend: 0.1, keys: [[0, {}], [LEAP_LOW, POUNCE, 'inOut'], [LEAP_WIND, POUNCE_MAX, 'lin']] },
   leapAir: { blend: 0.06, keys: [[0, {}]] },
   leapRec: { blend: 0.03, keys: [[0, {}], [0.08, LAND, 'out'], [0.18, LAND, 'lin'], [SKILL.recover, {}, 'inOut']] },
   whirlWind: wring(retime(HERO.leap, SKILL.whirl.windup)),
