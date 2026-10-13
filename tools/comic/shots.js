@@ -335,21 +335,23 @@ export const SHOTS = [
   /* ── 第 4 頁　中庭・戰後 ─────────────────────────────────────── */
   {
     // 殭屍王倒下，靈魂從身上浮出來：中景，殭屍王側著趴平（頭盔蓋住了臉），一顆發光的狗頭從牠背上升起來。
-    id: 'p4-1', size: [860, 720], ink: 3.5,
+    id: 'p4-1', size: [1800, 620], ink: 3.5,
     horizon: 0.62,
     bg: [
-      { piece: 'gateway', span: 5, rise: 3.6, h: 6.4, side: 5, x: 0.5, y: 0.63, size: 0.36 },
-      { piece: 'column', r: 0.46, h: 5.2, broken: 0.6, seed: 4, x: 0.08, y: 0.64, size: 0.2 },
-      { piece: 'column', r: 0.46, h: 5.2, seed: 5, x: 0.93, y: 0.64, size: 0.44 },
+      { piece: 'gateway', span: 5, rise: 3.6, h: 6.4, side: 5, x: 0.5, y: 0.63, size: 0.46 },
+      { piece: 'column', r: 0.46, h: 5.2, broken: 0.6, seed: 4, x: 0.06, y: 0.64, size: 0.24 },
+      { piece: 'column', r: 0.46, h: 5.2, broken: 0.35, seed: 3, x: 0.2, y: 0.64, size: 0.36 },
+      { piece: 'column', r: 0.46, h: 5.2, broken: 0.7, seed: 6, x: 0.8, y: 0.64, size: 0.2 },
+      { piece: 'column', r: 0.46, h: 5.2, seed: 5, x: 0.94, y: 0.64, size: 0.54 },
     ],
     cast: [{ who: 'boss', at: [0, 0], yaw: 2.0, move: { ...FLOP, headTilt: 0.35 } }],
     souls: [{ at: [-0.3, 2.6, -0.2], yaw: 0.6, scale: 1.3 }],
-    cam: { pos: [3.2, 1.1, 5.6], look: [0.0, 1.35, 0], fov: 42 },
+    cam: { pos: [3.2, 1.1, 5.6], look: [0.0, 1.35, 0], fov: 33 },
   },
   {
     // 好渴……：近景。主角坐在一根斷得很低的柱子上，累得眼睛擠成一條、喘氣。三分之四側拍，正面的話
     // 表情會畫到吻部上。
-    id: 'p4-2', size: [1200, 720], ink: 4,
+    id: 'p4-2', size: [900, 720], ink: 4,
     horizon: 0.82,
     bg: [
       { piece: 'arcade', bays: 1, span: 3.1, pier: 0.95, legH: 2.6, depth: 1.0, ruin: 0.3, seed: 9, x: 0.88, y: 0.84, size: 0.7 },
@@ -361,18 +363,27 @@ export const SHOTS = [
     light: [4, 7, 5],
   },
   {
+    // 沒有水……：從斜上方、主角背後俯視。主角趴上中庭那口井（blocks.js 的中庭也有一口）的井圈、頭探進井口
+    // 往下看。井口不放那片黑（mouth: false），留紙色——裡面什麼都沒有。
+    id: 'p4-3', size: [1150, 720], ink: 4,
+    props: [{ piece: 'well', r: 1.1, seed: 2, mouth: false, at: [0, 0] }],
+    cast: [{ who: 'hero', at: [0, 1.05], y: 0.7, yaw: Math.PI, move: { pitch: 0.55, headPitch: 0.55, drop: 0.12, front: -0.9, hind: 0.6, legs: 0.8, tailPitch: 0.3, w: 1 }, shadow: false }],
+    cam: { pos: [1.3, 3.6, 3.1], look: [0, 0, -0.2], fov: 36 },
+    light: [3, 8, 4],
+  },
+  {
     // 窄巷有井：過肩。主角的後腦勺與肩在右下，往西拱洞看出去——拱洞框住遠遠的窄巷，兩排房子的盡頭
     // 是小廣場上的那口井。
-    id: 'p4-3', size: [1200, 720], ink: 3.5,
+    id: 'p4-4', size: [1800, 720], ink: 3.5,
     horizon: 0.6,
     bg: [
-      { piece: 'house', W: 4.6, D: 4, e: 5.4, seed: 3, x: 0.35, y: 0.6, size: 0.3 },
-      { piece: 'house', W: 4.6, D: 4, e: 4.8, seed: 5, x: 0.62, y: 0.6, size: 0.27 },
-      { piece: 'well', r: 1.1, seed: 2, x: 0.485, y: 0.62, size: 0.1 },
+      { piece: 'house', W: 4.6, D: 4, e: 5.4, seed: 3, x: 0.393, y: 0.6, size: 0.3 },
+      { piece: 'house', W: 4.6, D: 4, e: 4.8, seed: 5, x: 0.573, y: 0.6, size: 0.27 },
+      { piece: 'well', r: 1.1, seed: 2, x: 0.483, y: 0.62, size: 0.1 },
       { piece: 'gateway', span: 3.1, rise: 2.6, h: 5.6, side: 6, x: 0.48, y: 1.25, size: 1.6 },
     ],
     cast: [{ who: 'hero', at: [0, 0], yaw: Math.PI + 0.35, move: { headPitch: -0.05, headYaw: 0.15, w: 1 }, face: 'hope', eyes: { lift: 0.2 } }],
-    cam: { focus: 'hero', yaw: 0.25, pitch: 0.05, dist: 1.6, fov: 40, frame: [0.3, 0.32] },
+    cam: { focus: 'hero', yaw: 0.25, pitch: 0.05, dist: 1.6, fov: 40, frame: [0.2, 0.32] },
   },
 
   /* ── 第 5 頁　窄巷・開場 ─────────────────────────────────────── */
