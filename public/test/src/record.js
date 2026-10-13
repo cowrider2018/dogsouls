@@ -112,11 +112,13 @@ function tick(svg) {
 
 /** 把 w×h 的一塊圈起來：繞一圈多一點、越繞越往外，頭尾錯開，頭尾輕、中間重，整個圈微微歪著。 */
 function ring(svg, w, h) {
-  const N = 72, cx = w / 2, cy = h / 2, rx = w / 2 + 5, ry = h / 2 + 4;
+  // 貼著按鈕的框繞（按鈕自己的內距就是字與圈之間的空隙），最外圈只比框大幾個百分點——
+  // 外面那一列留的邊距（index.html 的 .fps）裝得下，不會被卡片裁掉。
+  const N = 72, cx = w / 2, cy = h / 2, rx = w / 2, ry = h / 2;
   const from = -2.5 + jitter(0.2), turn = Math.PI * 2 + 0.75 + jitter(0.15);
-  const tilt = (-4 + jitter(2)) * Math.PI / 180, grow = 0.13 + jitter(0.03), wob = Math.random() * 6;
+  const tilt = (-3 + jitter(1.5)) * Math.PI / 180, grow = 0.09 + jitter(0.02), wob = Math.random() * 6;
   const pts = Array.from({ length: N }, (_, i) => {
-    const t = i / (N - 1), a = from + turn * t, k = 0.95 + grow * t + 0.02 * Math.sin(a * 3 + wob);
+    const t = i / (N - 1), a = from + turn * t, k = 0.94 + grow * t + 0.015 * Math.sin(a * 3 + wob);
     const x = Math.cos(a) * rx * k, y = Math.sin(a) * ry * k;
     return [cx + x * Math.cos(tilt) - y * Math.sin(tilt), cy + x * Math.sin(tilt) + y * Math.cos(tilt)];
   });
