@@ -11,6 +11,8 @@
 
    沒給模式（`?mode=` 空的也算）、或給了不認得的，就是 DEFAULT。線上（Cloudflare）只有 DEFAULT：
    其他模式是開發用的，表在 dev-modes.js，只在本機的 npm run dev 拿得到。
+
+   錄影不是模式，是完整遊戲的開關（`?record`），線上也開得到，見下面 tape。
    ------------------------------------------------------------------ */
 
 import { installFullscreen } from './fullscreen.js';
@@ -22,7 +24,8 @@ export const TITLE = 'Dogsouls: Revive the Kingdom from Zombie Invasion';
 export const DEFAULT = 'game';
 const GAME = { title: TITLE, entry: './mode-flow.js' };
 
-const asked = new URLSearchParams(location.search).get('mode');
+const params = new URLSearchParams(location.search);
+const asked = params.get('mode');
 
 /* 其他模式全在 dev-modes.js，那支跟它們的主程式都列在 public/.assetsignore，不上 Cloudflare。
    所以只有網址真的要了別的模式才去拿：線上拿不到（404）就當作沒給，照樣是完整遊戲；
@@ -35,13 +38,19 @@ if (asked && asked !== DEFAULT) {
 }
 const mode = Object.hasOwn(MODES, asked) ? asked : DEFAULT;
 
-const page = MODES[mode].page || mode;
-document.body.dataset.mode = page;
-if (page !== mode) document.body.dataset.tape = mode;
+/* 錄影（`?record`，給了就開，`record=0` 不算）：完整遊戲，同時錄下每一幀吃了什麼（tape.js），國王坐上王位
+   之後進轉檔畫面（record.js），可以把每一場轉成影片下載。`?replay` 是轉檔的時候 record.js 藏在 iframe 裡重演的
+   那一頁，不是給人開的。兩個都只跟完整遊戲搭：給了別的模式就不算。body 的 data-tape 說是哪一個
+   （mode-flow.js 照它），data-for 也認它（轉檔畫面只有 record 有）。 */
+const on = (k) => params.has(k) && params.get(k) !== '0';
+const tape = mode !== DEFAULT ? null : on('replay') ? 'replay' : on('record') ? 'record' : null;
+
+document.body.dataset.mode = mode;
+if (tape) document.body.dataset.tape = tape;
 document.title = MODES[mode].title || TITLE;
 for (const el of document.querySelectorAll('[data-for]')) {
   const fors = el.dataset.for.split(/\s+/);
-  if (!fors.includes(page) && !fors.includes(mode)) el.remove();
+  if (!fors.includes(mode) && !fors.includes(tape)) el.remove();
 }
 
 installFullscreen();

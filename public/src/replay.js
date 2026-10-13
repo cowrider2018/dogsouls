@@ -1,5 +1,5 @@
 /* ── src/replay.js ───────────────────────────────────────────────────
-   轉檔：重演的那一頁（?mode=replay，record.js 開在一個藏起來的 iframe 裡）。
+   轉檔：重演的那一頁（?replay，record.js 開在一個藏起來的 iframe 裡）。
 
    iframe 跟玩家當時的畫面一樣大（CSS 像素），所以書頁、操作列、手把的版面都跟當時一模一樣。
    這一頁載好之後跟上一層說 ready，收到帶子（tape.js）就回到按下開始的那一刻（mode-flow.js

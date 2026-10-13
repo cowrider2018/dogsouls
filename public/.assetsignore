@@ -7,13 +7,6 @@
 /src/mode-terrain.js
 /src/mode-combat.js
 
-# 錄影模式：轉檔畫面、重演、編碼、混音
-/src/record.js
-/src/replay.js
-/src/reel.js
-/src/film.js
-/vendor/mp4-muxer.mjs
-
 # 音效與音樂的錄音原檔（tools/make-sfx.mjs、make-music.mjs 的輸入，遊戲載的是做好的 .m4a）
 /assets/sfx/recorded/
 /assets/music/recorded/

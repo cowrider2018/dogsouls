@@ -101,7 +101,7 @@ import { Deck, blankTape, END_TAIL } from './tape.js';
 /** 完整遊戲（boot.js 的 game）：完整流程去掉面板、提示字與開發用的鍵。 */
 const GAME = document.body.dataset.mode === 'game';
 /**
- * 錄影模式（boot.js 的 record／replay）：'record' 是完整遊戲、同時錄下每一幀吃了什麼（tape.js），
+ * 錄影（boot.js 的 tape：?record／?replay）：'record' 是完整遊戲、同時錄下每一幀吃了什麼（tape.js），
  * 國王坐上王位就結束、進轉檔畫面（record.js）；'replay' 是轉檔的時候藏在 iframe 裡重演的那一頁
  * （replay.js）。不是錄影模式是 null。
  */

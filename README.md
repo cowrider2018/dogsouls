@@ -22,9 +22,10 @@ http://localhost:8787/ 是完整遊戲。本機另外開得到幾個開發用的
 | `/?mode=terrain` | 地形：四個城堡遺跡區塊，走上去看看 |
 | `/?mode=combat` | 戰鬥：黑牆圍起來的空地，試打每一種怪物 |
 | `/?mode=flow` | 完整流程：完整遊戲加上面板、提示字與開發用的鍵（R 重玩、1–6 跳場） |
-| `/?mode=record` | 錄影：完整遊戲，打完可以把每一場轉成影片下載 |
 
 這幾個模式**不上 Cloudflare**：它們的表（`public/src/dev-modes.js`）與只有它們用得到的檔案列在 [`public/.assetsignore`](public/.assetsignore)，`wrangler deploy` 不會上傳；線上帶任何 `?mode=` 都是完整遊戲。
+
+錄影不是模式，是完整遊戲的開關，**線上也開得到**：`/?record` 是完整遊戲，國王坐上王位之後可以把每一場轉成影片下載（全部在瀏覽器裡做，不上傳）。只跟完整遊戲搭，跟 `?mode=` 一起給就不算。
 
 `npm run dev` 是 `tools/serve.mjs`，一台不讀 `.assetsignore` 的靜態伺服器——`wrangler dev` 跟部署一樣會把那些檔案擋掉，所以不拿它當開發伺服器。想看線上實際的樣子就跑：
 

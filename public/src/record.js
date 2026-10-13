@@ -1,12 +1,12 @@
 /* ── src/record.js ───────────────────────────────────────────────────
-   錄影模式（?mode=record）的轉檔畫面：國王坐上王位之後，遊戲停下來，出現這一張。
+   錄影（?record）的轉檔畫面：國王坐上王位之後，遊戲停下來，出現這一張。
 
    每一場留下來的那一段（打過的那一次）一列、預設全勾，加上 30／60 fps（預設 30）與轉檔鈕；不寫說明。按了
    才轉，只轉勾的那幾場；不按就什麼都不做——轉檔要重演、一張一張畫、編碼，不要的人不該付這個錢。
 
    按下去之後：
      1. 這一頁的 GL 還掉（mode-flow.js 的 release）：重演的那一頁要自己的，手機上兩份放不下。
-     2. 開一個藏起來的 iframe（?mode=replay，replay.js），大小跟開始玩的時候的畫面一樣，
+     2. 開一個藏起來的 iframe（?replay，replay.js），大小跟開始玩的時候的畫面一樣，
         把帶子（tape.js）交給它。
      3. 它每轉好一段就交一支 mp4 回來，這裡馬上存到瀏覽器的下載資料夾（<a download>）。
    全部在玩家的瀏覽器裡做，不上傳、不經過伺服器。轉的時候盡量不讓螢幕睡著（Wake Lock）；
@@ -225,7 +225,8 @@ export function showReel({ tape, stages, release }) {
     try { lock = await navigator.wakeLock?.request('screen'); } catch { /* 不給就算了 */ }
 
     const q = new URLSearchParams(location.search);
-    q.set('mode', 'replay');
+    q.delete('record');
+    q.set('replay', '1');
     q.set('seed', String(tape.meta.bootSeed));
     const frame = document.createElement('iframe');
     frame.className = 'replay';

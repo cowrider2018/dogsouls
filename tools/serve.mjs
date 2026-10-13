@@ -3,7 +3,7 @@
 
    為什麼不是 wrangler dev：wrangler dev 跟 wrangler deploy 一樣讀 public/.assetsignore，
    列在那裡的檔案本機也拿不到——而那幾支正是只在本機用的開發模式（src/dev-modes.js）。
-   這一支不讀 .assetsignore，所以 /?mode=terrain、combat、flow、record 都開得到。
+   這一支不讀 .assetsignore，所以 /?mode=terrain、combat、flow 都開得到。
    想看線上實際的樣子（開發模式都退回完整遊戲）就跑 npm run preview，那是 wrangler dev。
 
    用法：npm run dev            → http://localhost:8787/
@@ -39,5 +39,5 @@ http.createServer((q, r) => {
     r.end(d);
   });
 }).listen(PORT, HOST, () => {
-  console.log(`http://${HOST}:${PORT}/   （開發模式：?mode=terrain、combat、flow、record；Ctrl+C 結束）`);
+  console.log(`http://${HOST}:${PORT}/   （開發模式：?mode=terrain、combat、flow；錄影：?record；Ctrl+C 結束）`);
 });

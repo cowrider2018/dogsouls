@@ -11,7 +11,7 @@
      4. 開發模式的表（src/dev-modes.js）沒有上線，boot.js 只動態 import 它
 
    動態 import（`import('./x.js')`）可以指到被排除的檔案：那是開發模式才走得到的路
-   （boot.js 拿 dev-modes.js、mode-flow.js 在錄影模式拿 record.js），線上拿不到會退回或根本不會走到。
+   （boot.js 拿 dev-modes.js），線上拿不到會退回。
 
    跑法：node tools/verify-ship.mjs
    ------------------------------------------------------------------ */
