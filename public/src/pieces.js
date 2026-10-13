@@ -20,7 +20,6 @@
 
 import { stone, drum, spike, blob, ring, cloth, gablePrism, cap, rng, hashAt } from './geom.js';
 import { C } from './palette.js';
-import { SURF } from './surface.js';
 import { TRIP } from './walk.js';
 
 /* ── 幾何快取 ────────────────────────────────────────────────────
@@ -1128,10 +1127,13 @@ export function well(B, o) {
       });
     }
   }
-  /* 井口那片黑。枯井（dry）換成土：跟地面同一個顏色（stage.js 的地面），井裡是乾的、
-     積滿了土。mouth: false 不放：漫畫裡的枯井從上面看進去，井口留紙色。 */
-  const mouth = o.dry ? { color: 0x6a5844, surf: SURF.plaster } : { color: 0x161310 };
-  if (o.mouth !== false) B.add(B.kit.drum(R * 0.78, R * 0.78, 0.1, 12), { p: [o.x, y + 0.05, o.z], ...mouth, ink: false });
+  /* 井口那片黑。枯井（dry）換成一片土（面在 0.1），跟井外的地面同一個顏色、同一片斑點
+     （B.dirtDisc）：井裡是乾的、積滿了土。mouth: false 不放：漫畫裡的枯井從上面看進去，
+     井口留紙色。 */
+  if (o.mouth !== false) {
+    if (o.dry) B.dirtDisc(o.x, o.z, R * 0.78, y + 0.1);
+    else B.add(B.kit.drum(R * 0.78, R * 0.78, 0.1, 12), { p: [o.x, y + 0.05, o.z], color: 0x161310, ink: false });
+  }
   for (const side of [-1, 1]) {
     B.add(B.kit.brick(0.14, 1.7, 0.14, 0.03), { p: [o.x + side * R * 0.85, y + 0.85, o.z], color: C.wood });
   }
