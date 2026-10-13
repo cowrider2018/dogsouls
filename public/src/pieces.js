@@ -20,6 +20,7 @@
 
 import { stone, drum, spike, blob, ring, cloth, gablePrism, cap, rng, hashAt } from './geom.js';
 import { C } from './palette.js';
+import { SURF } from './surface.js';
 import { TRIP } from './walk.js';
 
 /* ── 幾何快取 ────────────────────────────────────────────────────
@@ -1111,7 +1112,7 @@ export function deadTree(B, o) {
   }
 }
 
-/** 井。一圈石、兩根柱、一根橫木、一只吊桶。dry: 井口裡塌著大石磚（枯井）。 */
+/** 井。一圈石、兩根柱、一根橫木、一只吊桶。dry: 枯井——井底是土，上面塌著大石磚。 */
 export function well(B, o) {
   const r = rng(o.seed);
   const y = o.y || 0, R = o.r || 1.1;
@@ -1127,8 +1128,10 @@ export function well(B, o) {
       });
     }
   }
-  // 井口那片黑。mouth: false 不放：漫畫裡的枯井從上面看進去，井口留紙色。
-  if (o.mouth !== false) B.add(B.kit.drum(R * 0.78, R * 0.78, 0.1, 12), { p: [o.x, y + 0.05, o.z], color: 0x161310, ink: false });
+  /* 井口那片黑。枯井（dry）換成土：跟地面同一個顏色（stage.js 的地面），井裡是乾的、
+     積滿了土。mouth: false 不放：漫畫裡的枯井從上面看進去，井口留紙色。 */
+  const mouth = o.dry ? { color: 0x6a5844, surf: SURF.plaster } : { color: 0x161310 };
+  if (o.mouth !== false) B.add(B.kit.drum(R * 0.78, R * 0.78, 0.1, 12), { p: [o.x, y + 0.05, o.z], ...mouth, ink: false });
   for (const side of [-1, 1]) {
     B.add(B.kit.brick(0.14, 1.7, 0.14, 0.03), { p: [o.x + side * R * 0.85, y + 0.85, o.z], color: C.wood });
   }
@@ -1171,17 +1174,33 @@ export function well(B, o) {
     shut();
   }
   if (o.dry) {
-    /* 枯井：井口裡塌著幾塊大石磚，從上面看大約遮住一半的井口，另一半露出底下
-       那片黑——看得出是石磚掉進井裡堆著，不是蓋住了。每一塊斜著、四成沉在那片黑
-       （頂面 0.1）底下，所以是從黑裡冒出來的，不是擺在黑上面；露出來的頂面在
-       0.2～0.35，低於井圈。站在井圈上踩的是井圈的圓柱。位置與轉向是排好的：
-       轉過之後每一塊的角都在井圈的內緣以內，從上面看合起來遮住 48%。 */
+    /* 枯井：井底的土上塌著幾塊大石磚，從上面看大約遮住一半的井口，另一半露出土。
+       底下五塊斜著、四成沉進土裡（土面 0.1），所以是埋在土裡冒出來的，不是擺在
+       上面；露出來的頂面在 0.2～0.35，低於井圈。另外兩塊疊在上面：一頭擱在下面
+       那一塊的頂上、一頭落在土裡，所以是歪的（三十度上下）——一堆石頭有高有低、
+       互相壓著，才看得出是一堆，不是一塊一塊鋪的。站在井圈上踩的是井圈的圓柱。
+       位置與轉向是排好的：每一塊的角都在井圈的內緣以內，從上面看合起來遮住五成。 */
     const rr = rng(o.seed + 7);
+    const k = R / 1.1, tops = [];
     for (const [dx, dz, s, yaw] of [[-0.36, 0.2, 0.3, 0.4], [0.22, 0.36, 0.25, 1.3], [0.12, -0.34, 0.27, 2.2], [-0.2, -0.42, 0.18, 0.9], [0.5, -0.05, 0.17, 1.9]]) {
-      const k = R / 1.1, sx = 2.2 * s * k, sz = 1.86 * s * k, sy = s * k * rr.range(1.0, 1.3);
+      const sx = 2.2 * s * k, sz = 1.86 * s * k, sy = s * k * rr.range(1.0, 1.3);
       const cx = o.x + dx * k, cy = y + 0.1 + sy * 0.1, cz = o.z + dz * k;
       B.add(B.kit.brick(sx, sy, sz, 0.05, chipAt(cx, cy, cz)), {
         p: [cx, cy, cz], r: [rr.range(-0.25, 0.25), yaw, rr.range(-0.25, 0.25)], color: stoneTone(rr),
+      });
+      tops.push(cy + sy / 2);
+    }
+    /* 疊上去的兩塊：[壓在第幾塊上, 擱在它頂上的那一點 x, z, 落在土裡的那一點 x, z, 寬]。
+       磚的長軸從土裡那一頭指向擱著的那一頭，繞自己的 z 軸抬起 tilt 再轉到那個方向
+       （Euler XYZ、rx = 0：先 Rz 再 Ry）；兩頭各多出 6 公分，擱著的那一頭壓在下面那塊的頂上。 */
+    for (const [on, hx, hz, lx, lz, w] of [[0, -0.33, 0.17, -0.02, 0.06, 0.32], [2, 0.1, -0.3, 0.2, -0.02, 0.3]]) {
+      const hy = tops[on], ly = y + 0.1, th = 0.17 * k;
+      const ax = (hx - lx) * k, az = (hz - lz) * k, run = Math.hypot(ax, az);
+      const tilt = Math.atan2(hy - ly, run);
+      const cx = o.x + ((hx + lx) / 2) * k, cz = o.z + ((hz + lz) / 2) * k;
+      const cy = (hy + ly) / 2 + (th / 2) * Math.cos(tilt);
+      B.add(B.kit.brick(run / Math.cos(tilt) + 0.12, th, w * k, 0.05, chipAt(cx, cy, cz)), {
+        p: [cx, cy, cz], r: [0, Math.atan2(-az, ax), tilt], color: stoneTone(rr),
       });
     }
   }
