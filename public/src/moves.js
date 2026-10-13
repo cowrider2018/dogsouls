@@ -198,7 +198,7 @@ function sample(mv, tau, out) {
 
 /** 動作的每一個欄位（critter.js moveOverlay 認得的那些）。 */
 export const CHANNELS = [
-  'yaw', 'twist', 'lean', 'pitch', 'headYaw', 'headPitch', 'headTilt',
+  'yaw', 'twist', 'lean', 'pitch', 'headYaw', 'headPitch', 'headTilt', 'headFwd', 'headDrop',
   'tailYaw', 'tailPitch', 'drop', 'back', 'front', 'hind', 'knee', 'legs', 'w',
 ];
 

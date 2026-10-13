@@ -1767,6 +1767,8 @@ function airPose(rig, w, rise, dip) {
      lean       上半身往側邊倒（正值往右倒）
      pitch      身體仰俯（連頭與尾巴，不含腿；正值低頭）
      headYaw／headPitch／headTilt   頭再多轉多少（正值：往左、低頭、左耳朝上）
+     headFwd／headDrop             頭整顆搬多遠（模型單位，沿著身體自己的前、下）：不轉，只是換位置——
+                                   身體往前壓的時候把頭沿著身體往前下方送出去，臉的朝向照 head… 那三個
      tailYaw／tailPitch            尾巴的擺與抬（正值：往右、往上）
      drop       身體往下沉多少（模型單位）
      back       整隻往後退多少（模型單位，沿著牠自己的前後）：蓄力時往後縮
@@ -1792,6 +1794,8 @@ function moveOverlay(rig, m) {
   R[B.head * 3] += v('headPitch');
   R[B.head * 3 + 1] += v('headYaw');
   R[B.head * 3 + 2] += v('headTilt');
+  rig.position[B.head * 3 + 2] += v('headFwd');
+  rig.position[B.head * 3 + 1] -= v('headDrop');
   R[B.tail * 3] += v('tailPitch');
   R[B.tail * 3 + 2] += v('tailYaw');
   const w = Math.min(1, Math.max(0, v('legs')));
