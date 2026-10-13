@@ -31,7 +31,7 @@
 import * as THREE from '../vendor/three.module.js';
 import { PHYS, supportInfo } from './walk.js';
 import {
-  FIELD, REACH, KNOCK_SCALE, DAMAGE, KINDS, BREAK_WINDOW, hurt, makeMonster, harm, lifeStep, gainHeart,
+  FIELD, REACH, KNOCK_SCALE, DAMAGE, KINDS, BREAK_WINDOW, LUNGE, hurt, makeMonster, harm, lifeStep, gainHeart,
   dropSoul, soulStep, grabs, bankSouls,
   breaking, broken, breakTarget, startBreak, breakContact, contact, parry, spinStep, separate, placeMonster, monsterStep, bites, knock,
   knockHero, knockLand, daze, dazeStep,
@@ -55,7 +55,7 @@ import {
 import { SoulLook } from './soul.js';
 import { makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, flySoul } from './offer.js';
 import { DEATH, tipAngle, footprint, fallSide, fallHalf, tipNode } from './death.js';
-import { SKILL, RAGE, GUST, WHIRL_LEN, REAP, REND, radiusOf, raging, cut, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, ringsStep, shotHits, strikeHits, gustHits, ringHits, laneLength } from './skills.js';
+import { SKILL, RAGE, GUST, WHIRL_LEN, REAP, REND, radiusOf, raging, cut, makeWorld, bossStep, windDown, wavesStep, shotsStep, gustsStep, ringsStep, shotHits, strikeHits, gustHits, ringHits, laneLength } from './skills.js';
 import { Hearts } from './hearts.js';
 import { Fluid, Sheet } from './fluid.js';
 import { TRAILS } from './trail.js';
@@ -719,13 +719,18 @@ export class Fight {
   }
 
   /**
-   * 失去目標：玩家倒下了。放到一半的招、衝到一半的衝刺取消，之後不再挑招、不再追人——
-   * 被打飛的照拋物線落地，其餘站著（combat.js 的 monsterStep 沒有目標的那一段）。已經
-   * 出手的（飛著的球、往外走的氣流）照常走完。下一次 lineup 才回來。
+   * 失去目標：玩家倒下了。還在倒數的招、還在蓄力的衝刺取消；已經出手的（打倒主角的那一下就是）
+   * 照它的路線與動作播完，連同之後的僵直——不會一倒下就定格。之後不再挑招、不再追人——
+   * 被打飛的照拋物線落地，其餘站著（combat.js 的 monsterStep 沒有目標的那一段、skills.js 的 windDown）。
+   * 飛著的球、往外走的氣流也照常走完。主角這時候打不到（guard 無限大），播完的那幾下不會再扣血。
+   * 下一次 lineup 才回來。
    */
   standDown() {
     this._calm = true;
-    for (const { m } of this.foes) { m.cast = null; m.lunge = null; }
+    for (const { m } of this.foes) {
+      windDown(m);
+      if (m.lunge && m.lunge.t < LUNGE.windup) m.lunge = null;
+    }
   }
 
   /** 收招：連段歸零、朝向放開，怪物不動。倒下的那一刻用（之後不再 lead，屍體不出招）。 */
@@ -819,7 +824,7 @@ export class Fight {
     const strikes = [];
     for (const f of foes) {
       const m = f.m, cast = m.cast, shots = this.world.shots.length;
-      const st = this._calm ? null : bossStep(m, dt, player, this.world);
+      const st = bossStep(m, dt, player, this.world, undefined, this._calm);
       if (this.world.shots.length > shots) sound.play('shot');
       if (!st) continue;
       /* 打下去的那一刻。劍迴旋與上挑是連著好幾幀都在打，只有頭一幀出聲：記在那一招

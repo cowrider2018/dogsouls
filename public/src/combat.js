@@ -703,7 +703,7 @@ export function hurt(m, dmg, respawn = true) {
  * 東西：轉向不欠帳，加速量照 PHYS。
  *
  * `target` 是 null 就是沒有目標（玩家倒下了，Fight.standDown）：被擊退、被推開的照常
- * 飛完、滑完，其餘站著不動，不衝也不追。
+ * 飛完、滑完，已經衝出去的那一下照常衝完、發呆完（不接下一下），其餘站著不動，不衝也不追。
  */
 export function monsterStep(m, dt, target) {
   if (m.rally) rallyStep(m, dt);
@@ -742,6 +742,8 @@ export function monsterStep(m, dt, target) {
     m.broke = false;
     if (!m.rally) { m.stun = LUNGE.recover; m.reel = true; m.cast = null; m.lunge = null; }
   }
+  // 沒有目標：衝出去的那一下播完（還在蓄力的 standDown 已經收掉了），之後站著不動。
+  if (!target && !m.rally && m.lunge && m.lunge.t < LUNGE.windup + LUNGE.time + LUNGE.recover) { lungeStep(m, dt); return; }
   // 沒有目標、站起來的時候（RALLY）、放招中、出招後的僵直（skills.js、回神）：站著不動。
   if (!target || m.rally) { m.lunge = null; m.vx = 0; m.vy = 0; m.vz = 0; return; }
   if (m.cast || m.stun > 0) { m.vx = 0; m.vy = 0; m.vz = 0; return; }

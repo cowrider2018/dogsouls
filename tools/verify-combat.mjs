@@ -162,6 +162,9 @@
     42. 挑招的手感  開場固定：騎士跳砍→劍迴旋、殭屍王兩條命都先吐球、國王劈砍→旋風斬→召喚（第二條命再加瞪視），不管亂數；
                     開場招夠不到就追著不放別招；重生從頭來。之後照冷落加權（越久沒放越容易挑中），
                     同一招最多連兩次。
+    43. 主角倒下之後  （Fight.standDown）已經出手的照它的路線與動作播完：衝出去的那一下衝完、發呆完，
+                    不接下一下（國王一次衝好幾下也是）；跳砍在半空中的照常落地、劈、上挑、僵直，之後不再放招；
+                    第二條命的跳砸不接下一下。還在倒數、還在蓄力的收掉；一直放下去的（連吐、一直召）停在這一下、進僵直。
    ------------------------------------------------------------------ */
 
 import { PHYS } from '../public/src/walk.js';
@@ -173,7 +176,7 @@ import {
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
   SOUL, dropSoul, soulStep, grabs, bankSouls, DAZE, daze, dazeStep, knockHero,
 } from '../public/src/combat.js';
-import { SKILL, RAGE, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill, planOf, IDLE, REPEAT } from '../public/src/skills.js';
+import { SKILL, RAGE, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill, planOf, IDLE, REPEAT, windDown } from '../public/src/skills.js';
 import { steer } from '../public/src/walk.js';
 import { DUST, dustOf, dustFade, QUAKE, quakeBands, quakeFade, quakeTop, PLOW, plowPieces, plowClump } from '../public/src/dust.js';
 import { Motion, bloodOf, sizeOf, mirror, riseLift, MOVES as KNIGHT_MOVES } from '../public/src/monster.js';
@@ -3542,6 +3545,89 @@ console.log('42. 挑招的手感');
     const N = 4000;
     for (let i = 0; i < N; i++) { const k = next(m, 2, rng()); if (k === last) same++; last = k; }
     ok(same / N < 0.4, `騎士連放同一招的比例 ${(same / N).toFixed(2)}（全隨機是 0.5）`);
+  }
+}
+
+/* ── 43. 主角倒下之後 ──────────────────────────────────────────── */
+console.log('43. 主角倒下之後');
+{
+  // Fight.standDown 對每一隻做的事。
+  const settle = (m) => { windDown(m); if (m.lunge && m.lunge.t < LUNGE.windup) m.lunge = null; };
+  const END = LUNGE.windup + LUNGE.time + LUNGE.recover;
+  // 衝刺：衝到一半主角倒下，照常衝完、發呆完，不接下一下（國王一次衝好幾下），之後站著。
+  for (const kind of ['minion', 'king']) {
+    const m = makeMonster({ kind, x: 0, z: 0, yaw: 0 }), p = body(0, LUNGE.range * 0.5);
+    for (let i = 0; i < 300 && !(m.lunge && m.lunge.t >= LUNGE.windup + LUNGE.time * 0.3); i++) monsterStep(m, DT, p);
+    settle(m);
+    const left = END - m.lunge.t, z0 = m.z;
+    let t = 0, chained = false;
+    while (m.lunge && t < 3) { const L = m.lunge; monsterStep(m, DT, null); if (m.lunge && m.lunge !== L) chained = true; t += DT; }
+    const z1 = m.z;
+    for (let i = 0; i < 60; i++) monsterStep(m, DT, null);
+    ok(m.z > z0 + 0.05 && near(t, left, DT + 1e-9) && !chained && !m.lunge && m.z === z1,
+      `${kind}：衝到一半主角倒下，照常衝完（再衝 ${(z1 - z0).toFixed(2)} 公尺）、發呆完（${t.toFixed(2)} 秒），不接下一下，之後站著`);
+    const n = makeMonster({ kind, x: 0, z: 0, yaw: 0 });
+    for (let i = 0; i < 300 && !n.lunge; i++) monsterStep(n, DT, p);
+    settle(n);
+    ok(!n.lunge, `${kind}：還在蓄力的衝刺收掉`);
+  }
+  // 跳砍：在半空中主角倒下，照常落地、劈、上挑、僵直完，之後不再放招。還在倒數的收掉。
+  {
+    const S = SKILL.cleave, keep = KINDS.knight.skills;
+    KINDS.knight.skills = ['cleave'];
+    const m = makeMonster({ kind: 'knight', x: 0, z: 0, yaw: 0 }), w = makeWorld(), q = body(0, 4);
+    m.castT = 0;
+    for (let i = 0; i < 300 && !(m.cast && m.cast.t > S.windup + S.air / 2); i++) bossStep(m, DT, q, w, () => 0);
+    const mid = m.y;
+    settle(m);
+    const kept = !!m.cast;
+    let t = 0, chop = false, fan = false;
+    while (t < 4 && (m.cast || m.stun > 0)) {
+      const st = bossStep(m, DT, q, w, () => 0, true);
+      if (st && st.shape === 'strip') chop = true;
+      if (st && st.shape === 'fan') fan = true;
+      monsterStep(m, DT, null);
+      t += DT;
+    }
+    ok(mid > 0.3 && kept && chop && fan && near(m.y, 0) && !m.cast && !(m.stun > 0),
+      `跳砍在半空中（${mid.toFixed(2)} 公尺）主角倒下：照常落地、劈、上挑、僵直完（${t.toFixed(2)} 秒）`);
+    m.castT = 0;
+    let again = false;
+    for (let i = 0; i < 300; i++) { bossStep(m, DT, q, w, () => 0, true); if (m.cast) again = true; }
+    ok(!again, '播完之後不再放招');
+    const n = makeMonster({ kind: 'knight', x: 0, z: 0, yaw: 0 });
+    n.castT = 0;
+    bossStep(n, DT, q, w, () => 0);
+    const wound = !!n.cast && n.cast.t < S.windup;
+    settle(n);
+    ok(wound && !n.cast && !(n.stun > 0), '還在倒數的跳砍收掉，不進僵直');
+    KINDS.knight.skills = keep;
+  }
+  // 第二條命的跳砸：半空中主角倒下，這一下照常落地，不接下一下，落地才僵直。
+  {
+    const S = SKILL.leap, m = makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 }), w = makeWorld();
+    m.life = 2;
+    m.cast = { skill: 'leap', t: S.windup - S.air / 2, dirX: 0, dirZ: 1, x0: 0, y0: 0, z0: 0, tx: 0, ty: 0, tz: 2 };
+    settle(m);
+    let t = 0, hit = null;
+    while (t < 2 && m.cast) { hit = bossStep(m, DT, body(0, 4), w, () => 0, true) || hit; t += DT; }
+    ok(hit && hit.shape === 'circle' && !m.cast && near(m.z, 2) && m.stun === recoverOf('leap'), '第二條命的跳砸：這一下照常落地、打那一圈，不接下一下、直接僵直');
+  }
+  // 一直放下去的：出手了的停在這一下、進僵直；倒數中的收掉。
+  {
+    const b = makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 });
+    b.life = 2;
+    b.cast = { skill: 'orb', t: SKILL.orb.windup + 0.1, spat: 1, dirX: 0, dirZ: 1 };
+    settle(b);
+    const orb = !b.cast && b.stun === recoverOf('orb');
+    const k = makeMonster({ kind: 'king', x: 0, z: 0, yaw: 0 });
+    k.cast = { skill: 'summon', t: SKILL.summon.windup + 0.1, frail: true, spots: [], next: 1 };
+    settle(k);
+    const summon = !k.cast && k.stun === recoverOf('summon');
+    const g = makeMonster({ kind: 'king', x: 0, z: 0, yaw: 0 });
+    g.cast = { skill: 'glare', t: SKILL.glare.windup - 0.1, dirX: 0, dirZ: 1 };
+    settle(g);
+    ok(orb && summon && !g.cast && !(g.stun > 0), '連吐、一直召：停在這一下、進僵直；倒數中的瞪視收掉（不會瞪到倒下的主角）');
   }
 }
 

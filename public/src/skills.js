@@ -251,6 +251,22 @@ const rangeOf = (m, skill) => (SKILL[skill].range ?? Infinity) * (raging(m) && s
 /** 這一招出完僵直幾秒：那一招自己的 `recover`，沒有就是 SKILL.recover。 */
 export const recoverOf = (skill) => SKILL[skill].recover ?? SKILL.recover;
 
+/** 招在什麼時候出手（倒數走完）：跳砸是起跳的那一刻，兩套連斬是跳砍那一跳。 */
+const LAUNCH = { leap: SKILL.leap.windup - SKILL.leap.air, reapAir: SKILL.cleave.windup, reapGround: SKILL.cleave.windup };
+const launched = (c) => c.t >= (LAUNCH[c.skill] ?? SKILL[c.skill].windup);
+
+/**
+ * 主角倒下了（Fight.standDown）：放到一半的招怎麼收。還在倒數的收掉；一直放下去的（第二條命連吐球、
+ * 一直召）出手了的話停在這一下、進僵直；其餘出手了的照它的路線與動作播完（bossStep 的 calm）——
+ * 打倒主角的那一下就在這裡面，不會停在半空中或劈到一半。
+ */
+export function windDown(m) {
+  const c = m.cast;
+  if (!c) return;
+  if (!launched(c)) m.cast = null;
+  else if (c.skill === 'orb' || c.frail) { m.cast = null; m.stun = recoverOf(c.skill); }
+}
+
 /** 這一次召喚召幾隻：補到 cap 為止，一次最多 each 隻（0～2 隻時召 2、3 隻時召 1、滿了 0）。 */
 export const summonCount = (m) => Math.max(0, Math.min(SKILL.summon.each, SKILL.summon.cap - (m.brood || 0)));
 
@@ -807,10 +823,13 @@ function waveHits(st, p) {
  *
  * 挑招只從夠得到的招裡挑（`range`，見檔頭，第二條命的扇形見 RAGE；召喚還要場上沒滿，READY），照記性挑（planOf）；一招都挑不到的話不重新計時，下一幀再看。
  *
+ * calm：主角倒下了（windDown 收過一次），target 是牠倒下的地方。不挑新招，放到一半的照常播完，
+ * 播完不接下一下（第二條命的跳砸）。
+ *
  * @param {() => number} rng 挑招用的亂數（離線驗證給固定的）
  * @returns {object|null} 這一幀打下來的範圍攻擊（給 strikeHits），沒有就是 null
  */
-export function bossStep(m, dt, target, world, rng = random) {
+export function bossStep(m, dt, target, world, rng = random, calm = false) {
   const k = kindOf(m);
   const list = skillsOf(m);
   if (!list.length || m.rally) return null;   // 站起來的時候（combat.js 的 RALLY）不放招
@@ -820,7 +839,7 @@ export function bossStep(m, dt, target, world, rng = random) {
   }
   m.castT -= dt;
   // 衝刺（combat.js 的 LUNGE）打完才挑下一招，兩件事不會疊在一起。
-  if (!m.cast && m.castT <= 0 && !busy(m) && !(m.stun > 0) && !m.lunge) {
+  if (!calm && !m.cast && m.castT <= 0 && !busy(m) && !(m.stun > 0) && !m.lunge) {
     const gap = Math.hypot(target.x - m.x, target.z - m.z);
     const can = list.filter((s) => gap <= rangeOf(m, s) && (!READY[s] || READY[s](m)));
     const skill = can.length ? choose(m, list, can, rng) : null;
@@ -830,9 +849,11 @@ export function bossStep(m, dt, target, world, rng = random) {
     }
   }
   if (!m.cast) return null;
-  m.cast.t += dt;
-  const skill = m.cast.skill;
+  const c = m.cast;
+  c.t += dt;
+  const skill = c.skill;
   const hit = CAST[skill](m, world, target) || null;
+  if (calm && m.cast !== c) m.cast = null;
   if (!m.cast) m.stun = recoverOf(skill);              // 出完了：僵直
   // 地震：打下去的這一刻是震波的起點，之後由 wavesStep 一圈一圈往外推，不是一次打完。
   if (hit && QUAKE[hit.shape]) world.waves.push(Object.assign(hit, { t: 0, from: 0, to: 0, fresh: true, done: false }));
