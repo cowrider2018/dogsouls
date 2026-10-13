@@ -8,6 +8,8 @@
      片段前一點  WARM 秒開始畫但不錄：光影、霧、後製有些東西是一幀一幀累積的，先讓它們跟上。
      片段裡      畫，最多每秒 fps 張（玩家選的 30 或 60）交給 film.js 拍下來、reel.js 編進影片；音效與音樂接到這一段
                  自己的離線混音上（時鐘換成影片的時間）。最後一幀之後混音、裝箱，整支交給上一層下載。
+                 書頁蓋住的那幾幀（tape.js 的 covers）只算不畫，影片的時間也不走：那時候世界停著，
+                 跳過去前後接得上。書頁本身不拍（Film 的 story 關掉），影片裡只有戰鬥。
    只轉玩家勾的那幾場：最後一場勾的錄完就停，後面不再快轉。每一段一支 mp4，打完一段就交一段。帶子的指紋對不上（重演走歪了）也照錄，最後跟上一層說。
 
    跟上一層講話都用 postMessage（同源）：
@@ -21,8 +23,7 @@
 
 import { Film } from './film.js';
 import { Reel, pickFormat, canReel, clockedContext, offlineMix } from './reel.js';
-import { sceneEnd, sceneSeconds, TAPE_VERSION } from './tape.js';
-import { PAGES } from './comic.js';
+import { sceneEnd, sceneSeconds, coverMask, TAPE_VERSION } from './tape.js';
 
 /**
  * 影片的大小：照玩家當時畫面的實際解析度（CSS 像素 × renderer 的像素比），像素量超過 MAX_PIXELS
@@ -62,17 +63,6 @@ async function pickVideo(view, dpr, fps) {
     if (format.video) return { ...size, format };
   }
   return null;
-}
-
-/** 漫畫的每一張圖都載好（書頁要畫進影片，圖還沒到就是空的一格）。 */
-async function comicLoaded() {
-  const srcs = new Set();
-  for (const page of PAGES) for (const p of page.panels) for (const src of [p.src, ...(p.strips || []).map((st) => st.src)]) if (src) srcs.add(src);
-  await Promise.all([...srcs].map((src) => {
-    const img = new Image();
-    img.src = src;
-    return img.decode().catch(() => {});
-  }));
 }
 
 /**
@@ -124,12 +114,16 @@ async function replay(game, tape, pick, fps) {
 
   /* 每一場一支影片，每一支照那一場自己的畫面定大小與方向：按下開始的那一刻畫面不一定是玩的時候的樣子
      （開始畫面直拿、玩的時候才轉橫；按開始的那一下才進全螢幕，畫面過幾幀才變大）。一段裡畫面變過的話
-     照佔最久的那一個，其他的那幾段等比縮進來、留黑邊。 */
+     照佔最久的那一個，其他的那幾段等比縮進來、留黑邊。
+     蓋著的幀（mask）不畫也不算時間：開場頁蓋住的那一刻開始的一段，從書頁一掀開的那一幀錄起，暖身也只數沒蓋著的幀。 */
+  const mask = coverMask(tape);
   const scenes = tape.scenes.filter((sc) => pick.has(sc.k)).map((sc) => {
-    const last = sceneEnd(tape, sc);
-    let from = sc.start, t = 0;
-    while (from > 0 && t < WARM) t += tape.dt[--from];
-    return { ...sc, last, from, seconds: sceneSeconds(tape, sc) };
+    const last = sceneEnd(tape, sc, mask);
+    let start = sc.start;
+    while (start < last && mask[start]) start++;
+    let from = start, t = 0;
+    while (from > 0 && t < WARM) if (!mask[--from]) t += tape.dt[from];
+    return { ...sc, start, last, from, seconds: sceneSeconds(tape, sc, mask) };
   });
   scenes.forEach((sc, n) => {
     if (n) sc.from = Math.max(sc.from, scenes[n - 1].last + 1);        // 暖身不伸進上一段
@@ -139,7 +133,7 @@ async function replay(game, tape, pick, fps) {
     for (let i = sc.from; i <= sc.last; i++) {
       for (; at < tape.views.length && tape.views[at][0] <= i; at++) view = tape.views[at][1];
       const key = keyOf(view), slot = time.get(key) || { view, t: 0 };
-      slot.t += tape.dt[i];
+      if (!mask[i]) slot.t += tape.dt[i];
       time.set(key, slot);
     }
     sc.view = [...time.values()].sort((a, b) => b.t - a.t)[0].view;
@@ -170,13 +164,12 @@ async function replay(game, tape, pick, fps) {
   game.sound.attach(offlineMix(0.1));
   await game.sound.ready();
   game.sound.detach();
-  await comicLoaded();
 
   game.rewind(meta);
   let film = null;
   // 最後一場要轉的錄完就停：之後的不必再快轉。
   const N = scenes.length ? scenes[scenes.length - 1].last + 1 : 0;
-  const shots = scenes.reduce((n, sc) => n + (sc.last - sc.start + 1), 0);
+  const shots = scenes.reduce((n, sc) => n + mask.subarray(sc.start, sc.last + 1).reduce((m, v) => m + 1 - v, 0), 0);
   const total = N + shots * SHOT_COST;
   let done = 0, told = 0;
   /** 時間花在哪（毫秒）：快轉的幀、畫的幀（世界＋GL）、拍（疊圖層）、等編碼器、混音裝箱；各幾幀。 */
@@ -191,7 +184,7 @@ async function replay(game, tape, pick, fps) {
     // 暖身開始（片段開始前 WARM 秒）：畫面換成這一場的大小。
     if (sc && i === sc.from) {
       filming = sc;
-      film = new Film(sc.size.width, sc.size.height);
+      film = new Film(sc.size.width, sc.size.height, { story: false });
       apply();
     }
     if (sc && i === sc.start) {
@@ -201,10 +194,10 @@ async function replay(game, tape, pick, fps) {
       game.sound.attach(clock);
       game.music.attach(clock);
     }
-    const real = tape.dt[i];
-    // 這一幀要不要畫：片段裡到了下一張的時間才畫；片段前 WARM 秒畫但不錄；其他的不畫。
-    const shoot = !!cut && cut.t >= cut.next - 1e-6;
-    const draw = shoot || (!!sc && i >= sc.from && i < sc.start);
+    const real = tape.dt[i], hidden = mask[i] === 1;
+    // 這一幀要不要畫：片段裡到了下一張的時間才畫；片段前 WARM 秒畫但不錄；書頁蓋著的、其他的不畫。
+    const shoot = !!cut && !hidden && cut.t >= cut.next - 1e-6;
+    const draw = shoot || (!!sc && !hidden && i >= sc.from && i < sc.start);
     let t0 = clockIn();
     game.step(real, draw);
     const t1 = clockIn();
@@ -218,8 +211,8 @@ async function replay(game, tape, pick, fps) {
       cost.encode += clockIn() - t2;
       cut.next = Math.max(cut.next + 1 / fps, cut.t);
       done += SHOT_COST;
-    } else if (cut) done += SHOT_COST;
-    if (cut) cut.t += real;
+    } else if (cut && !hidden) done += SHOT_COST;
+    if (cut && !hidden) cut.t += real;
 
     if (cut && i === cut.sc.last) {
       game.sound.detach();

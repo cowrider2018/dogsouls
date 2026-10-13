@@ -534,6 +534,12 @@ export class Fight {
   keep() { for (const f of this._corpses) f.corpse.kept = true; }
 
   /**
+   * 屍體全都倒定了：每一具都躺平落地（_decay 的 down），幽靈炸開收掉了。錄影照它收一場的片段
+   * （mode-flow.js 的 settle）。
+   */
+  get settled() { return this._corpses.every((f) => f.corpse.down !== null); }
+
+  /**
    * 獻靈魂的地方：躺平落地的國王（REST 的 lie）身體的中間——倒向那一邊、離腳半個身高，
    * 高度是躺著那一身的一半。還沒躺下（或沒有國王）是 null。
    */

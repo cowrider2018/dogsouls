@@ -9,6 +9,7 @@
      4. 片段       走進第 k 場記開始、打完記結束；倒下重打的話開始換成重打的那一次；
                    sceneEnd 照 dt 多錄 tail 秒、不超過帶子的尾巴；sceneSeconds 是那一段的秒數。
      5. 開始以前   還沒 roll 的時候（開始畫面）問操作是原樣問，不錄。
+     6. 書頁蓋住   蓋著的幀記成一段一段（covers）；片段的尾巴與長度都不算蓋著的幀。
 
    跑法：node tools/verify-tape.mjs
    ------------------------------------------------------------------ */
@@ -164,6 +165,29 @@ console.log('5. 開始以前');
   deck.wrap(w.controls, ['axis', 'jumpPressed', 'jumpDown']);
   w.controls.jumpPressed();
   ok(asked === 1 && t.calls.length === 0, '還沒 roll：照樣問，不錄');
+}
+
+console.log('6. 書頁蓋住');
+{
+  const w = makeWorld(input);
+  const t = blankTape({});
+  const deck = new Deck('record', t, { cam: w.cam, story: w.story, pad: w.pad, view: () => ({ w: 1, h: 1 }), sum: w.sum });
+  deck.roll();
+  // 第 30～59 幀、第 70 幀書頁蓋著；第 95～399 幀是收片段之後才蓋住的戰後頁（尾巴只數沒蓋著的幀）。
+  const covered = (i) => (i >= 30 && i < 60) || i === 70 || (i >= 95 && i < 400);
+  const marks = { 10: () => deck.enter(0), 90: () => deck.close(0, 0.25) };
+  for (let i = 0; i < 420; i++) {
+    deck.begin(1 / 60);
+    w.story.covered = covered(i);
+    marks[i]?.();
+    deck.end();
+  }
+  ok(JSON.stringify(t.covers) === JSON.stringify([[30, 59], [70, 70], [95, 399]]), `連著的蓋著併成一段：${JSON.stringify(t.covers)}`);
+  const sc = t.scenes[0], last = sceneEnd(t, sc);
+  // 尾巴 15 幀：91～94 四幀，跳過 95～399，接著 400～410（加到不少於 0.25 秒，多一幀也對）。
+  ok(last >= 410 && last <= 411, `尾巴跳過蓋著的幀：收到第 ${last} 幀`);
+  const kept = last - sc.start + 1 - 30 - 1 - 305;
+  ok(Math.abs(sceneSeconds(t, sc) - kept / 60) < 1e-9, `長度只算沒蓋著的 ${kept} 幀`);
 }
 
 console.log(fails ? `\n${fails} 項沒過` : '\n全部通過');

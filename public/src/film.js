@@ -107,10 +107,13 @@ export class Film {
   /**
    * @param {number} width 影片的寬（畫素）
    * @param {number} height 影片的高
+   * @param {{story?: boolean}} [opts] story：拍不拍書頁。關卡錄影只拍戰鬥，關掉（replay.js）；
+   *   以後一次過的全錄模式要拍漫畫的話打開——書頁那一整套（_story 以下）就是給它留的。
    */
-  constructor(width, height) {
+  constructor(width, height, { story = true } = {}) {
     this.width = width;
     this.height = height;
+    this.story = story;
     this.canvas = document.createElement('canvas');
     this.canvas.width = width;
     this.canvas.height = height;
@@ -177,7 +180,7 @@ export class Film {
     if (el.dream && el.dream.style.visibility === 'visible') this._dream(f);
     this._rails(f);
     g.drawImage(el.pad, 0, 0, f.w, f.h);
-    if (el.story && el.story.classList.contains('on')) this._story(f, t);
+    if (this.story && el.story && el.story.classList.contains('on')) this._story(f, t);
     g.setTransform(1, 0, 0, 1, 0, 0);
     return this.canvas;
   }

@@ -303,16 +303,19 @@ function startFrom(k) {
 function engage() {
   const k = run.next;
   run.active = true;
-  deck?.enter(k);
   applyDoors();
   const say = () => hud.flash(`第 ${k + 1} 場：${stageName(k)}`);
   const comic = !!SCRIPT.open[k] && !opened.has(k);
   const how = entranceOf(k, appeared.has(k), comic);
   spawnIn = how === 'comic' ? Infinity : SPAWN_DELAY;
+  // 錄影：這一場的片段從這裡開始；有開場頁的話從書頁蓋住的那一刻（怪物這時站好，蓋著的幀轉檔的時候跳過，tape.js）。
   if (comic) {
     opened.add(k);
-    story.start(pagesOf(SCRIPT.open[k]), { then: say, cover: how === 'comic' ? () => appear(k, false) : null });
-  } else say();
+    story.start(pagesOf(SCRIPT.open[k]), { then: say, cover: () => { deck?.enter(k); if (how === 'comic') appear(k, false); } });
+  } else {
+    deck?.enter(k);
+    say();
+  }
 }
 
 /** 第 k 場的怪物上場：`rise` 是從站位底下升上來，不然直接站在站位上。這一場算登場過了。 */
@@ -337,15 +340,19 @@ function clear() {
   const k = run.next - 1;
   // 墓室打完不走回去：書頁蓋住的時候直接送到下一場的休息點（route.js 的 warp）。
   const warpTo = STAGES[k].warp && !done ? () => place(restAt(run.next, ruins)) : null;
-  // 錄影模式：戰後的漫畫翻完，這一場的片段就到這裡（最後一場到國王坐上王位，見 play）。
-  const say = () => {
-    hud.flash(done ? '六場全部打完——門全開了' : `這一場清完了。下一場：${stageName(run.next)}`);
-    if (!done) deck?.close(k);
-  };
+  const say = () => hud.flash(done ? '六場全部打完——門全開了' : `這一場清完了。下一場：${stageName(run.next)}`);
+  // 錄影：這一場的片段收在屍體全落地（settle）。墓室打完被送走的話等不到——收在書頁蓋住、送走之前。
+  closing = k;
   // 王座廳的戰後頁（第 14 頁）只演到國王倒下：書頁走了才交靈魂，國王復活那一頁另外翻（SCRIPT.offered）。
   // 沒有戰後頁的話只有慢動作，慢完才開門、浮字。
   const pages = SCRIPT.after[k] ? pagesOf(SCRIPT.after[k]) : [];
-  const cover = () => { if (warpTo) warpTo(); applyDoors(); };
+  const cover = () => {
+    if (warpTo) {
+      if (closing === k) { deck?.close(k, 0); closing = null; }
+      warpTo();
+    }
+    applyDoors();
+  };
   story.start(pages, { slow: true, cover: pages.length ? cover : null, then: pages.length ? say : () => { applyDoors(); say(); } });
   if (!done) hud.paint({ block: STAGES[run.next].id });
 }
@@ -455,16 +462,24 @@ function worldSum() {
   return out;
 }
 
-/** 錄影模式：國王坐上王位之後已經多錄了幾秒（END_TAIL 秒就結束）；null = 還沒坐好。 */
+/** 錄影：清完、片段還沒收的那一場（k）；null = 沒有。 */
+let closing = null;
+/** 錄影模式：國王坐上王位之後過了幾秒（END_TAIL 秒就結束）；null = 還沒坐好。 */
 let ending = null;
 /** 整場結束了：主迴圈不再排下一幀。 */
 let stopped = false;
 
-/** 錄影模式每一幀問一次：國王坐好了沒有。坐好了就收最後一段、再錄 END_TAIL 秒，然後結束。 */
+/** 錄影模式每一幀問一次：清完的那一場屍體全落地了沒有（fight.js 的 settled），落地了就收這一段。 */
+function settle() {
+  if (closing === null || !fight.settled) return;
+  deck.close(closing);
+  closing = null;
+}
+
+/** 錄影模式每一幀問一次：國王坐好了沒有。坐好了再過 END_TAIL 秒就結束（片段早就收好了，見 settle）。 */
 function watchThrone(real) {
   if (ending === null) {
     if (fight.king?.trip?.phase !== 'seated') return;
-    deck.close(STAGES.length - 1, END_TAIL);
     ending = 0;
   }
   ending += real;
@@ -528,7 +543,7 @@ function step(real, draw = true) {
   play(real, draw);
   if (deck) {
     deck.end();
-    if (TAPE === 'record') watchThrone(real);
+    if (TAPE === 'record') { settle(); watchThrone(real); }
   }
 }
 
