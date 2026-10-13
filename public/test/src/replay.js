@@ -6,13 +6,13 @@
    的 rewind），照帶子一幀一幀推世界：
      片段外      只算不畫（快轉）。世界照樣每一幀都走——少走一幀，後面就全歪了。
      片段前一點  WARM 秒開始畫但不錄：光影、霧、後製有些東西是一幀一幀累積的，先讓它們跟上。
-     片段裡      畫，最多每秒 FPS 張交給 film.js 拍下來、reel.js 編進影片；音效與音樂接到這一段
+     片段裡      畫，最多每秒 fps 張（玩家選的 30 或 60）交給 film.js 拍下來、reel.js 編進影片；音效與音樂接到這一段
                  自己的離線混音上（時鐘換成影片的時間）。最後一幀之後混音、裝箱，整支交給上一層下載。
-   每一段一支 mp4，打完一段就交一段。帶子的指紋對不上（重演走歪了）也照錄，最後跟上一層說。
+   只轉玩家勾的那幾場：最後一場勾的錄完就停，後面不再快轉。每一段一支 mp4，打完一段就交一段。帶子的指紋對不上（重演走歪了）也照錄，最後跟上一層說。
 
    跟上一層講話都用 postMessage（同源）：
      → { type: 'ready' }
-     ← { type: 'tape', tape }
+     ← { type: 'tape', tape, pick, fps }        pick：要轉的那幾場（k）；fps：30 或 60
      → { type: 'progress', done, total, scene }    done／total 是幀數（快轉的幀與錄的幀權重不同）
      → { type: 'file', k, name, blob }
      → { type: 'done', drift }                     drift：第一個對不上的幀，-1 是都對得上
@@ -26,9 +26,9 @@ import { PAGES } from './comic.js';
 
 /**
  * 影片的大小：照玩家當時畫面的實際解析度（CSS 像素 × renderer 的像素比），像素量超過 MAX_PIXELS
- * （1080p）才等比縮小；寬高都取 16 的倍數（見 videoSize）。一秒最多 FPS 張。
+ * （1080p）才等比縮小；寬高都取 16 的倍數（見 videoSize）。一秒幾張是玩家選的（FPS 的一個）。
  */
-export const MAX_PIXELS = 1920 * 1088, FPS = 60;
+export const MAX_PIXELS = 1920 * 1088, FPS = [30, 60];
 /** 片段開始前幾秒先畫起來（不錄）。 */
 const WARM = 0.5;
 /** 錄的一幀當作快轉的幾幀（進度條的權重：畫、拍、編比只算貴很多）。 */
@@ -55,10 +55,10 @@ export function videoSize(view, dpr = 2, shrink = 1) {
 }
 
 /** 挑一個這個瀏覽器編得了的大小：當時的解析度先試，不行就縮成 3/4、1/2。 */
-async function pickVideo(view, dpr) {
+async function pickVideo(view, dpr, fps) {
   for (const shrink of [1, 0.75, 0.5]) {
     const size = videoSize(view, dpr, shrink);
-    const format = await pickFormat(size.width, size.height, FPS);
+    const format = await pickFormat(size.width, size.height, fps);
     if (format.video) return { ...size, format };
   }
   return null;
@@ -80,16 +80,16 @@ async function comicLoaded() {
  * renderer、sound、music、stages（每一場的名字）。
  */
 export async function serve(game) {
-  const tape = await new Promise((resolve) => {
+  const { tape, pick, fps } = await new Promise((resolve) => {
     addEventListener('message', function take(e) {
       if (e.origin !== location.origin || e.data?.type !== 'tape') return;
       removeEventListener('message', take);
-      resolve(e.data.tape);
+      resolve(e.data);
     });
     post({ type: 'ready' });
   });
   try {
-    await replay(game, tape);
+    await replay(game, tape, new Set(pick), FPS.includes(fps) ? fps : FPS[FPS.length - 1]);
   } catch (e) {
     post({ type: 'error', message: String(e?.message || e) });
   }
@@ -115,11 +115,11 @@ function fitTo(game, view, s, size = null) {
   if (size) game.renderer.setDrawingBufferSize((size.width + 0.5) / s, (size.height + 0.5) / s, s);
 }
 
-async function replay(game, tape) {
+async function replay(game, tape, pick, fps) {
   if (tape?.version !== TAPE_VERSION) throw new Error('帶子的格式不對');
   if (!canReel()) throw new Error('這個瀏覽器不能轉檔（沒有 WebCodecs）');
   const { meta } = tape;
-  const picked = await pickVideo(meta.view, meta.dpr || Math.min(devicePixelRatio || 1, 2));
+  const picked = await pickVideo(meta.view, meta.dpr || Math.min(devicePixelRatio || 1, 2), fps);
   if (!picked) throw new Error('這個瀏覽器編不了任何一種影片格式');
   const { s, width, height, format } = picked;
 
@@ -136,8 +136,10 @@ async function replay(game, tape) {
 
   game.rewind(meta);
   const film = new Film(width, height);
-  const scenes = tape.scenes.map((sc) => ({ ...sc, last: sceneEnd(tape, sc), seconds: sceneSeconds(tape, sc) }));
-  const N = tape.dt.length;
+  const scenes = tape.scenes.filter((sc) => pick.has(sc.k))
+    .map((sc) => ({ ...sc, last: sceneEnd(tape, sc), seconds: sceneSeconds(tape, sc) }));
+  // 最後一場要轉的錄完就停：之後的不必再快轉。
+  const N = scenes.length ? scenes[scenes.length - 1].last + 1 : 0;
   const shots = scenes.reduce((n, sc) => n + (sc.last - sc.start + 1), 0);
   const total = N + shots * SHOT_COST;
   let done = 0, told = 0;
@@ -158,7 +160,7 @@ async function replay(game, tape) {
     const sc = scenes[k];
     if (sc && i === sc.start) {
       const mix = offlineMix(sc.seconds);
-      cut = { sc, reel: new Reel({ width, height, fps: FPS, format }), mix, t: 0, next: 0 };
+      cut = { sc, reel: new Reel({ width, height, fps, format }), mix, t: 0, next: 0 };
       const clock = clockedContext(mix, () => cut.t);
       game.sound.attach(clock);
       game.music.attach(clock);
@@ -178,7 +180,7 @@ async function replay(game, tape) {
       cost.shoot += t2 - t1;
       await cut.reel.frame(pic, cut.t);
       cost.encode += clockIn() - t2;
-      cut.next = Math.max(cut.next + 1 / FPS, cut.t);
+      cut.next = Math.max(cut.next + 1 / fps, cut.t);
       done += SHOT_COST;
     } else if (cut) done += SHOT_COST;
     if (cut) cut.t += real;

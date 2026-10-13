@@ -167,8 +167,8 @@
   #start:active { transform: translateY(4px); box-shadow: 0 0 0 #5c9628; }
 
   /* ── 轉檔畫面（錄影模式，record.js）─────────────────────────────
-     國王坐上王位之後蓋住整個畫面：暗下去的遊戲上面一張跟開始畫面同一種紙的卡片，列出每一場
-     留下來的那一段，按了才轉。重演的那一頁（iframe.replay）跟開始玩的時候的畫面一樣大，
+     國王坐上王位之後蓋住整個畫面：暗下去的遊戲上面一張跟開始畫面同一種紙的卡片。不寫說明，只有
+     每一場一列（勾的才轉）、30／60 fps、轉檔鈕，按了之後是進度。重演的那一頁（iframe.replay）跟開始玩的時候的畫面一樣大，
      藏在最底下——它的版面要跟當時一模一樣，所以不縮放，只是看不見。 */
   #reel {
     position: fixed; inset: 0; z-index: 7;
@@ -189,16 +189,18 @@
       repeating-linear-gradient(90deg, rgba(110, 85, 50, .035) 0 1px, transparent 1px 4px);
     box-shadow: inset 0 0 28px rgba(120, 88, 45, .38), 0 14px 34px rgba(0, 0, 0, .5);
   }
-  #reel h2 { margin: 0; font-size: 20px; letter-spacing: .3em; }
   #reel p { margin: 0; font-size: 13px; line-height: 1.7; }
-  #reel .note { opacity: .7; font-size: 12px; }
   #reel .scenes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
-  #reel .scenes li { display: grid; grid-template-columns: 1fr auto 4.5em; gap: 10px; align-items: baseline;
+  #reel .scenes li { display: grid; grid-template-columns: auto 1fr auto 4.5em; gap: 10px; align-items: center;
     padding: 5px 0; border-bottom: 1px solid rgba(43, 35, 32, .15); font-size: 13px; }
   #reel .scenes .len { font-variant-numeric: tabular-nums; opacity: .7; }
   #reel .scenes .state { text-align: right; font-size: 12px; opacity: .75; }
   #reel .scenes li.now .state { opacity: 1; font-weight: 700; }
   #reel .scenes li.saved .state { color: #4d7a1f; opacity: 1; }
+  #reel input { accent-color: #5c9628; width: 16px; height: 16px; margin: 0; }
+  #reel .fps { display: flex; gap: 18px; font-size: 13px; }
+  #reel .fps label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  #reel.busy input, #reel.over input { pointer-events: none; opacity: .6; }
   #reel .go {
     width: 100%; padding: 13px; border: 0; border-radius: 12px;
     font: 700 16px/1 system-ui, sans-serif; letter-spacing: .2em; text-indent: .2em;
@@ -209,7 +211,8 @@
   #reel .bar { display: none; height: 8px; border: 1px solid var(--ink-page); background: #f7eedb; }
   #reel.busy .bar, #reel.over .bar { display: block; }
   #reel .bar i { display: block; height: 100%; width: 0; background: #7fae3e; transition: width .2s linear; }
-  #reel .say { min-height: 1.7em; font-weight: 700; }
+  #reel .say { display: none; min-height: 1.7em; font-weight: 700; }
+  #reel.busy .say, #reel.over .say { display: block; }
   iframe.replay { position: fixed; left: 0; top: 0; border: 0; z-index: -1; visibility: hidden; pointer-events: none; }
 
   /* ── 操作列 ──────────────────────────────────────────────
@@ -623,11 +626,12 @@
 <div id="story" data-for="flow game"></div>
 <div id="reel" data-for="record">
   <div class="card">
-    <h2>錄影</h2>
-    <p>六場都打完了。每一場打過的那一次，可以各轉成一支影片，存到這台裝置的下載資料夾。</p>
     <ol class="scenes"></ol>
-    <p class="note">轉檔會把整場重演一遍再編成影片，全部在這台裝置上做，不會上傳。手機上可能要好幾分鐘，也比較耗電；轉的時候請留在這一頁。不轉的話，直接關掉這一頁就好。</p>
-    <button class="go">轉檔並下載</button>
+    <div class="fps">
+      <label><input type="radio" name="fps" value="30" />30 fps</label>
+      <label><input type="radio" name="fps" value="60" checked />60 fps</label>
+    </div>
+    <button class="go">轉檔</button>
     <div class="bar"><i></i></div>
     <p class="say"></p>
   </div>

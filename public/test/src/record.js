@@ -1,8 +1,8 @@
 /* ── test/src/record.js ──────────────────────────────────────────────
    錄影模式（?mode=record）的轉檔畫面：國王坐上王位之後，遊戲停下來，出現這一張。
 
-   上面列出每一場留下來的那一段（打過的那一次）與長度。玩家按「轉檔並下載」才轉；不按就什麼都
-   不做——轉檔要把整場重演一遍、一張一張畫、編碼，手機上很花電，不要的人不該付這個錢。
+   每一場留下來的那一段（打過的那一次）一列、預設全勾，加上 30／60 fps 與轉檔鈕；不寫說明。按了
+   才轉，只轉勾的那幾場；不按就什麼都不做——轉檔要重演、一張一張畫、編碼，不要的人不該付這個錢。
 
    按下去之後：
      1. 這一頁的 GL 還掉（mode-flow.js 的 release）：重演的那一頁要自己的，手機上兩份放不下。
@@ -31,6 +31,7 @@ function download(blob, name) {
 
 /**
  * 出現轉檔畫面。`tape` 是錄好的帶子，`stages` 是每一場的名字，`release` 把這一頁的 GL 還掉。
+ * 畫面上只有每一場一列（預設全勾）、30／60 fps、轉檔鈕；按了之後是進度。
  */
 export function showReel({ tape, stages, release }) {
   const root = document.getElementById('reel');
@@ -41,28 +42,36 @@ export function showReel({ tape, stages, release }) {
   const rows = new Map();
   for (const sc of tape.scenes) {
     const li = document.createElement('li');
-    li.innerHTML = '<b></b><span class="len"></span><span class="state"></span>';
+    li.innerHTML = '<input type="checkbox" checked /><b></b><span class="len"></span><span class="state"></span>';
     li.querySelector('b').textContent = `第 ${sc.k + 1} 場　${stages[sc.k]}`;
     li.querySelector('.len').textContent = clockOf(sceneSeconds(tape, sc));
+    li.addEventListener('click', (e) => {
+      if (root.classList.contains('busy') || root.classList.contains('over')) return;
+      const box = li.querySelector('input');
+      if (e.target !== box) box.checked = !box.checked;
+      go.disabled = !picked().length;
+    });
     list.append(li);
     rows.set(sc.k, li);
   }
+  const picked = () => [...rows].filter(([, li]) => li.querySelector('input').checked).map(([k]) => k);
   const mark = (k, text, cls) => {
     const li = rows.get(k);
     if (!li) return;
     li.querySelector('.state').textContent = text;
-    li.className = cls || '';
+    li.classList.remove('now', 'saved');
+    if (cls) li.classList.add(cls);
   };
-  if (!tape.scenes.length) {
-    go.disabled = true;
-    say.textContent = '這一輪沒有留下可以轉的片段。';
-    return;
-  }
+  go.disabled = !tape.scenes.length;
 
   go.addEventListener('click', async () => {
+    const pick = picked();
+    if (!pick.length) return;
+    const fps = Number(root.querySelector('input[name="fps"]:checked').value);
     go.disabled = true;
     root.classList.add('busy');
-    say.textContent = '準備中……';
+    say.textContent = '準備中';
+    for (const k of pick) mark(k, '等待');
     release();
     let lock = null;
     try { lock = await navigator.wakeLock?.request('screen'); } catch { /* 不給就算了 */ }
@@ -76,7 +85,6 @@ export function showReel({ tape, stages, release }) {
     frame.style.height = `${tape.meta.view.h}px`;
     frame.src = `${location.pathname}?${q}`;
 
-    let current = null;
     const end = (text) => {
       say.textContent = text;
       root.classList.remove('busy');
@@ -89,28 +97,21 @@ export function showReel({ tape, stages, release }) {
       if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
       const m = e.data;
       if (m.type === 'ready') {
-        say.textContent = '重演中……';
-        frame.contentWindow.postMessage({ type: 'tape', tape }, location.origin);
+        frame.contentWindow.postMessage({ type: 'tape', tape, pick, fps }, location.origin);
       } else if (m.type === 'progress') {
-        bar.style.width = `${(100 * m.done / m.total).toFixed(1)}%`;
-        if (m.scene !== null && m.scene !== current) {
-          current = m.scene;
-          mark(current, '轉檔中', 'now');
-        }
-        if (m.scene !== null) say.textContent = m.mixing ? `第 ${m.scene + 1} 場：混音、裝箱……` : `第 ${m.scene + 1} 場：轉檔中……`;
-        else say.textContent = '快轉到下一段……';
+        const pct = 100 * m.done / m.total;
+        bar.style.width = `${pct.toFixed(1)}%`;
+        say.textContent = `${Math.floor(pct)}%`;
+        if (m.scene !== null) mark(m.scene, m.mixing ? '裝箱' : '轉檔中', 'now');
       } else if (m.type === 'file') {
         download(m.blob, `coparkour-${m.k + 1}-${m.name}.mp4`);
         mark(m.k, '已下載', 'saved');
-        current = null;
       } else if (m.type === 'done') {
         bar.style.width = '100%';
         console.info('轉檔', m.size, m.cost);
-        end(m.drift >= 0
-          ? '轉好了，但重演到一半跟你玩的那一次對不上，後面的影片可能跟當時不一樣。'
-          : '全部轉好了，影片在瀏覽器的下載資料夾裡。');
+        end(m.drift >= 0 ? '完成（重演有偏差）' : '完成');
       } else if (m.type === 'error') {
-        end(`轉檔失敗：${m.message}`);
+        end(`失敗：${m.message}`);
       }
     };
     addEventListener('message', listen);
