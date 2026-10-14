@@ -5,6 +5,10 @@
    一顆心是一張 Sprite（永遠正對鏡頭），整排掛在一個 Group 上、Group 轉成鏡頭的
    朝向，所以排開的方向是畫面上的左右。一排最多 ROW 顆，多的往上疊一排。
    不吃深度、不吃霧：牆或怪物擋在前面也看得到。
+
+   轉檔（replay.js）的時候在手機上偶發地壞過：滿的心不見、破圖、黑色的方格，每次壞得
+   不一樣，受傷之後空的那幾顆是好的。原因沒抓到；畫法不動，只在重演每畫一張之前把兩張
+   貼圖重新傳上 GPU（refresh），GPU 上那一份就永遠是剛傳上去的。
    ------------------------------------------------------------------ */
 
 import * as THREE from '../vendor/three.module.js';
@@ -82,6 +86,12 @@ export class Hearts {
     this._full = mat(true);
     this._empty = mat(false);
     this._list = [];
+  }
+
+  /** 兩張貼圖下一次畫的時候重新傳上 GPU（重演每畫一張之前叫，mode-flow.js）。不改任何像素。 */
+  refresh() {
+    this._full.map.needsUpdate = true;
+    this._empty.map.needsUpdate = true;
   }
 
   /**

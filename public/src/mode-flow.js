@@ -655,6 +655,12 @@ function play(real, draw) {
     crowd: king ? [...folk.here(player.block), king] : folk.here(player.block),
   });
   cost.split();
+  /* 轉檔的重演：每畫一張之前愛心的貼圖重新傳上 GPU、three 記的 GL 狀態全部重來（hearts.js 的 refresh），
+     手機上滿的心偶發地不見、破圖、變成黑格子。兩樣都不改任何像素。 */
+  if (draw && TAPE === 'replay') {
+    fight.hearts.refresh();
+    renderer.resetState();
+  }
   if (draw) light.render();
   cost.end();
   // 跳躍鍵的圖案：長按會交靈魂的時候（在國王身邊、還沒交滿、操作沒收起來）是托著靈魂的手。
