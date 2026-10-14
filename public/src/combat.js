@@ -217,7 +217,7 @@ export const KINDS = {
   ghost: { name: '幽靈', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1, fly: true },
   knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], open: ['cleave', 'whirl'], every: 3 },
   wraith: { name: '幽靈騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
-  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 3 },
+  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 2.5 },
 };
 
 /**
