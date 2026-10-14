@@ -104,8 +104,8 @@
                     國王咬的是騎士那一把劍，只有劍萼與劍柄（還有柄頭）是金色的。
     28. 國王        血 40、腳程 3、咬 2、走路受重力。一次最多衝兩下：第一下沒咬到就不僵直，重新
                     蓄力 0.25 秒再衝；第一下咬到、或第二下衝完，才僵直；站著不動的被第一下咬到就
-                    僵直，跳過第一下的被第二下咬到，兩下都跳過的衝滿兩下。蓄力的時候每一幀瞬間對準
-                    玩家，衝出去的那一刻定住、直線衝完。畫面上的身體蓄力每秒轉 0.3×28、衝的時候 0.8×28 弳
+                    僵直，跳過第一下的被第二下咬到，兩下都跳過的衝滿兩下。每一下在蓄力開始那一刻
+                    朝玩家鎖定方向、直線衝完。畫面上的身體蓄力每秒轉 0.3×28、衝的時候 0.8×28 弳
                     （外觀轉身 TURN_RATE 的倍數），整套每一幀都不跳；頭在蓄力與衝的時候左右上下跟著玩家，
                     僵直才放掉。蓄力被打不取消。三面盾：挨打先用掉一面、那一下
                     整個不算（不扣血、不擊退、不累積破防、衝刺不斷）；挨打（擋沒擋都算）之後 8 秒
@@ -2312,7 +2312,7 @@ console.log('28. 國王');
   const wrap = (a) => a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
 
   ok(chains(king()) && !chains(makeMonster({ kind: 'minion', x: 0, z: 0, yaw: 0 })) && K.lunges === 2,
-    '國王一次最多衝兩下、蓄力的時候不鎖方向；小怪照舊鎖方向');
+    '國王一次最多衝兩下（連衝）；小怪不連衝');
   ok(near(CHAIN_TURN.windup, 0.3 * TURN_RATE) && near(CHAIN_TURN.dash, 0.8 * TURN_RATE),
     `畫面上的身體轉身：蓄力 ${CHAIN_TURN.windup.toFixed(1)}、衝 ${CHAIN_TURN.dash.toFixed(1)} 弳每秒——外觀轉身（${TURN_RATE}）的 0.3 與 0.8 倍`);
 
@@ -2364,7 +2364,7 @@ console.log('28. 國王');
     ok(stages.join() === 'windup,dash,windup,dash,recover', `動作一段接一段、中間不播僵直（${stages.join('→')}）`);
     ok(heads.length === 2 && heads.every((h) => h > 0.85), `每一下蓄力完頭都左右上下跟著玩家（${heads.map((h) => h.toFixed(2)).join('、')}）`);
     const toward = (d) => (d.dirX * (p.x - d.x) + d.dirZ * (p.z - d.z)) / Math.hypot(p.x - d.x, p.z - d.z);
-    ok(dashes.every((d) => toward(d) > 0.999), `每一下衝出去的那一刻都正對著玩家（瞬間對準，${dashes.map((d) => toward(d).toFixed(3)).join('、')}）`);
+    ok(dashes.every((d) => toward(d) > 0.999), `玩家沒動：每一下都朝著玩家衝（${dashes.map((d) => toward(d).toFixed(3)).join('、')}）`);
   }
   {
     /* 第一下跳過，第二下站在地上。 */
@@ -2373,36 +2373,37 @@ console.log('28. 國王');
     ok(dashes.length === 2 && p.hp === 10 - K.bite, `躲過第一下：第二下咬到（衝了 ${dashes.length} 下，扣 ${K.bite}、剩 ${p.hp}）`);
   }
   {
-    /* 規則：蓄力剛開始，玩家換到牠正後方——下一幀就對準；衝出去之後玩家再走開，方向不變。 */
+    /* 規則：蓄力剛開始，玩家換到牠正後方——方向不改，照開始蓄力那一刻鎖定的直線衝完。 */
     const m = king(), p = hero(0, 1.5);
     while (!m.lunge) monsterStep(m, DT, p);
-    p.z = -1.5;
-    monsterStep(m, DT, p);
-    const aimed = near(m.lunge.dirZ, -1) && near(m.lunge.dirX, 0) && near(m.aimZ, -1);
-    while (m.lunge.t < LUNGE.windup) monsterStep(m, DT, p);
     const dir = [m.lunge.dirX, m.lunge.dirZ];
-    p.x = 1.5;
-    while (m.lunge.t < T) monsterStep(m, DT, p);
-    ok(aimed && near(dir[1], -1) && m.lunge.dirX === dir[0] && m.lunge.dirZ === dir[1],
-      '蓄力的時候瞬間對準玩家（換到背後下一幀就對準）；衝出去之後方向定住，玩家再走開也直線衝完');
+    p.z = -1.5;
+    let same = true;
+    while (m.lunge && m.lunge.t < T) { monsterStep(m, DT, p); same &&= m.lunge.dirX === dir[0] && m.lunge.dirZ === dir[1]; }
+    ok(near(dir[1], 1) && same, '每一下的方向在蓄力開始那一刻鎖定：之後玩家換到背後，蓄力與衝都不改');
   }
   {
-    /* 畫面：同一個情境，身體照 CHAIN_TURN 追過去——蓄力的 0.25 秒轉不到背後，衝的時候轉得快。 */
-    const m = king(), p = hero(0, 1.5), mo = new Motion();
-    while (!m.lunge) { monsterStep(m, DT, p); mo.step(DT, m, p); }
-    p.z = -1.5;
+    /* 畫面：兩下都跳過，第一下衝過頭，第二下鎖定的方向在背後——身體照 CHAIN_TURN 轉過去：
+       蓄力的 0.25 秒轉不到，衝的時候轉得快。 */
+    const m = king(), p = hero(0, 1.5, UP), mo = new Motion();
+    while (!(m.lunge && m.lunge.n === 2)) { monsterStep(m, DT, p); bites(p, m); mo.step(DT, m, p); }
+    const goal = Math.atan2(m.lunge.dirX, m.lunge.dirZ);
     const wind = [], dash = [];
+    let y0 = mo._yaw;
+    mo.step(DT, m, p);
+    wind.push(Math.abs(wrap(mo._yaw - y0)));
     while (m.lunge.t < T - 1e-9) {
-      const y0 = mo._yaw;
+      y0 = mo._yaw;
       monsterStep(m, DT, p);
       const [stage] = mo._stage(m);
       mo.step(DT, m, p);
       (stage === 'windup' ? wind : dash).push(Math.abs(wrap(mo._yaw - y0)));
     }
-    ok(wind.length > 10 && wind.every((a) => near(a, CHAIN_TURN.windup * DT, 1e-9)), `畫面上蓄力的時候身體慢慢轉，一幀 ${(CHAIN_TURN.windup * DT).toFixed(3)} 弳`);
+    ok(near(Math.abs(goal), Math.PI, 0.05) && wind.length > 10 && wind.every((a) => near(a, CHAIN_TURN.windup * DT, 1e-9)),
+      `第二下鎖定在背後：畫面上蓄力的時候身體慢慢轉，一幀 ${(CHAIN_TURN.windup * DT).toFixed(3)} 弳`);
     ok(near(dash[0], CHAIN_TURN.dash * DT, 1e-9) && dash.every((a) => a <= CHAIN_TURN.dash * DT + 1e-9),
       `衝的時候轉得快，一幀最多 ${(CHAIN_TURN.dash * DT).toFixed(3)} 弳；轉到衝的方向為止`);
-    ok(near(wrap(mo._yaw - Math.PI), 0, 1e-9), '衝完的時候身體已經轉到衝的方向');
+    ok(near(wrap(mo._yaw - goal), 0, 1e-9), '衝完的時候身體已經轉到衝的方向');
   }
   {
     const m = king(), p = hero(0, 1.5, UP);
