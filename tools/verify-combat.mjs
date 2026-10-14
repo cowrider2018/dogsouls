@@ -102,7 +102,7 @@
                     靜置姿勢）：冠環的底是圓角矩形，下緣低過頭頂（坐在頭上、不是浮著），頭頂那一截
                     整個包在冠環內面裡；垂下來的耳朵在冠環底下；王冠跟著頭骨轉、墨線跟著墨色換。
                     國王咬的是騎士那一把劍，只有劍萼與劍柄（還有柄頭）是金色的。
-    28. 國王        血 40、腳程 3.8、咬 2、走路受重力。一次最多衝兩下：第一下沒咬到就不僵直，重新
+    28. 國王        血 40、腳程 3、咬 2、走路受重力。一次最多衝兩下：第一下沒咬到就不僵直，重新
                     蓄力 0.25 秒再衝；第一下咬到、或第二下衝完，才僵直；站著不動的被第一下咬到就
                     僵直，跳過第一下的被第二下咬到，兩下都跳過的衝滿兩下。蓄力的時候每一幀瞬間對準
                     玩家，衝出去的那一刻定住、直線衝完。畫面上的身體蓄力每秒轉 0.3×28、衝的時候 0.8×28 弳
@@ -530,8 +530,8 @@ const recovering = (p, d = 1.4) => {
 console.log('10. 名冊與血');
 {
   ok(KINDS.minion.hp === 4 && KINDS.boss.hp === 20, '名冊裡兩類：小怪血 4、殭屍王血 20');
-  ok(KINDS.knight.hp === 10 && KINDS.knight.speed === 3.6 && !KINDS.knight.steady && !KINDS.knight.fly && sizeOf('knight') === 1.2,
-    '騎士：血 10、腳程 3.6、衝刺打得斷、不會飛、畫成 1.2 倍高');
+  ok(KINDS.knight.hp === 10 && KINDS.knight.speed === 3.5 && !KINDS.knight.steady && !KINDS.knight.fly && sizeOf('knight') === 1.2,
+    '騎士：血 10、腳程 3.5、衝刺打得斷、不會飛、畫成 1.2 倍高');
   ok(SPAWN.monsters.map((s) => makeMonster(s)).every((q) => q.hp === KINDS[q.kind].hp), '每一隻生出來是自己那一類的滿血');
   const mm = makeMonster(SPAWN.monsters[1]);
   hurt(mm, DAMAGE.slash);
@@ -2302,8 +2302,8 @@ console.log('27. 王冠');
 console.log('28. 國王');
 {
   const K = KINDS.king;
-  ok(K.hp === 40 && K.speed === 3.8 && K.bite === 2 && !K.fly && K.steady && !K.soul,
-    '國王：血 40、腳程 3.8、咬 2、走路受重力、衝刺跟殭屍王一樣打不斷、不掉靈魂');
+  ok(K.hp === 40 && K.speed === 3 && K.bite === 2 && !K.fly && K.steady && !K.soul,
+    '國王：血 40、腳程 3、咬 2、走路受重力、衝刺跟殭屍王一樣打不斷、不掉靈魂');
   const king = () => makeMonster({ kind: 'king', x: 0, z: 0, yaw: 0 });
   const hero = (x, z, y = 0) => ({ ...body(x, z, y), hp: 10, max: 10, guard: 0 });
   /** 跳在牠頭頂上：水平疊得上也咬不到（走路的那一類只看水平追、只看水平衝）。 */

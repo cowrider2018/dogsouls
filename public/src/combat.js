@@ -181,21 +181,21 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  * 怪物就是多一筆，規則不動。每一隻怪物身上帶的是牠自己的「狀態」（位置、速度、
  * 挨了幾下…），數值一律回頭查這一張，用 `m.kind` 認類別。
  *
- *   minion  殭屍（綠色的小怪）。血 4——第一段加第二段剛好打死，破不了防。腳程 3.4：
+ *   minion  殭屍（綠色的小怪）。血 4——第一段加第二段剛好打死，破不了防。腳程 3.25：
  *           走路是 PHYS.walk（4），所以放開手就會被追上。
  *   boss    殭屍王（畫成兩倍大）。血 20，`lives` 兩條命（見 RALLY）。腳程 4。不會一直追：每 `every` 秒從 `skills`
  *           裡隨機放一招（規則在 skills.js），放招的時候站著不動。`steady`：
  *           衝刺（蓄力與衝）不會被打斷（見 armored）。
  *   ghost   幽靈（半透明的小怪）。血、腳程跟殭屍一樣。`fly`：不受重力，
  *           y 跟 x、z 一樣追、一樣衝、被擊退也不落下（見 FLY）。
- *   knight  騎士（殭屍畫成 1.2 倍高，嘴裡咬著一把雙刃劍）。血 10、腳程 3.6。
+ *   knight  騎士（殭屍畫成 1.2 倍高，嘴裡咬著一把雙刃劍）。血 10、腳程 3.5。
  *           衝刺跟小怪一樣一打就取消（不是 `steady`）。每 `every` 秒從 `skills`
  *           裡挑一招（skills.js），夠得到才放。
  *   wraith  幽靈騎士（騎士那一身，穿幽靈那一件、半透明）。數值跟騎士一樣，也掉靈魂；差別是招比較慢（`every`），
  *           `fly`（跟幽靈一樣不受重力），招只有兩套連斬（skills.js 的 reapAir：下劈、上挑、
  *           在空中原地轉一圈；reapGround：下劈、在地上原地轉一圈、上挑。三下連著），每次各一半。
  *           衝刺咬人照常。
- *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3.8，走路、
+ *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3，走路、
  *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺最多衝幾下——沒咬到就接下一下，咬到或衝滿才僵直；蓄力的時候一直瞬間對準玩家（見 LUNGE、chains）。`shields`：身邊幾面盾，
  *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。`steady`：衝刺跟殭屍王一樣不會被打斷。每 `every`
  *           秒從 `skills` 裡挑一招（skills.js）。
@@ -212,12 +212,12 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  */
 export const BREAK_AT = 8;
 export const KINDS = {
-  minion: { name: '殭屍', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1 },
+  minion: { name: '殭屍', hp: 4, speed: 3.25, breakAt: BREAK_AT, bite: 1 },
   boss: { name: '殭屍王', hp: 20, lives: 2, speed: 4, breakAt: BREAK_AT, bite: 3, soul: true, steady: true, skills: ['orb', 'leap', 'cone'], open: ['orb'], rageOpen: ['orb'], every: 3 },
-  ghost: { name: '幽靈', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1, fly: true },
-  knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], open: ['cleave', 'whirl'], every: 3 },
-  wraith: { name: '幽靈騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
-  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 2.5 },
+  ghost: { name: '幽靈', hp: 4, speed: 3.25, breakAt: BREAK_AT, bite: 1, fly: true },
+  knight: { name: '騎士', hp: 10, speed: 3.5, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], open: ['cleave', 'whirl'], every: 3 },
+  wraith: { name: '幽靈騎士', hp: 10, speed: 3.5, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
+  king: { name: '國王', hp: 40, lives: 2, speed: 3, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 2.5 },
 };
 
 /**
