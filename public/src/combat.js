@@ -27,8 +27,8 @@
    站著發呆（蓄力）0.25 秒，然後朝那時鎖定的方向衝一下（速度 16、0.25 秒內
    減到 0），衝完僵直 0.75 秒才回去追。只有衝的那 0.25 秒裡碰到玩家，玩家
    才被咬到、扣血（小怪 1、騎士 2、殭屍王 3、國王 2，見 KINDS 的 `bite` 與下面的「玩家的血」）。
-   國王（KINDS 的 `lunges`）一次最多衝三下：這一下沒咬到就不僵直，接著重新蓄力 0.25 秒、
-   再衝一下；任何一下咬到、或第三下也沒咬到，衝完才僵直。牠蓄力的時候方向不鎖：每一幀
+   國王（KINDS 的 `lunges`）一次最多衝兩下：第一下沒咬到就不僵直，接著重新蓄力 0.25 秒、
+   再衝一下；第一下咬到、或第二下衝完（咬沒咬到都一樣），才僵直。牠蓄力的時候方向不鎖：每一幀
    都瞬間對準玩家（跟殭屍王連吐火球一樣，見 chains），衝出去的那一刻才定下來、直線衝完。
    身體畫面上是慢慢轉過去的（monster.js 的 CHAIN_TURN），那只是動畫。
 
@@ -38,7 +38,7 @@
 
    攻擊中（attacking：放招、或衝刺的蓄力加衝，不含之後的僵直）被打會怎樣看類別
    （KINDS 的 `steady`）：小怪一打就取消；殭屍王與國王不會被打斷——跟放招的倒數一樣
-   打不退、傷害減半（armored）。國王每兩下之間的重新蓄力也算在裡面，三下連著打不斷。
+   打不退、傷害減半（armored）。國王兩下之間的重新蓄力也算在裡面，兩下連著打不斷。
    畫面上攻擊中墨線變紅，跟 armored 出自同一個 attacking，所以不可打斷與紅色永遠是同一段。
 
    幽靈（KINDS 的 `fly`）不受重力、會飛：y 跟 x、z 是同一回事。追人是朝玩家
@@ -217,7 +217,7 @@ export const KINDS = {
   ghost: { name: '幽靈', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1, fly: true },
   knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], open: ['cleave', 'whirl'], every: 3 },
   wraith: { name: '幽靈騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
-  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 3, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 3 },
+  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 3 },
 };
 
 /**

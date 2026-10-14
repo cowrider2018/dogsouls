@@ -102,9 +102,9 @@
                     靜置姿勢）：冠環的底是圓角矩形，下緣低過頭頂（坐在頭上、不是浮著），頭頂那一截
                     整個包在冠環內面裡；垂下來的耳朵在冠環底下；王冠跟著頭骨轉、墨線跟著墨色換。
                     國王咬的是騎士那一把劍，只有劍萼與劍柄（還有柄頭）是金色的。
-    28. 國王        血 40、腳程 3.8、咬 2、走路受重力。一次最多衝三下：沒咬到就不僵直，重新蓄力
-                    0.25 秒再衝；任何一下咬到、或第三下也沒咬到，衝完才僵直；站著不動的被第一下咬到
-                    就僵直，跳過第一下的被第二下咬到，三下都跳過的衝滿三下。蓄力的時候每一幀瞬間對準
+    28. 國王        血 40、腳程 3.8、咬 2、走路受重力。一次最多衝兩下：第一下沒咬到就不僵直，重新
+                    蓄力 0.25 秒再衝；第一下咬到、或第二下衝完，才僵直；站著不動的被第一下咬到就
+                    僵直，跳過第一下的被第二下咬到，兩下都跳過的衝滿兩下。蓄力的時候每一幀瞬間對準
                     玩家，衝出去的那一刻定住、直線衝完。畫面上的身體蓄力每秒轉 0.3×28、衝的時候 0.8×28 弳
                     （外觀轉身 TURN_RATE 的倍數），整套每一幀都不跳；頭在蓄力與衝的時候左右上下跟著玩家，
                     僵直才放掉。蓄力被打不取消。三面盾：挨打先用掉一面、那一下
@@ -2311,8 +2311,8 @@ console.log('28. 國王');
   const yawOf = (m) => Math.atan2(m.aimX, m.aimZ);
   const wrap = (a) => a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
 
-  ok(chains(king()) && !chains(makeMonster({ kind: 'minion', x: 0, z: 0, yaw: 0 })) && K.lunges === 3,
-    '國王一次最多衝三下、蓄力的時候不鎖方向；小怪照舊鎖方向');
+  ok(chains(king()) && !chains(makeMonster({ kind: 'minion', x: 0, z: 0, yaw: 0 })) && K.lunges === 2,
+    '國王一次最多衝兩下、蓄力的時候不鎖方向；小怪照舊鎖方向');
   ok(near(CHAIN_TURN.windup, 0.3 * TURN_RATE) && near(CHAIN_TURN.dash, 0.8 * TURN_RATE),
     `畫面上的身體轉身：蓄力 ${CHAIN_TURN.windup.toFixed(1)}、衝 ${CHAIN_TURN.dash.toFixed(1)} 弳每秒——外觀轉身（${TURN_RATE}）的 0.3 與 0.8 倍`);
 
@@ -2352,25 +2352,25 @@ console.log('28. 國王');
       `咬到的那一下衝完就僵直、僵直完收掉；扣 ${K.bite}（剩 ${p.hp}）`);
   }
   {
-    /* 三下都跳過：一直站在牠頭頂上。 */
+    /* 兩下都跳過：一直站在牠頭頂上。 */
     const p = hero(0, 1.5, UP);
     const { dashes, done, turn, stages, heads } = lunge(p);
-    ok(dashes.length === 3 && dashes.every((d, i) => d.n === i + 1), `三下都沒咬到：衝滿三下（第 ${dashes.map((d) => d.n).join('、')} 下）`);
+    ok(dashes.length === 2 && dashes.every((d, i) => d.n === i + 1), `兩下都沒咬到：衝滿兩下（第 ${dashes.map((d) => d.n).join('、')} 下）`);
     // 換下一下的那一幀、蓄力落在格點上，各差一幀。
-    ok(dashes.length === 3 && near(dashes[1].t - dashes[0].t, T, DT * 2.5) && near(dashes[2].t - dashes[1].t, T, DT * 2.5),
-      `每一下在上一下開始衝之後 ${T} 秒開始衝：衝完直接重新蓄力 ${LUNGE.windup} 秒`);
-    ok(near(done - dashes[2].t, LUNGE.time + LUNGE.recover, DT * 1.5) && p.hp === 10, '第三下衝完才僵直、僵直完收掉；沒扣血');
+    ok(dashes.length === 2 && near(dashes[1].t - dashes[0].t, T, DT * 2.5),
+      `第二下在第一下開始衝之後 ${T} 秒開始衝：衝完直接重新蓄力 ${LUNGE.windup} 秒`);
+    ok(near(done - dashes[1].t, LUNGE.time + LUNGE.recover, DT * 1.5) && p.hp === 10, '第二下衝完才僵直、僵直完收掉；沒扣血');
     ok(turn <= CHAIN_TURN.dash * DT + 1e-9, `畫面上的身體整套每一幀最多轉 ${turn.toFixed(3)} 弳（衝的轉速一幀 ${(CHAIN_TURN.dash * DT).toFixed(3)}）：不跳`);
-    ok(stages.join() === 'windup,dash,windup,dash,windup,dash,recover', `動作一段接一段、中間不播僵直（${stages.join('→')}）`);
-    ok(heads.length === 3 && heads.every((h) => h > 0.85), `每一下蓄力完頭都左右上下跟著玩家（${heads.map((h) => h.toFixed(2)).join('、')}）`);
+    ok(stages.join() === 'windup,dash,windup,dash,recover', `動作一段接一段、中間不播僵直（${stages.join('→')}）`);
+    ok(heads.length === 2 && heads.every((h) => h > 0.85), `每一下蓄力完頭都左右上下跟著玩家（${heads.map((h) => h.toFixed(2)).join('、')}）`);
     const toward = (d) => (d.dirX * (p.x - d.x) + d.dirZ * (p.z - d.z)) / Math.hypot(p.x - d.x, p.z - d.z);
     ok(dashes.every((d) => toward(d) > 0.999), `每一下衝出去的那一刻都正對著玩家（瞬間對準，${dashes.map((d) => toward(d).toFixed(3)).join('、')}）`);
   }
-  for (const k of [2, 3]) {
-    /* 前 k − 1 下跳過，第 k 下站在地上。 */
+  {
+    /* 第一下跳過，第二下站在地上。 */
     const p = hero(0, 1.5, UP);
-    const { dashes } = lunge(p, (t, m, q) => { if (m.lunge && m.lunge.n >= k) q.y = 0; });
-    ok(dashes.length === k && p.hp === 10 - K.bite, `躲過前 ${k - 1} 下：第 ${k} 下咬到就僵直（衝了 ${dashes.length} 下，扣 ${K.bite}、剩 ${p.hp}）`);
+    const { dashes } = lunge(p, (t, m, q) => { if (m.lunge && m.lunge.n >= 2) q.y = 0; });
+    ok(dashes.length === 2 && p.hp === 10 - K.bite, `躲過第一下：第二下咬到（衝了 ${dashes.length} 下，扣 ${K.bite}、剩 ${p.hp}）`);
   }
   {
     /* 規則：蓄力剛開始，玩家換到牠正後方——下一幀就對準；衝出去之後玩家再走開，方向不變。 */
