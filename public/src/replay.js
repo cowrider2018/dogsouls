@@ -70,6 +70,7 @@ async function pickVideo(view, dpr, fps) {
  * renderer、sound、music、stages（每一場的名字）。
  */
 export async function serve(game) {
+  const ears = hear(game);
   const { tape, pick, fps } = await new Promise((resolve) => {
     addEventListener('message', function take(e) {
       if (e.origin !== location.origin || e.data?.type !== 'tape') return;
@@ -79,10 +80,22 @@ export async function serve(game) {
     post({ type: 'ready' });
   });
   try {
-    await replay(game, tape, new Set(pick), FPS.includes(fps) ? fps : FPS[FPS.length - 1]);
+    await replay(game, tape, new Set(pick), FPS.includes(fps) ? fps : FPS[FPS.length - 1], ears);
   } catch (e) {
     post({ type: 'error', message: String(e?.message || e) });
   }
+}
+
+/**
+ * 聲音的檔解好：音樂自己解；音效要接到一個 AudioContext 才解得了，先接一個用完就丟的離線混音。
+ * 一進這一頁就開始解，不等帶子——等帶子、挑格式、快轉到第一段的時候它在背景解，錄第一段之前才等它。
+ * 解的時候音效接著的那一個還沒開始混（state 是 suspended），sound.js 的 play 一句都不放、什麼都不記，
+ * 跟沒接一樣。
+ */
+async function hear(game) {
+  game.sound.attach(offlineMix(0.1));
+  await Promise.all([game.music.ready(), game.sound.ready()]);
+  game.sound.detach();
 }
 
 /**
@@ -105,7 +118,8 @@ function fitTo(game, view, s, size = null) {
   if (size) game.renderer.setDrawingBufferSize((size.width + 0.5) / s, (size.height + 0.5) / s, s);
 }
 
-async function replay(game, tape, pick, fps) {
+/** `ears` 是 hear 解聲音的那一份（錄第一段之前要解完）。 */
+async function replay(game, tape, pick, fps, ears) {
   if (tape?.version !== TAPE_VERSION) throw new Error('帶子的格式不對');
   if (!canReel()) throw new Error('這個瀏覽器不能轉檔（沒有 WebCodecs）');
   const { meta } = tape;
@@ -138,11 +152,11 @@ async function replay(game, tape, pick, fps) {
     }
     sc.view = [...time.values()].sort((a, b) => b.t - a.t)[0].view;
   });
+  // 每一種畫面大小各挑一次格式，幾種一起問。
   const sizes = new Map();
+  for (const sc of scenes) if (!sizes.has(keyOf(sc.view))) sizes.set(keyOf(sc.view), pickVideo(sc.view, dpr, fps));
   for (const sc of scenes) {
-    const key = keyOf(sc.view);
-    if (!sizes.has(key)) sizes.set(key, await pickVideo(sc.view, dpr, fps));
-    sc.size = sizes.get(key);
+    sc.size = await sizes.get(keyOf(sc.view));
     if (!sc.size) throw new Error('這個瀏覽器編不了任何一種影片格式');
   }
 
@@ -158,12 +172,6 @@ async function replay(game, tape, pick, fps) {
   game.deck.tape = tape;
   game.deck.h.resize = (v) => { view = v; apply(); };
   apply();
-
-  // 聲音的檔先解好：音樂自己解；音效要接到一個 AudioContext 才解得了，先接一個用完就丟的。
-  await game.music.ready();
-  game.sound.attach(offlineMix(0.1));
-  await game.sound.ready();
-  game.sound.detach();
 
   game.rewind(meta);
   let film = null;
@@ -188,6 +196,7 @@ async function replay(game, tape, pick, fps) {
       apply();
     }
     if (sc && i === sc.start) {
+      await ears;                 // 聲音的檔解完了才接（hear 解完會放開它借的那一個）
       const mix = offlineMix(sc.seconds), { width, height, format } = sc.size;
       cut = { sc, reel: new Reel({ width, height, fps, format }), mix, t: 0, next: 0 };
       const clock = clockedContext(mix, () => cut.t);

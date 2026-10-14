@@ -23,6 +23,7 @@
    ------------------------------------------------------------------ */
 
 import { sceneSeconds } from './tape.js';
+import { pickFormat } from './reel.js';
 
 /** 秒 → 「m:ss」。 */
 const clockOf = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
@@ -221,6 +222,9 @@ export function showReel({ tape, stages, release }) {
     say.textContent = '準備中';
     for (const k of pick) mark(k, '等待');
     release();
+    /* 先問一次編碼器：這個瀏覽器第一次問的時候要把整套編碼器叫起來（量過：一秒半，之後再問幾十毫秒）。
+       重演那一頁載入的那幾秒它在背景醒好，那一頁挑格式（replay.js 的 pickVideo）就不必再等。大小隨便一個。 */
+    pickFormat(1280, 720, fps).catch(() => {});
     let lock = null;
     try { lock = await navigator.wakeLock?.request('screen'); } catch { /* 不給就算了 */ }
 
