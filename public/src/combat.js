@@ -195,8 +195,8 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  *           `fly`（跟幽靈一樣不受重力），招只有兩套連斬（skills.js 的 reapAir：下劈、上挑、
  *           在空中原地轉一圈；reapGround：下劈、在地上原地轉一圈、上挑。三下連著），每次各一半。
  *           衝刺咬人照常。
- *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3，走路、
- *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺最多衝幾下——沒咬到就接下一下，咬到或衝滿才僵直；蓄力的時候繼續瞄、只跟一半（見 LUNGE、chains）。`shields`：身邊幾面盾，
+ *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3，場上有牠召喚的幽靈（m.brood）時
+ *           `broodSpeed` 1.5（見 paceOf），走路、受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺最多衝幾下——沒咬到就接下一下，咬到或衝滿才僵直；蓄力的時候繼續瞄、只跟一半（見 LUNGE、chains）。`shields`：身邊幾面盾，
  *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。`steady`：衝刺跟殭屍王一樣不會被打斷。每 `every`
  *           秒從 `skills` 裡挑一招（skills.js）。
  *
@@ -217,7 +217,7 @@ export const KINDS = {
   ghost: { name: '幽靈', hp: 4, speed: 3.25, breakAt: BREAK_AT, bite: 1, fly: true },
   knight: { name: '騎士', hp: 10, speed: 3.5, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], open: ['cleave', 'whirl'], every: 3 },
   wraith: { name: '幽靈騎士', hp: 10, speed: 3.5, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
-  king: { name: '國王', hp: 40, lives: 2, speed: 3, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 2.5 },
+  king: { name: '國王', hp: 40, lives: 2, speed: 3, broodSpeed: 1.5, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 2.5 },
 };
 
 /**
@@ -450,6 +450,12 @@ export const BREAK_ATK = {
 
 /** 一隻怪物的那一類數值。 */
 export const kindOf = (m) => KINDS[m.kind];
+
+/** 追人的腳程：場上有牠召喚的（m.brood，fight.js 每幀數好寫進來）而且那一類有 `broodSpeed`，就是那個，不然 `speed`。 */
+export const paceOf = (m) => {
+  const K = kindOf(m);
+  return m.brood && K.broodSpeed != null ? K.broodSpeed : K.speed;
+};
 
 /**
  * 甩頭的僵直（衝刺的、幽靈騎士連斬的、國王旋風斬的）裡沒在甩的時間（秒）：甩之前先完全不動
@@ -783,10 +789,10 @@ export function monsterStep(m, dt, target) {
     return;
   }
   if (fly) {
-    [m.vx, m.vy, m.vz] = steer3(m.vx, m.vy, m.vz, dx / d, dy / d, dz / d, kindOf(m).speed, dt);
+    [m.vx, m.vy, m.vz] = steer3(m.vx, m.vy, m.vz, dx / d, dy / d, dz / d, paceOf(m), dt);
     m.y = flyY(m, m.y + m.vy * dt);
   } else {
-    [m.vx, m.vz] = steer(m.vx, m.vz, m.aimX, m.aimZ, kindOf(m).speed, dt);
+    [m.vx, m.vz] = steer(m.vx, m.vz, m.aimX, m.aimZ, paceOf(m), dt);
   }
   walkTo(m, m.x + m.vx * dt, m.z + m.vz * dt);
 }

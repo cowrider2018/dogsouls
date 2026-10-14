@@ -3584,6 +3584,10 @@ console.log('40. 國王的第二條命');
     // 第一條命 0.5：summon
     for (let i = 0; i < 60; i++) { bossStep(k1, DT, body(0, 3), w1, () => 0.5); n1 += w1.spawns.length; w1.spawns.length = 0; }
     ok(n1 === 2 && armored({ ...k1, cast: { skill: 'summon' }, lunge: null }), '第一條命照舊：倒數 0.5 秒一次召 2 隻，打不斷');
+    // 腳程：場上沒有牠召喚的時候 speed，有的時候 broodSpeed。
+    const pace = (brood) => { const m = king(1, 0, -5); m.brood = brood; for (let i = 0; i < 60; i++) monsterStep(m, DT, body(0, 5)); return Math.hypot(m.vx, m.vz); };
+    ok(near(pace(0), 3, 0.01) && near(pace(1), 1.5, 0.01) && near(pace(6), 1.5, 0.01),
+      `國王腳程：沒有召喚的 3、有召喚的 1.5（${pace(0).toFixed(2)}、${pace(1).toFixed(2)}、${pace(6).toFixed(2)}）`);
   }
 
   // 劈砍：第二條命劈下去之後接上挑。主角在倒數的時候走到旁邊——第二刀照劈下去那一刻的位置瞄。
