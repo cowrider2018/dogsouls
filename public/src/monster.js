@@ -126,12 +126,16 @@
    頭跟著主角現在的位置左右轉（LOOK，最多 LOOK.max）只給真的會追著主角的招：瞪視一直轉向主角，
    跳砸起跳之前一直瞄著主角（skills.js 的 cast.track；身體只轉 TRACK.body 那麼多，其餘是頭轉的，
    而且上下也跟——頭正對著主角）；國王的連衝（combat.js 的 chains）從蓄力起、每一下的蓄力與衝都一樣
-   左右上下跟著主角（身體照 LUNGE.turn 慢慢轉過去，頭先到），僵直才放掉。扇形地震鎖定的是倒數開始那一刻的方向，主角之後怎麼跑都不會變——
+   左右上下跟著主角，僵直才放掉。
+
+   國王連衝的身體轉身另外慢（CHAIN_TURN）：規則上蓄力時每一幀都瞬間對準主角，衝出去的那一刻定住，
+   但畫面上的身體蓄力時照 CHAIN_TURN.windup、衝與衝完照 CHAIN_TURN.dash 轉過去——衝過頭之後是一路
+   轉回來。頭先到（頭的左右是照畫面上的身體算的，所以真的正對著主角）。扇形地震鎖定的是倒數開始那一刻的方向，主角之後怎麼跑都不會變——
    頭要是跟著主角轉，看起來就像招也跟著轉，玩家會照著頭躲錯地方。所以扇形的頭盯著鎖定的方向不動。
    ------------------------------------------------------------------ */
 
 import * as THREE from '../vendor/three.module.js';
-import { Critter, depthOnly, samePlace } from './critter.js';
+import { Critter, depthOnly, samePlace, TURN_RATE } from './critter.js';
 import { LUNGE, STILL, RALLY, DAZE, kindOf, chains, again } from './combat.js';
 import { SKILL, RAGE, UP_AIR, REAP, recoverOf } from './skills.js';
 import { PHYS } from './walk.js';
@@ -564,6 +568,12 @@ const DRIFT = {
 };
 const DRIFT_LEGS = ['front', 'hind', 'knee'];
 
+/**
+ * 國王連衝（combat.js 的 chains）時畫面上的身體轉多快（弳每秒）：蓄力 windup、衝與衝完 dash——
+ * 外觀轉身速率（critter.js 的 TURN_RATE）的 0.3 與 0.8 倍。只是動畫，規則上是瞬間對準。
+ */
+export const CHAIN_TURN = { windup: 0.3 * TURN_RATE, dash: 0.8 * TURN_RATE };
+
 /** 衝的時候畫得跳多高：體型（sizeOf）的這麼多倍，公尺。 */
 const DASH_HOP = 0.25;
 
@@ -587,7 +597,9 @@ export class Motion {
     this._swing = 0;
     this._pose = {};
     this._driftPose = {};
-    this._out = { move: null, lift: 0, air: false, vy: null };
+    /** 畫面上身體朝哪（弳，累加、不收進 ±π）：平常就是 m 的面向，國王連衝的時候照 CHAIN_TURN 追過去。 */
+    this._yaw = null;
+    this._out = { move: null, lift: 0, air: false, vy: null, yaw: 0 };
   }
 
   /**
@@ -596,12 +608,13 @@ export class Motion {
    * @param {{x: number, z: number}} player 主角：要盯著的時候頭轉向牠
    * @returns {{move: object, lift: number, air: boolean, vy: number | null}}
    *   move 疊在上面的動作（給 critter.update）、lift 身體畫得比 m.y 高多少（公尺）、
-   *   air 畫成在空中、vy 交給 Critter 的垂直速度（null = 用 m.vy）
+   *   air 畫成在空中、vy 交給 Critter 的垂直速度（null = 用 m.vy）、yaw 身體朝哪（給 critter.setFacing）
    */
   step(dt, m, player) {
     const o = this._out;
     o.lift = 0; o.air = false; o.vy = null;
     const [stage, t] = this._stage(m);
+    o.yaw = this._turn(dt, stage, m);
     if (stage === 'dash') this._hop(o, m, t);
     if (stage === 'leapAir') this._fly(o, m, t);
     if (stage === 'cleaveAir') this._hopTo(o, m, t);
@@ -610,6 +623,19 @@ export class Motion {
     const move = this.mover.step(dt, stage, t);
     o.move = this._lookAt(dt, stage, m, player, this._float(dt, stage, m, move));
     return o;
+  }
+
+  /**
+   * 畫面上的身體朝向：國王連衝（m.lunge 還在）的時候從上一幀的朝向照 CHAIN_TURN 轉向 m 的面向
+   * （蓄力那一段用 windup，衝與衝完用 dash）；其他時候就是 m 的面向，轉身交給 Critter（TURN_RATE）。
+   */
+  _turn(dt, stage, m) {
+    const goal = Math.atan2(m.aimX, m.aimZ);
+    if (this._yaw === null || !chains(m) || !m.lunge || !stage) return (this._yaw = goal);
+    let d = goal - this._yaw;
+    d -= 2 * Math.PI * Math.round(d / (2 * Math.PI));
+    const step = (stage === 'windup' ? CHAIN_TURN.windup : CHAIN_TURN.dash) * dt;
+    return (this._yaw += Math.max(-step, Math.min(step, d)));
   }
 
   /**
@@ -635,7 +661,7 @@ export class Motion {
   }
 
   /**
-   * 頭跟著主角轉：主角在身體朝向的哪一邊，頭就再轉那麼多（夾在 ±LOOK.max）。
+   * 頭跟著主角轉：主角在身體（畫面上的朝向，_turn）的哪一邊，頭就再轉那麼多（夾在 ±LOOK.max）。
    * 一直瞄著主角的招（cast.track）連上下也跟：頭再仰、再低到正對著主角身體的中間（_tilt），
    * 主角跳起來頭就跟著抬。
    * 轉多少乘上 _look（上下乘 _tilt），進出那幾段是追過去的，不是一幀跳過去。頭既然在看人，
@@ -649,7 +675,7 @@ export class Motion {
     this._tilt += ((track ? 1 : 0) - this._tilt) * k;
     if (this._look < 1e-3 || !player) return move;
     const lim = track ? LOOK.trackMax : LOOK.max, clamp = (a) => Math.max(-lim, Math.min(lim, a));
-    const face = Math.atan2(m.aimX, m.aimZ), to = Math.atan2(player.x - m.x, player.z - m.z);
+    const face = this._yaw, to = Math.atan2(player.x - m.x, player.z - m.z);
     let d = to - face;
     d -= 2 * Math.PI * Math.round(d / (2 * Math.PI));
     const pose = Object.assign(this._pose, move);

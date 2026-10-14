@@ -28,9 +28,9 @@
    減到 0），衝完僵直 0.75 秒才回去追。只有衝的那 0.25 秒裡碰到玩家，玩家
    才被咬到、扣血（小怪 1、騎士 2、殭屍王 3、國王 2，見 KINDS 的 `bite` 與下面的「玩家的血」）。
    國王（KINDS 的 `lunges`）一次最多衝三下：這一下沒咬到就不僵直，接著重新蓄力 0.25 秒、
-   再衝一下；任何一下咬到、或第三下也沒咬到，衝完才僵直。牠的衝刺不鎖方向（LUNGE.turn）：
-   身體（也就是衝的方向）一直朝玩家轉，蓄力的時候轉得慢、衝的時候轉得快，所以衝過頭之後
-   是一路轉回來、不是一幀轉過去。
+   再衝一下；任何一下咬到、或第三下也沒咬到，衝完才僵直。牠蓄力的時候方向不鎖：每一幀
+   都瞬間對準玩家（跟殭屍王連吐火球一樣，見 chains），衝出去的那一刻才定下來、直線衝完。
+   身體畫面上是慢慢轉過去的（monster.js 的 CHAIN_TURN），那只是動畫。
 
    國王身邊有三面盾（KINDS 的 `shields`）：挨打的時候先用掉一面，那一下整個不算——
    不扣血、不擊退、不累積破防、衝刺也不取消（parry）。挨打（不管擋沒擋）之後
@@ -196,7 +196,7 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  *           在空中原地轉一圈；reapGround：下劈、在地上原地轉一圈、上挑。三下連著），每次各一半。
  *           衝刺咬人照常。
  *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3.8，走路、
- *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺最多衝幾下——沒咬到就接下一下，咬到或衝滿才僵直；衝的時候一直朝玩家轉（見 LUNGE）。`shields`：身邊幾面盾，
+ *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺最多衝幾下——沒咬到就接下一下，咬到或衝滿才僵直；蓄力的時候一直瞬間對準玩家（見 LUNGE、chains）。`shields`：身邊幾面盾，
  *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。`steady`：衝刺跟殭屍王一樣不會被打斷。每 `every`
  *           秒從 `skills` 裡挑一招（skills.js）。
  *
@@ -464,19 +464,15 @@ export const STILL = { before: 0.15, after: 0.1 };
  *   recover  衝完之後僵直多久，才回去追人：低頭、STILL.before 秒完全不動、甩頭，再 STILL.after 秒
  *            沒有動作（monster.js）。
  *
- *   turn     一次衝好幾下的那一類（chains，國王）不鎖方向：身體一直朝玩家轉，衝的方向就是身體的
- *            朝向。蓄力的時候每秒轉 windup 弳、衝的時候 dash 弳——外觀轉身速率（critter.js 的
- *            TURN_RATE，28）的 0.3 與 0.8 倍。咬到之後不再轉，照那個方向衝完。
- *
  * 衝得到的 2.0 比 range 1.8 還長：站著不動的人一定被衝到（牠會衝過頭），
- * 蓄力的時候往旁邊閃開才躲得掉（會轉的那一類躲不掉，只能跳過去，或跑出 2 公尺外）。
+ * 蓄力的時候往旁邊閃開才躲得掉（國王蓄力時一直對準，要在牠衝出去之後才閃得掉）。
  */
-export const LUNGE = {
-  range: 1.8, windup: 0.25, speed: 16, time: 0.25, recover: STILL.before + 0.5 + STILL.after,
-  turn: { windup: 0.3 * 28, dash: 0.8 * 28 },
-};
+export const LUNGE = { range: 1.8, windup: 0.25, speed: 16, time: 0.25, recover: STILL.before + 0.5 + STILL.after };
 
-/** 一次衝好幾下的那一類（KINDS 的 `lunges`，國王）：衝刺不鎖方向（LUNGE.turn），頭一直盯著玩家（monster.js）。 */
+/**
+ * 一次衝好幾下的那一類（KINDS 的 `lunges`，國王）：蓄力的時候不鎖方向，每一幀瞬間對準玩家，
+ * 衝出去才定下來（lungeStep）。畫面上身體慢慢轉、頭一直盯著玩家（monster.js）。
+ */
 export const chains = (m) => (kindOf(m).lunges || 1) > 1;
 
 /** 這一下衝完要接下一下嗎：會連衝的那一類、這一下沒咬到（bit）、還沒衝滿 `lunges` 下。 */
@@ -820,14 +816,9 @@ function airStep(m, dt, cols = m.field.cols) {
 /**
  * 開始一下衝刺（第 n 下）：站住蓄力，方向在這一刻朝玩家的腳鎖定——會飛的連高低一起
  * （三維的方向），走路的只看水平。正好疊在玩家身上的時候朝自己的面向。
- * 會連衝的那一類（chains）不鎖：從自己現在的面向起算，之後每一幀朝玩家轉（lungeStep）。
+ * 會連衝的那一類（chains）蓄力的時候還會一直重新對準（lungeStep）。
  */
 function lockLunge(m, target, n) {
-  if (chains(m)) {
-    m.lunge = { t: 0, n, dirX: m.aimX, dirY: 0, dirZ: m.aimZ };
-    m.vx = 0; m.vy = 0; m.vz = 0;
-    return;
-  }
   const fly = !!kindOf(m).fly;
   const dx = target.x - m.x, dy = fly ? target.y - m.y : 0, dz = target.z - m.z;
   const d = Math.hypot(dx, dy, dz);
@@ -873,14 +864,12 @@ const lungeDist = (s) => LUNGE.speed * (s - (s * s) / (2 * LUNGE.time));
  * `hot`：這一幀有衝（走了一段）。碰撞看的是它，而不是「t 落在哪一段」——衝完
  * 的那一幀 t 已經跨進衝完之後的發呆了，但牠這一幀剛好走到最遠處。
  *
- * 會連衝的那一類（chains）在蓄力與衝的時候先朝 `target` 轉一點（LUNGE.turn，照這一幀開始時在哪一段），
- * 再沿轉過的方向走；咬到之後（bit）、衝完之後、沒有目標的時候不轉。
+ * 會連衝的那一類（chains）蓄力的時候每一幀先瞬間對準 `target`（水平），衝出去的那一幀用的是
+ * 那一幀開始時對準的方向，之後就定住；沒有目標的時候不對準。
  */
 function lungeStep(m, dt, target) {
   const L = m.lunge;
-  if (target && chains(m) && !L.bit && L.t < LUNGE.windup + LUNGE.time) {
-    turnLunge(L, m, target, (L.t < LUNGE.windup ? LUNGE.turn.windup : LUNGE.turn.dash) * dt);
-  }
+  if (target && chains(m) && L.t < LUNGE.windup) aimLunge(L, m, target);
   const s0 = Math.min(LUNGE.time, Math.max(0, L.t - LUNGE.windup));
   L.t += dt;
   const s1 = Math.min(LUNGE.time, Math.max(0, L.t - LUNGE.windup));
@@ -897,15 +886,11 @@ function lungeStep(m, dt, target) {
   }
 }
 
-/** 衝刺的方向（水平）朝 target 轉，最多轉 step 弳。target 正好在牠身上的時候不轉。 */
-function turnLunge(L, m, target, step) {
-  const dx = target.x - m.x, dz = target.z - m.z;
-  if (Math.hypot(dx, dz) < 1e-6) return;
-  const at = Math.atan2(L.dirX, L.dirZ);
-  let d = Math.atan2(dx, dz) - at;
-  d -= 2 * Math.PI * Math.round(d / (2 * Math.PI));
-  const a = at + Math.max(-step, Math.min(step, d));
-  L.dirX = Math.sin(a); L.dirZ = Math.cos(a);
+/** 衝刺的方向（水平）瞬間對準 target。target 正好在牠身上的時候不動。 */
+function aimLunge(L, m, target) {
+  const dx = target.x - m.x, dz = target.z - m.z, d = Math.hypot(dx, dz);
+  if (d < 1e-6) return;
+  L.dirX = dx / d; L.dirZ = dz / d;
 }
 
 /** 這一幀正在衝。只有這段時間碰到玩家才算——蓄力與衝完之後的發呆都不算。 */
