@@ -138,7 +138,8 @@ export function setup(ctx) {
   scene.traverse((o) => {
     if (!o.isMesh || !isBanded(o.material) || o.material.transparent) return;
     box.setFromObject(o);
-    if (box.max.y - box.min.y < 0.01) return;      // 平的（地面）：擋不到東西
+    // 平的（地面）：擋不到東西。遺跡切出來的塊（stage.js）有的只有地板，照樣算——整份一個的時候它們本來就在。
+    if (box.max.y - box.min.y < 0.01 && !o.userData.caster) return;
     o.layers.enable(LAYER);
     casters.push(o);
   });

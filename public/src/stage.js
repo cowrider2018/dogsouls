@@ -17,7 +17,7 @@ import { SURF, surfaceTextures } from './surface.js';
 import { buildRuins } from './blocks.js';
 import { facet } from './geom.js';
 import { arenaGap } from './walk.js';
-import { buildVeil } from './veil.js';
+import { buildVeil, VEIL } from './veil.js';
 import { AO, buildAO } from './ao.js';
 import { random } from './chance.js';
 
@@ -96,6 +96,95 @@ ${steps}
   return mesh;
 }
 
+/* ── 切塊 ─────────────────────────────────────────────────────────
+   整片遺跡的砌體與墨線各是一大份（五十多萬個三角形、四十多萬條線段），整份一個 mesh 的話
+   包圍球蓋住整張地圖，鏡頭外的照樣畫——站在王座廳，其他每一間都在 GPU 上走一遍。
+   所以照水平位置切成 TILE 公尺見方的一塊一塊，three 照視錐整塊整塊地不畫。
+   每一塊共用原本的頂點屬性（GPU 上只有一份），自己只帶 index 與包圍球、包圍盒。
+   塊與塊之間的先後是固定的（renderOrder 照塊在原本那一份裡第一次出現的先後，一塊多 0.001）：
+   不然 three 照遠近排，有幾處貼在一起的面（同一個平面上疊著的兩塊）誰蓋誰會跟著鏡頭換，走一步閃一下。
+   墨線（地圖的與門的）全部排在砌體之後（INK_ORDER）：整份一個的時候墨線的材質比石頭晚建、排在後面，
+   邊上跟石面一樣深的那一線是墨蓋石；墨線之間不必排，疊在一起的兩條是同一種墨，誰先都一樣。
+   全部在 0 與 1 之間——在地面、門這些 0 的後面，在不寫深度、要等地面畫完的血（blood.js，1）前面。
+
+   只靠視錐還不夠：王座廳這種大房間橫著看過去，牆後面別間的塊照樣在視錐裡。所以再照房間挑——
+   每個場地是一個封死的黑盒子（veil.js：牆從牆腳實心到封頂，不透明的純黑），鏡頭在哪一間裡，
+   那一間的牆外面不管有什麼都被牆蓋成黑的，跟清除色同一個黑：不畫，畫面一個像素都不差。
+   所以每一塊記著它碰得到哪幾間，每次畫之前（scene.onBeforeRender）看鏡頭在哪一間，碰不到的那幾塊
+   關掉 layer 0（鏡頭的那一層）——只關這一層，陰影的相機（light/shadow.js，它自己那一層）照樣拍得到。
+   鏡頭不在任何一間裡就全畫。
+   `?tiles=0` 不切（整份一個，量差多少用的）。 */
+const TILE = 16;
+const TILES_ON = new URLSearchParams(location.search).get('tiles') !== '0';
+const INK_ORDER = 0.5;
+
+/** 一塊（包圍盒）碰不碰得到一間（arenaGap 定義的邊界、牆腳到封頂），多留 `pad` 公尺。 */
+function touches(box, a, pad = 0.25) {
+  if (box.max.y < VEIL.base - pad || box.min.y > a.lid + pad) return false;
+  if (a.shape === 'circle') {
+    const x = Math.min(Math.max(a.x, box.min.x), box.max.x), z = Math.min(Math.max(a.z, box.min.z), box.max.z);
+    return Math.hypot(x - a.x, z - a.z) <= a.r + pad;
+  }
+  return box.max.x >= a.x0 - pad && box.min.x <= a.x1 + pad && box.max.z >= a.z0 - pad && box.min.z <= a.z1 + pad;
+}
+
+/**
+ * 每次畫之前照鏡頭在哪一間（`arenaAt`，再看是不是真的在牆裡、牆腳與封頂之間），把碰不到那一間的塊
+ * （`objs`）的 layer 0 關掉（見切塊）。接在場景原本的 onBeforeRender 後面。
+ */
+function cullRooms(scene, objs, arenas, arenaAt) {
+  const rooms = objs.map((o) => arenas.map((a) => touches(o.geometry.boundingBox, a)));
+  let was = -2;
+  const before = scene.onBeforeRender;
+  scene.onBeforeRender = function (renderer, sc, camera, target) {
+    before.call(this, renderer, sc, camera, target);
+    if (!camera.layers.isEnabled(0)) return;          // 陰影那一台：不管
+    const e = camera.matrixWorld.elements, x = e[12], y = e[13], z = e[14];
+    const a = arenaAt(x, z);
+    const at = y > VEIL.base && y < a.lid && arenaGap(a, x, z) > 0 ? arenas.indexOf(a) : -1;
+    if (at === was) return;
+    was = at;
+    objs.forEach((o, i) => {
+      if (at < 0 || rooms[i][at]) o.layers.enable(0);
+      else o.layers.disable(0);
+    });
+  };
+}
+
+/**
+ * 一份沒有 index 的幾何 → 一塊一塊：每一個圖元（`per` 個頂點：三角形 3、線段 2）照它的中心
+ * 落在哪一格歸到哪一塊，塊裡照原本的先後。
+ */
+function tiles(geometry, per) {
+  const P = geometry.attributes.position.array, n = P.length / 3 / per;
+  const cells = new Map();
+  for (let i = 0; i < n; i++) {
+    let x = 0, z = 0;
+    for (let k = 0; k < per; k++) { x += P[(i * per + k) * 3]; z += P[(i * per + k) * 3 + 2]; }
+    const key = `${Math.floor(x / per / TILE)},${Math.floor(z / per / TILE)}`;
+    if (!cells.has(key)) cells.set(key, []);
+    cells.get(key).push(i);
+  }
+  const v = new THREE.Vector3();
+  return [...cells.values()].map((prims) => {
+    const index = new Uint32Array(prims.length * per);
+    prims.forEach((p, j) => { for (let k = 0; k < per; k++) index[j * per + k] = p * per + k; });
+    const g = new THREE.BufferGeometry();
+    for (const [name, attr] of Object.entries(geometry.attributes)) g.setAttribute(name, attr);
+    g.setIndex(new THREE.BufferAttribute(index, 1));
+    // 包圍盒與球只算這一塊用到的頂點（three 自己算的話會把共用的整份頂點都算進去）。
+    const box = new THREE.Box3();
+    for (const i of index) box.expandByPoint(v.fromArray(P, i * 3));
+    const sphere = new THREE.Sphere(box.getCenter(new THREE.Vector3()), 0);
+    let r2 = 0;
+    for (const i of index) r2 = Math.max(r2, sphere.center.distanceToSquared(v.fromArray(P, i * 3)));
+    sphere.radius = Math.sqrt(r2);
+    g.boundingBox = box;
+    g.boundingSphere = sphere;
+    return g;
+  });
+}
+
 /**
  * 砌出整片遺跡、放進場景。
  *
@@ -139,7 +228,20 @@ export function buildStage(scene, renderer) {
   /* ── 廢墟 ────────────────────────────────────────────────────── */
   const ruins = buildRuins();
   const stoneMat = toonVC({ surf: SURF_ON }), inkMat = inkLine();
-  scene.add(new THREE.Mesh(ruins.geometry, stoneMat), new THREE.LineSegments(ruins.ink, inkMat));
+  const blocks = (TILES_ON ? tiles(ruins.geometry, 3) : [ruins.geometry]).map((g, k) => {
+    const m = new THREE.Mesh(g, stoneMat);
+    if (TILES_ON) m.renderOrder = (k + 1) * 0.001;
+    m.userData.caster = true;     // 只有地板的那幾塊也照樣投影（light/shadow.js），跟整份一個的時候一樣
+    return m;
+  });
+  const inked = (g) => {
+    const line = new THREE.LineSegments(g, inkMat);
+    if (TILES_ON) line.renderOrder = INK_ORDER;
+    return line;
+  };
+  const lines = (TILES_ON ? tiles(ruins.ink, 2) : [ruins.ink]).map(inked);
+  scene.add(...blocks, ...lines);
+  if (TILES_ON) cullRooms(scene, [...blocks, ...lines], ruins.arenas, arenaAt);
   /* 地圖裡一片一片的土（枯井的井底）：跟地面同一顆材質，所以顏色與斑點都是地面那一張。 */
   for (const d of ruins.dirt) {
     const m = new THREE.Mesh(new THREE.CircleGeometry(d.r, 24), ground.material);
@@ -157,7 +259,7 @@ export function buildStage(scene, renderer) {
   const doorMeshes = ruins.pieces.map((q) => {
     const g = new THREE.Group();
     if (q.geometry.attributes.position.count) g.add(new THREE.Mesh(q.geometry, stoneMat));
-    if (q.ink.attributes.position.count) g.add(new THREE.LineSegments(q.ink, inkMat));
+    if (q.ink.attributes.position.count) g.add(inked(q.ink));
     // 開著的門洞裡那幾層黑霧：跟黑牆同一種材質，所以門洞的盡頭跟黑牆是同一個黑。
     if (q.haze.alpha.length) g.add(hazeMesh(q.haze));
     scene.add(g);
