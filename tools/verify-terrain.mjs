@@ -76,7 +76,7 @@ import { SURF, SURF_DEF, TEX_N, MOSS, surfacePixels, mossAt } from '../public/sr
 import { stone } from '../public/src/geom.js';
 import { CAM, makeCam, updateCam } from '../public/src/camera.js';
 import { readFileSync } from 'node:fs';
-import { loadZoo, TURN_RATE } from '../public/src/critter.js';
+import { loadZoo, TURN_RATE, HEAD_LEAD } from '../public/src/critter.js';
 import { Pad, REST_ICON, GIVE, SOUL_SHAPE, SOUL_OUTLINE, bodySpan } from '../public/src/pad.js';
 import { railTier } from '../public/src/hud.js';
 import { roomOf, signposts } from '../public/src/route.js';
@@ -1962,6 +1962,33 @@ for (const id of zoo.models) {
   ok(Math.abs(turned * dt - want) < 2 * dt, '站著不動也會轉到最後的操控方向',
     `${(turned * dt).toFixed(3)} 秒 / 該是 ${want.toFixed(3)}`);
   ok(Math.abs(c.root.rotation.y - Math.PI / 2) < 1e-9, '轉到就停，不會轉過頭');
+  c.setFacing(0);
+  for (let i = 0; i < 200; i++) c.update(dt, { speed: 0, grounded: true, vy: 0 });
+
+  /* 頭先轉（HEAD_LEAD）：邊走邊轉 90°。身體照 TURN_RATE（上面量過的那一個），頭兩倍快——頭還在轉的時候
+     身體轉過的角度是頭的一半；頭先到，等身體跟上，脖子收回 0。頭骨真的多轉了脖子那麼多。 */
+  const B = c.rig._cache, headYaw = () => c.rig.rotation[B.head * 3 + 1];
+  c.setFacing(Math.PI / 2);
+  let half = true, peak = 0, bone = true;
+  for (let i = 0; i < 120; i++) {
+    c.update(dt, { speed: 3, grounded: true, vy: 0 });
+    const body = c._yaw, head = body + c._neck;
+    if (head < Math.PI / 2 - 1e-9) half &&= Math.abs(body - HEAD_LEAD.body * head) < 1e-9;
+    peak = Math.max(peak, c._neck);
+    const n = c._neck;
+    c._neck = 0; c.update(0, { speed: 3, grounded: true, vy: 0 }); const flat = headYaw();
+    c._neck = n; c.update(0, { speed: 3, grounded: true, vy: 0 });
+    bone &&= Math.abs(headYaw() - flat - n) < 1e-6;           // 骨頭的角度是 Float32
+  }
+  ok(HEAD_LEAD.body === 0.5 && half, '走路轉彎：頭還在轉的時候，身體轉過的角度是頭的 50%');
+  // 頭兩幀轉到（一幀 2 × 28 / 60 弳）：那一刻身體轉了兩幀，脖子 = 90° − 身體的兩幀。
+  ok(Math.abs(peak - (Math.PI / 2 - 2 * TURN_RATE * dt)) < 1e-9 && Math.abs(c._neck) < 1e-9 && Math.abs(c._yaw - Math.PI / 2) < 1e-9,
+    `頭先到（脖子最多 ${peak.toFixed(2)} 弳），身體跟上之後脖子收回 0`);
+  ok(bone, '頭骨多轉的就是脖子那一份');
+  c.setFacing(Math.PI * 1.5);
+  let most = 0;
+  for (let i = 0; i < 120; i++) { c.update(dt, { speed: 3, grounded: true, vy: 0 }); most = Math.max(most, Math.abs(c._neck)); }
+  ok(Math.abs(most - HEAD_LEAD.max) < 1e-9, `迴轉 180°：脖子最多扭 ${HEAD_LEAD.max} 弳`);
   c.setFacing(0);
   for (let i = 0; i < 200; i++) c.update(dt, { speed: 0, grounded: true, vy: 0 });
 }

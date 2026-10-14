@@ -209,6 +209,11 @@ const IDLE_SPEED = 0.2;
    而牠實際上早就往新方向去了。轉向不再是物理的一部分之後，它唯一的
    工作就是讓人看清楚「牠現在朝哪」，那件事越快越好。 */
 export const TURN_RATE = 28;
+/* 轉身是頭先轉、身體跟上（遊戲那邊 cat.js 的「the turn」同一個道理）：身體照 TURN_RATE 轉，頭以
+   TURN_RATE / HEAD_LEAD.body 轉向同一個目標，所以轉彎的時候身體轉過的角度只有頭的 body 那麼多成；
+   頭先到，等身體跟上。頭比身體多轉的那一份（脖子，_neck）最多 HEAD_LEAD.max 弳（cat.js 的
+   HEAD_YAW_MAX）。純外觀：身體的朝向（_yaw）、轉多快、移動都不變。 */
+export const HEAD_LEAD = { body: 0.5, max: 0.9 };
 /** 彈簧的次步長上限，跟 cat.js 的 MAX_SUB_DT 一樣。 */
 const MAX_SUB_DT = 0.005;
 
@@ -942,6 +947,8 @@ export class Critter {
     this.sway.seed(0, 0);
     this._yaw = 0;
     this._yawGoal = 0;
+    /** 頭比身體多轉了多少（弳，見 HEAD_LEAD）。 */
+    this._neck = 0;
     this._vySmooth = 0;
     this._airW = 0;
     this._riseW = 0;
@@ -1443,6 +1450,7 @@ export class Critter {
   adopt(other) {
     this._yaw = other._yaw;
     this._yawGoal = other._yawGoal;
+    this._neck = other._neck;
     this._vySmooth = other._vySmooth;
     this._airW = other._airW;
     this._riseW = other._riseW;
@@ -1566,8 +1574,17 @@ export class Critter {
     let diff = ((this._yawGoal - this._yaw + Math.PI) % (Math.PI * 2)) - Math.PI;
     if (diff < -Math.PI) diff += Math.PI * 2;
     const step = TURN_RATE * d;
+    const yawWas = this._yaw;
     this._yaw += Math.abs(diff) < step ? diff : Math.sign(diff) * step;
     this.root.rotation.y = this._yaw;
+
+    /* 頭先轉（HEAD_LEAD）：從上一幀頭的朝向（身體 + 脖子）以身體的 1 / body 倍速轉向同一個目標，
+       脖子是轉完之後頭比身體多出來的那一份。直接改 _yaw 的（擺位置的時候）脖子也跟著收回來。 */
+    const head = yawWas + this._neck;
+    const left = wrapPi(this._yawGoal - head);
+    const hstep = step / HEAD_LEAD.body;
+    const headNow = head + (Math.abs(left) < hstep ? left : Math.sign(left) * hstep);
+    this._neck = Math.max(-HEAD_LEAD.max, Math.min(HEAD_LEAD.max, wrapPi(headNow - this._yaw)));
 
     /* 步頻跟著實際速度走。speed01 是 Driver 要的「有多用力在跑」，
        遊戲那邊是除以 REF_SPEED，這裡除以 8（以前衝刺的速度）。衝刺拿掉
@@ -1648,6 +1665,8 @@ export class Critter {
     applyPose(this.rig, p);
     airPose(this.rig, this._airW, this._riseW, this._dip);
     if (mv) moveOverlay(this.rig, mv);
+    // 頭先轉的那一份（HEAD_LEAD）：跟動作的 headYaw 同一個軸，疊在最上面。
+    if (this._neck && this.rig._cache) this.rig.rotation[this.rig._cache.head * 3 + 1] += this._neck;
 
     // 帽子：戴著就是骨頭的原尺寸，脫掉就縮到零。
     for (const b of this._hatBones) {
