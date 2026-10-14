@@ -128,7 +128,7 @@
    而且上下也跟——頭正對著主角）；國王的連衝（combat.js 的 chains）從蓄力起、每一下的蓄力與衝都一樣
    左右上下跟著主角，僵直才放掉。
 
-   國王連衝的身體轉身另外慢（CHAIN_TURN）：規則上每一下在蓄力開始那一刻就鎖定方向，
+   國王連衝的身體轉身另外慢（CHAIN_TURN）：規則上每一下蓄力時瞄（只跟一半，combat.js 的 LUNGE.follow）、衝出去那一刻定住，
    但畫面上的身體蓄力時照 CHAIN_TURN.windup、衝與衝完照 CHAIN_TURN.dash 轉過去——衝過頭之後是一路
    轉回來。頭先到（頭的左右是照畫面上的身體算的，所以真的正對著主角）。扇形地震鎖定的是倒數開始那一刻的方向，主角之後怎麼跑都不會變——
    頭要是跟著主角轉，看起來就像招也跟著轉，玩家會照著頭躲錯地方。所以扇形的頭盯著鎖定的方向不動。
@@ -570,7 +570,7 @@ const DRIFT_LEGS = ['front', 'hind', 'knee'];
 
 /**
  * 國王連衝（combat.js 的 chains）時畫面上的身體轉多快（弳每秒）：蓄力 windup、衝與衝完 dash——
- * 外觀轉身速率（critter.js 的 TURN_RATE）的 0.3 與 0.8 倍。只是動畫，規則上蓄力開始那一刻就鎖定了。
+ * 外觀轉身速率（critter.js 的 TURN_RATE）的 0.3 與 0.8 倍。只是動畫，衝的方向是規則決定的（combat.js 的 LUNGE.follow）。
  */
 export const CHAIN_TURN = { windup: 0.3 * TURN_RATE, dash: 0.8 * TURN_RATE };
 

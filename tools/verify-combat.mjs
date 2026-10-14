@@ -104,8 +104,8 @@
                     國王咬的是騎士那一把劍，只有劍萼與劍柄（還有柄頭）是金色的。
     28. 國王        血 40、腳程 3、咬 2、走路受重力。一次最多衝兩下：第一下沒咬到就不僵直，重新
                     蓄力 0.25 秒再衝；第一下咬到、或第二下衝完，才僵直；站著不動的被第一下咬到就
-                    僵直，跳過第一下的被第二下咬到，兩下都跳過的衝滿兩下。每一下在蓄力開始那一刻
-                    朝玩家鎖定方向、直線衝完。畫面上的身體蓄力每秒轉 0.3×28、衝的時候 0.8×28 弳
+                    僵直，跳過第一下的被第二下咬到，兩下都跳過的衝滿兩下。每一下開始蓄力時朝玩家瞄，
+                    蓄力時繼續瞄但只跟一半的角度，衝出去的那一刻定住、直線衝完。畫面上的身體蓄力每秒轉 0.3×28、衝的時候 0.8×28 弳
                     （外觀轉身 TURN_RATE 的倍數），整套每一幀都不跳；頭在蓄力與衝的時候左右上下跟著玩家，
                     僵直才放掉。蓄力被打不取消。三面盾：挨打先用掉一面、那一下
                     整個不算（不扣血、不擊退、不累積破防、衝刺不斷）；挨打（擋沒擋都算）之後 8 秒
@@ -2373,14 +2373,21 @@ console.log('28. 國王');
     ok(dashes.length === 2 && p.hp === 10 - K.bite, `躲過第一下：第二下咬到（衝了 ${dashes.length} 下，扣 ${K.bite}、剩 ${p.hp}）`);
   }
   {
-    /* 規則：蓄力剛開始，玩家換到牠正後方——方向不改，照開始蓄力那一刻鎖定的直線衝完。 */
+    /* 規則：蓄力剛開始，玩家繞到牠正右邊（90°）——方向只跟一半（45°）；衝出去之後玩家再走開，方向不變。 */
     const m = king(), p = hero(0, 1.5);
     while (!m.lunge) monsterStep(m, DT, p);
+    const yaw0 = Math.atan2(m.lunge.dirX, m.lunge.dirZ);
+    p.x = 1.5; p.z = 0;
+    monsterStep(m, DT, p);
+    const half = Math.atan2(m.lunge.dirX, m.lunge.dirZ);
+    while (m.lunge.t < LUNGE.windup) monsterStep(m, DT, p);
     const dir = [m.lunge.dirX, m.lunge.dirZ];
-    p.z = -1.5;
+    p.x = -1.5;
     let same = true;
     while (m.lunge && m.lunge.t < T) { monsterStep(m, DT, p); same &&= m.lunge.dirX === dir[0] && m.lunge.dirZ === dir[1]; }
-    ok(near(dir[1], 1) && same, '每一下的方向在蓄力開始那一刻鎖定：之後玩家換到背後，蓄力與衝都不改');
+    ok(near(LUNGE.follow, 0.5) && near(yaw0, 0) && near(half, (LUNGE.follow * Math.PI) / 2, 0.02),
+      `蓄力的時候繼續瞄，但只跟一半：玩家繞過去 90°，方向轉 ${(half * 180 / Math.PI).toFixed(1)}°`);
+    ok(same, '衝出去的那一刻定住：之後玩家換到另一邊，直線衝完');
   }
   {
     /* 畫面：兩下都跳過，第一下衝過頭，第二下鎖定的方向在背後——身體照 CHAIN_TURN 轉過去：

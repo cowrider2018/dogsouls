@@ -28,9 +28,9 @@
    減到 0），衝完僵直 0.75 秒才回去追。只有衝的那 0.25 秒裡碰到玩家，玩家
    才被咬到、扣血（小怪 1、騎士 2、殭屍王 3、國王 2，見 KINDS 的 `bite` 與下面的「玩家的血」）。
    國王（KINDS 的 `lunges`）一次最多衝兩下：第一下沒咬到就不僵直，接著重新蓄力 0.25 秒、
-   再衝一下；第一下咬到、或第二下衝完（咬沒咬到都一樣），才僵直。每一下的方向跟別的怪物一樣，
-   在那一下開始蓄力的那一刻朝玩家鎖定，之後直線衝完。衝過頭之後身體畫面上是慢慢轉向鎖定的
-   方向（monster.js 的 CHAIN_TURN），那只是動畫。
+   再衝一下；第一下咬到、或第二下衝完（咬沒咬到都一樣），才僵直。每一下開始蓄力的那一刻朝玩家
+   瞄一次；蓄力的時候繼續瞄，但玩家繞過去的角度只跟一半（LUNGE.follow），衝出去的那一刻定住、
+   直線衝完。衝過頭之後身體畫面上是慢慢轉向衝的方向（monster.js 的 CHAIN_TURN），那只是動畫。
 
    國王身邊有三面盾（KINDS 的 `shields`）：挨打的時候先用掉一面，那一下整個不算——
    不扣血、不擊退、不累積破防、衝刺也不取消（parry）。挨打（不管擋沒擋）之後
@@ -196,7 +196,7 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  *           在空中原地轉一圈；reapGround：下劈、在地上原地轉一圈、上挑。三下連著），每次各一半。
  *           衝刺咬人照常。
  *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3，走路、
- *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺最多衝幾下——沒咬到就接下一下，咬到或衝滿才僵直；每一下在蓄力開始那一刻鎖定方向（見 LUNGE、chains）。`shields`：身邊幾面盾，
+ *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺最多衝幾下——沒咬到就接下一下，咬到或衝滿才僵直；蓄力的時候繼續瞄、只跟一半（見 LUNGE、chains）。`shields`：身邊幾面盾，
  *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。`steady`：衝刺跟殭屍王一樣不會被打斷。每 `every`
  *           秒從 `skills` 裡挑一招（skills.js）。
  *
@@ -463,15 +463,17 @@ export const STILL = { before: 0.15, after: 0.1 };
  *   speed    衝出去的初速，time 秒內線性減到 0——衝 speed·time/2 = 2.0 公尺。
  *   recover  衝完之後僵直多久，才回去追人：低頭、STILL.before 秒完全不動、甩頭，再 STILL.after 秒
  *            沒有動作（monster.js）。
+ *   follow   會連衝的那一類（chains，國王）蓄力的時候繼續瞄：從開始蓄力那一刻瞄的方向起，玩家繞過去
+ *            的角度只跟這麼多成（跟殭屍王跳砸的 TRACK.body 同一種），衝出去的那一刻定住。
  *
  * 衝得到的 2.0 比 range 1.8 還長：站著不動的人一定被衝到（牠會衝過頭），
  * 蓄力的時候往旁邊閃開才躲得掉（國王蓄力時一直對準，要在牠衝出去之後才閃得掉）。
  */
-export const LUNGE = { range: 1.8, windup: 0.25, speed: 16, time: 0.25, recover: STILL.before + 0.5 + STILL.after };
+export const LUNGE = { range: 1.8, windup: 0.25, speed: 16, time: 0.25, recover: STILL.before + 0.5 + STILL.after, follow: 0.5 };
 
 /**
- * 一次衝好幾下的那一類（KINDS 的 `lunges`，國王）。規則上每一下跟別的衝刺一樣在蓄力開始時鎖定方向；
- * 差在畫面：身體慢慢轉向鎖定的方向、頭一直盯著玩家（monster.js）。
+ * 一次衝好幾下的那一類（KINDS 的 `lunges`，國王）：蓄力的時候繼續瞄、只跟一半（LUNGE.follow，lungeStep）；
+ * 畫面上身體慢慢轉向衝的方向、頭一直盯著玩家（monster.js）。
  */
 export const chains = (m) => (kindOf(m).lunges || 1) > 1;
 
@@ -761,12 +763,12 @@ export function monsterStep(m, dt, target) {
      這一幀就開始下一下的蓄力（從衝完的朝向接著朝玩家轉）。衝完的那一幀（hot）照常算咬，
      咬到沒有（bit）要等那一幀的 bites 才知道，所以下一幀才換成下一下。 */
   const L0 = m.lunge;
-  if (L0 && L0.t >= LUNGE.windup + LUNGE.time && again(m)) { lockLunge(m, target, L0.n + 1); lungeStep(m, dt); return; }
+  if (L0 && L0.t >= LUNGE.windup + LUNGE.time && again(m)) { lockLunge(m, target, L0.n + 1); lungeStep(m, dt, target); return; }
   /* 衝完、再發呆 recover 秒之後收掉。收掉的這一幀站著不動、不接著衝下一次：
      殭屍王的 bossStep 在 monsterStep 之前，牠要看到一幀「沒在衝」才挑得了招，
      不然貼著人的殭屍王會一次接一次地衝，永遠輪不到放招。 */
   if (m.lunge && m.lunge.t >= LUNGE.windup + LUNGE.time + LUNGE.recover) { m.lunge = null; m.vx = 0; m.vy = 0; m.vz = 0; return; }
-  if (m.lunge) { lungeStep(m, dt); return; }
+  if (m.lunge) { lungeStep(m, dt, target); return; }
   /* 朝玩家的腳追。會飛的連高低一起追（三維的方向），走路的只看水平。 */
   const fly = !!kindOf(m).fly;
   const dx = target.x - m.x, dy = fly ? target.y - m.y : 0, dz = target.z - m.z;
@@ -822,6 +824,7 @@ function lockLunge(m, target, n) {
   const dx = target.x - m.x, dy = fly ? target.y - m.y : 0, dz = target.z - m.z;
   const d = Math.hypot(dx, dy, dz);
   m.lunge = d > 1e-6 ? { t: 0, n, dirX: dx / d, dirY: dy / d, dirZ: dz / d } : { t: 0, n, dirX: m.aimX, dirY: 0, dirZ: m.aimZ };
+  m.lunge.yaw0 = Math.atan2(m.lunge.dirX, m.lunge.dirZ);   // 會連衝的那一類蓄力時從這裡跟（lungeStep）
   m.vx = 0; m.vy = 0; m.vz = 0;
 }
 
@@ -862,9 +865,13 @@ const lungeDist = (s) => LUNGE.speed * (s - (s * s) / (2 * LUNGE.time));
  *
  * `hot`：這一幀有衝（走了一段）。碰撞看的是它，而不是「t 落在哪一段」——衝完
  * 的那一幀 t 已經跨進衝完之後的發呆了，但牠這一幀剛好走到最遠處。
+ *
+ * 會連衝的那一類（chains）蓄力的時候每一幀再瞄 `target` 一次（水平），方向是開始蓄力那一刻瞄的（yaw0）
+ * 加上玩家繞過去的角度的 LUNGE.follow 成；衝出去的那一幀用的是那一幀開始時瞄的，之後就定住。
  */
-function lungeStep(m, dt) {
+function lungeStep(m, dt, target = null) {
   const L = m.lunge;
+  if (target && chains(m) && L.t < LUNGE.windup) followLunge(L, m, target);
   const s0 = Math.min(LUNGE.time, Math.max(0, L.t - LUNGE.windup));
   L.t += dt;
   const s1 = Math.min(LUNGE.time, Math.max(0, L.t - LUNGE.windup));
@@ -879,6 +886,16 @@ function lungeStep(m, dt) {
     if (dy) m.y = flyY(m, m.y + dy * step);
     walkTo(m, m.x + L.dirX * step, m.z + L.dirZ * step);
   }
+}
+
+/** 蓄力時再瞄一次：從 yaw0 起，玩家繞過去的角度只跟 LUNGE.follow 成。target 正好在牠身上的時候不動。 */
+function followLunge(L, m, target) {
+  const dx = target.x - m.x, dz = target.z - m.z;
+  if (Math.hypot(dx, dz) < 1e-6) return;
+  let turn = Math.atan2(dx, dz) - L.yaw0;
+  turn -= 2 * Math.PI * Math.round(turn / (2 * Math.PI));
+  const a = L.yaw0 + LUNGE.follow * turn;
+  L.dirX = Math.sin(a); L.dirZ = Math.cos(a);
 }
 
 /** 這一幀正在衝。只有這段時間碰到玩家才算——蓄力與衝完之後的發呆都不算。 */
