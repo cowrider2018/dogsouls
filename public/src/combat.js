@@ -435,13 +435,15 @@ export const DAMAGE = { slash: 1, rise: 3, slam: 2, break: 5 };
  * 破防攻擊的數值。
  *
  *   flight  突進花多久飛到頭頂（秒）。速度由它反推，所以不管目標多遠都是這麼久。
+ *   lock    突進的最後這麼久（秒）不再重瞄（steerBreak）：剩下的時間太短，重解出來的速度會暴衝。
+ *   reach   突進碰到目標的判定，水平上比兩個身體相交再寬這麼多（公尺）。
  *   spin    迴旋一圈多久（秒）。
  *   off     跳離：水平（突進的反方向）與垂直的速度。垂直是一次普通的跳。
  *   push    同一瞬間怪物被推開：水平速度 h（突進的方向），在地上滑行時每秒
  *           減速 decel——5 m/s 滑 0.6 秒、約 1.6 公尺。沒有垂直的份。
  */
 export const BREAK_ATK = {
-  flight: 0.35, spin: 0.6,
+  flight: 0.35, lock: 0.05, reach: 0.3, spin: 0.6,
   off: { h: 5, v: PHYS.jump },
   push: { h: 5, decel: 8 },
 };
@@ -1393,32 +1395,69 @@ function ahead(m, T) {
  * 在空中發動也是同一條式子——垂直速度是從玩家現在的高度反推的，原本往上或
  * 往下的速度直接換掉。
  *
- * 速度是照拋物線反推的：BREAK_ATK.flight 秒後腳正好落在頭頂上。頭頂取的是
- * 牠**那時候**會在的地方——照牠現在的速度往前推（見 ahead）。追過來的怪物是
- * 迎著玩家跑的，照現在的位置瞄會飛過頭。
+ * 速度是照拋物線反推的（aimBreak）：BREAK_ATK.flight 秒後腳正好落在頭頂上。
+ * 飛的途中每一幀再瞄一次（steerBreak）。
  */
 export function startBreak(c, p, m) {
   resetBreak(m);
-  const T = BREAK_ATK.flight, g = PHYS.gravity;
-  const [tx, my, tz] = ahead(m, T);
-  const ty = my + PHYS.height;
-  const hx = tx - p.x, hz = tz - p.z, hd = Math.hypot(hx, hz);
   c.target = m;
-  [c.dashX, c.dashZ] = hd > 1e-6 ? [hx / hd, hz / hd] : [p.aimX, p.aimZ];
-  p.vx = hx / T;
-  p.vz = hz / T;
-  p.vy = (ty - p.y + 0.5 * g * T * T) / T;
+  aimBreak(p, m, BREAK_ATK.flight);
+  const hd = Math.hypot(p.vx, p.vz);
+  [c.dashX, c.dashZ] = hd > 1e-6 ? [p.vx / hd, p.vz / hd] : [p.aimX, p.aimZ];
   p.grounded = false;
   p.aimX = c.dashX; p.aimZ = c.dashZ;
+  c.from = { x: p.x, y: p.y, z: p.z };
 }
 
 /**
- * 突進碰到目標了嗎：水平上兩個身體相交，垂直上玩家的腳最高可以在牠頭頂上方
- * 0.3 公尺（瞄的就是頭頂，差一點點不該算沒碰到）。
+ * 突進的一幀（玩家移動之前）：用剩下的時間對牠重瞄一次，記下玩家移動之前的位置（breakContact 掃的那一段）。
+ *
+ * 發射那一刻是照牠當時的速度往前推，但這 0.35 秒裡牠常常不照那個速度走：迎面追過來的
+ * 一走進 LUNGE.range 就停下蓄力，蓄力的會衝出去，衝刺會減速，被打飛的落地就停。
+ * 每一幀照牠現在的樣子重解一次拋物線，抵達的時間不變，弧線順著彎過去；牠照原本的
+ * 預測走的話，重解出來的速度跟原本的一樣。最後 BREAK_ATK.lock 秒不重瞄。
+ * 突進的方向（dashX、dashZ：跳離與推開的方向）是發射那一刻的，不跟著改。
  */
-export function breakContact(p, m) {
-  if (Math.hypot(p.x - m.x, p.z - m.z) >= PHYS.radius * 2) return false;
-  return p.y <= m.y + PHYS.height + 0.3 && p.y + PHYS.height > m.y;
+export function steerBreak(c, p) {
+  c.from = { x: p.x, y: p.y, z: p.z };
+  const T = BREAK_ATK.flight - c.t;
+  if (T > BREAK_ATK.lock) aimBreak(p, c.target, T);
+}
+
+/**
+ * 給玩家 T 秒後腳正好落在 m 頭頂上的速度：照拋物線反推，垂直速度從玩家現在的高度
+ * 反推（原本往上或往下的直接換掉）。頭頂取的是牠**那時候**會在的地方——照牠現在的
+ * 速度往前推（見 ahead）。追過來的怪物是迎著玩家跑的，照現在的位置瞄會飛過頭。
+ */
+function aimBreak(p, m, T) {
+  const [tx, my, tz] = ahead(m, T);
+  p.vx = (tx - p.x) / T;
+  p.vz = (tz - p.z) / T;
+  p.vy = (my + PHYS.height - p.y + 0.5 * PHYS.gravity * T * T) / T;
+}
+
+/** breakContact 沿著這一幀的路線每隔多遠看一次。 */
+const SWEEP = 0.1;
+
+/**
+ * 突進碰到目標了嗎：水平上兩個身體相交（再寬 BREAK_ATK.reach），垂直上玩家的腳最高
+ * 可以在牠頭頂上方 0.3 公尺（瞄的就是頭頂，差一點點不該算沒碰到）。
+ *
+ * 看的是這一幀整段路線（`from` 到現在，每 SWEEP 公尺一點），不只終點：一幀最長 0.05 秒，
+ * 遠的目標突進一幀可以飛一公尺多，只看終點會從牠身上穿過去。
+ *
+ * @returns {null | {x: number, y: number, z: number}} 路線上最早碰到的那一點（玩家的腳）；
+ *   沒碰到是 null。呼叫端把玩家擺回那一點再定住（latch 記的是那時候的相對位置）。
+ */
+export function breakContact(p, m, from = p) {
+  const dx = p.x - from.x, dy = p.y - from.y, dz = p.z - from.z;
+  const n = Math.max(1, Math.ceil(Math.hypot(dx, dy, dz) / SWEEP));
+  for (let i = 0; i <= n; i++) {
+    const k = i / n, x = from.x + dx * k, y = from.y + dy * k, z = from.z + dz * k;
+    if (Math.hypot(x - m.x, z - m.z) >= PHYS.radius * 2 + BREAK_ATK.reach) continue;
+    if (y <= m.y + PHYS.height + 0.3 && y + PHYS.height > m.y) return { x, y, z };
+  }
+  return null;
 }
 
 /**

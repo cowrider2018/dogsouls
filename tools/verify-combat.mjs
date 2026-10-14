@@ -35,6 +35,8 @@
                     碰到之後牠轉一圈、玩家繞牠 360°、扣 5、往反方向跳離，同一
                     瞬間牠被往突進的方向推開（只有水平）；整招無敵；在空中也
                     按得出來——被第二段打破防的那一刻玩家就在空中，接得上。
+                    飛的途中每一幀重瞄、碰到看整段路線：迎面走來半路停下、蓄力中衝出去、
+                    一幀 0.05 秒打 10 公尺外的，都碰得到；目標照預測走的話弧線不變。
     13. 怪物不疊    三隻追同一個站著不動的人，身體一直不重疊、不出牆。
     14. 陣容        六種陣容：3 殭屍、1 殭屍王、1 幽靈騎士、3 幽靈、1 騎士、1 國王，預設是第三種；
                     每一隻都在中線 1/3 那條橫線上、面向中心，不疊在一起。
@@ -177,7 +179,7 @@ import { PHYS } from '../public/src/walk.js';
 import {
   MODES, DEFAULT_MODE, LUNGE, STILL, RALLY, spared, rallied, lunging, ARENA, SPAWN, DOG_H, REACH, SWING, REST, KNOCK, KNOCK_SCALE, FAN, WINDOW, KINDS, DAMAGE, hurt, placeMonster,
   BREAK_AT, BREAK_WINDOW, broken,
-  FLY, BREAK_ATK, breaking, breakTarget, startBreak, breakContact, latch, contact, parry, spinStep, separate, armored, attacking,
+  FLY, BREAK_ATK, breaking, breakTarget, startBreak, steerBreak, breakContact, latch, contact, parry, spinStep, separate, armored, attacking,
   makeMonster as freshMonster, monsterStep, touching, bites, chains, again, knock, inSlash, inFan, inRing, slashTip, fanFrame,
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
   SOUL, dropSoul, soulStep, grabs, bankSouls, DAZE, daze, dazeStep, knockHero,
@@ -725,6 +727,70 @@ console.log('12. 破防攻擊');
   cd.t = BREAK_ATK.spin;
   const rd = spinStep(cd, { ...pa }, md);
   ok(rd.died && md.vx === 0 && md.vz === 0 && !md.slide && near(md.z, md.spawn.z), '這一下打死牠：在重生點重生，不帶推開的速度');
+
+  /* 突進途中牠不照發射那一刻的速度走：每一幀重瞄（steerBreak）、碰到看整段路線，還是碰得到。
+     old 是改之前的做法（只瞄一次、只看終點）：同一個情境要打空，才證明這個情境真的會打空。
+     一幀照 Fight 的順序：lead（發射或重瞄）→ 玩家移動 → 怪物 → 判碰到。 */
+  const dashAt = (m, p, old = false) => {
+    const c = makeCombo();
+    breakNow(m);
+    for (let t = 0; t < BREAK_ATK.flight + 0.2; t += DT) {
+      const act = comboStep(c, DT, { pressed: t === 0, grounded: p.grounded, near: false, breakable: t === 0 });
+      if (act.brk) startBreak(c, p, m);
+      else if (c.phase !== 'dash') break;
+      else if (!old) steerBreak(c, p);
+      p.x += p.vx * DT; p.z += p.vz * DT;
+      p.vy -= PHYS.gravity * DT; p.y += p.vy * DT;
+      if (p.y <= 0 && p.vy <= 0) { p.y = 0; p.vy = 0; p.grounded = true; } else p.grounded = false;
+      monsterStep(m, DT, p);
+      if (old ? breakContact(p, m) : breakContact(p, m, c.from)) return t + DT;
+    }
+    return -1;
+  };
+  const hero0 = (z) => ({ x: 0, y: 0, z, vx: 0, vy: 0, vz: 0, grounded: true, aimX: 0, aimZ: -1 });
+  /* 衝刺中的：牠朝玩家原本站的地方衝，玩家已經往旁邊閃開，衝到一半按。照那一刻的速度
+     （十幾 m/s）等速往前推，但衝刺 0.25 秒內就減速到停——照發射那一刻瞄會飛過頭很遠。 */
+  const charging = () => {
+    const m = makeMonster(), q = { x: 0, y: 0, z: 1.7 };
+    m.x = 0; m.z = 0;
+    monsterStep(m, DT, q);                                       // 走進 LUNGE.range：朝 +z 鎖定、開始蓄力
+    q.x = 1.2;                                                   // 玩家往旁邊閃開
+    while (m.lunge.t < LUNGE.windup + 0.04) monsterStep(m, DT, q);
+    return m;
+  };
+  const aside = () => ({ ...hero0(1.7), x: 1.2 });
+  const lOld = dashAt(charging(), aside(), true);
+  const lNew = dashAt(charging(), aside());
+  const cm = charging();
+  ok(lOld < 0 && lNew > 0 && lNew < BREAK_ATK.flight + 2 * DT,
+    `衝刺中（${Math.hypot(cm.vx, cm.vz).toFixed(1)} m/s、減速中）按：只瞄一次打空，重瞄 ${lNew.toFixed(2)} 秒碰到`);
+  // 一幀的路線整段從牠身上穿過去、兩端都碰不到：只看終點不算，看整段算，碰到的是最早的那一點。
+  {
+    const m = makeMonster(); m.x = 0; m.z = 0;
+    const from = { x: 0, y: 0.5, z: 1.2 }, to = { x: 0, y: 0.5, z: -1.2 };
+    const at = breakContact(to, m, from), edge = PHYS.radius * 2 + BREAK_ATK.reach;
+    ok(!breakContact(to, m) && !breakContact(from, m) && at && at.z < edge && at.z > edge - 0.1 - 1e-9,
+      `一幀從牠身上穿過去：只看終點碰不到，看整段碰到（z = ${at && at.z.toFixed(2)}，剛進判定的地方）`);
+  }
+
+  // 照預測走的（站著不動）：重瞄出來的水平速度跟發射那一刻一樣，弧線不變。
+  {
+    const m = makeMonster(), p = hero0(4), c = makeCombo();
+    m.x = 0.5; m.z = 0;
+    breakNow(m);
+    comboStep(c, DT, { pressed: true, grounded: true, near: false, breakable: true });
+    startBreak(c, p, m);
+    const v0 = [p.vx, p.vz];
+    let drift = 0;
+    for (let i = 0; i < 10; i++) {
+      p.x += p.vx * DT; p.z += p.vz * DT;
+      p.vy -= PHYS.gravity * DT; p.y += p.vy * DT;
+      comboStep(c, DT, { pressed: false, grounded: false, near: false, breakable: false });
+      steerBreak(c, p);
+      drift = Math.max(drift, Math.abs(p.vx - v0[0]), Math.abs(p.vz - v0[1]));
+    }
+    ok(drift < 1e-9, `站著不動的目標：重瞄不改水平速度（差 ${drift.toExponential(1)}）`);
+  }
 }
 
 /* ── 13. 怪物不疊 ────────────────────────────────────────────── */

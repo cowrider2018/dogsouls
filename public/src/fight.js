@@ -33,7 +33,7 @@ import { PHYS, supportInfo } from './walk.js';
 import {
   FIELD, REACH, KNOCK_SCALE, DAMAGE, KINDS, BREAK_WINDOW, LUNGE, hurt, makeMonster, harm, lifeStep, gainHeart,
   dropSoul, soulStep, grabs, bankSouls,
-  breaking, broken, breakTarget, startBreak, breakContact, contact, parry, spinStep, separate, placeMonster, monsterStep, bites, knock,
+  breaking, broken, breakTarget, startBreak, steerBreak, breakContact, contact, parry, spinStep, separate, placeMonster, monsterStep, bites, knock,
   knockHero, knockLand, daze, dazeStep,
   inSlash, inFan, inRing, slashTip, makeCombo, comboStep, invulnerable, untouchable, cueing, attacking, taken, spared, rallied,
 } from './combat.js';
@@ -800,6 +800,7 @@ export class Fight {
     if (act.brk) this._face = null;
     if (act.start === 1) combo.tip = slashTip(this.body(player));
     if (act.brk) startBreak(combo, player, target);
+    else if (combo.phase === 'dash') steerBreak(combo, player);   // 飛的途中重瞄（牠停下、衝出去、落地都跟得上）
     if (act.jump) {
       player.vy = PHYS.jump;
       player.grounded = false;
@@ -882,8 +883,13 @@ export class Fight {
        重生的只有 back 的那幾隻；其餘的打死了留在原地、帶著擊退倒下去（_fell）。 */
     const spot = new Map(foes.map(({ m }) => [m, { x: m.x, y: m.y, z: m.z, field: m.field }]));
     const back = (m) => this.respawn && !m.by;
-    // 破防攻擊：突進碰到目標就定住牠、進迴旋（有盾的話被擋掉、直接跳離）；迴旋轉完就扣血、跳離。
-    if (combo.phase === 'dash' && breakContact(player, combo.target) && contact(combo, player, combo.target)) sound.play('parry');
+    /* 破防攻擊：突進碰到目標就定住牠、進迴旋（有盾的話被擋掉、直接跳離）；迴旋轉完就扣血、跳離。
+       碰到看的是這一幀整段路線（lead 記下的 from 到現在），玩家擺回最早碰到的那一點。 */
+    const at = combo.phase === 'dash' && breakContact(player, combo.target, combo.from);
+    if (at) {
+      player.x = at.x; player.y = at.y; player.z = at.z;
+      if (contact(combo, player, combo.target)) sound.play('parry');
+    }
     const dead = new Set();
     if (combo.phase === 'spin') {
       const m = combo.target, r = spinStep(combo, player, m, back(m));
