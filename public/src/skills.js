@@ -42,7 +42,7 @@
            被打中）就炸掉；路上撞到場上的東西一樣炸掉。吐完第三顆才僵直。
      leap  範圍（連震波的塵幾道）跟第一條命一樣，但連跳兩下：第一下落地打下去的那一刻不僵直，就地再倒數
            一次（倒數、預告、起跳之前一直瞄著主角都跟第一下一樣），第二下落地才僵直。
-     cone  半徑 1.5 倍（長度變長，所以夠得到的距離 `range` 也是 1.5 倍），角度從 60° 張開到 105°。
+     cone  半徑（連夠得到的距離 `range`）跟第一條命一樣，只有角度從 60° 張開到 105°。
 
    騎士的招：
 
@@ -227,10 +227,10 @@ export const gustRise = (t) => GUST.edge + (1 - GUST.edge) * Math.sqrt(Math.max(
 export const RING = { depth: GUST.top - GUST.inner, half: SKILL.gale.wave.half };
 
 /**
- * 殭屍王第二條命的招（見檔頭）。grow：扇形的半徑（連 range）放大幾倍；half：扇形的半角；hops：跳砸連跳幾下。
+ * 殭屍王第二條命的招（見檔頭）。half：扇形的半角（半徑不變）；hops：跳砸連跳幾下。
  * orb：連吐 count 顆拋物線的球，倒數完之後每 every 秒一顆，每一顆從腳上 mouth 那麼高飛 flight 秒落到主角腳下。
  */
-export const RAGE = { grow: 1.5, half: (105 / 2) * (Math.PI / 180), hops: 2, orb: { count: 3, every: 0.5, flight: 0.9, mouth: 1.5 * DOG_H } };
+export const RAGE = { half: (105 / 2) * (Math.PI / 180), hops: 2, orb: { count: 3, every: 0.5, flight: 0.9, mouth: 1.5 * DOG_H } };
 
 /** 這隻在第二條命以後了嗎（有 `lives` 的那一類，combat.js 的 RALLY）：招照 RAGE。 */
 export const raging = (m) => (m.life || 1) > 1;
@@ -238,14 +238,8 @@ export const raging = (m) => (m.life || 1) > 1;
 /** 這隻現在挑得到哪幾招：第二條命以後、那一類有 `rage` 的話照它（國王多了瞪視），其餘照 `skills`。 */
 export const skillsOf = (m) => (raging(m) && kindOf(m).rage) || kindOf(m).skills || [];
 
-/** 這隻放這一招的半徑：第二條命的扇形是 RAGE.grow 倍。 */
-export const radiusOf = (m, skill) => SKILL[skill].radius * (raging(m) && skill === 'cone' ? RAGE.grow : 1);
-
 /** 這隻放扇形的半角：第二條命張開到 RAGE.half。 */
 export const halfOf = (m) => (raging(m) ? RAGE.half : SKILL.cone.half);
-
-/** 這隻放這一招要離玩家多近（不限距離是 Infinity）：第二條命的扇形照它變長的半徑。 */
-const rangeOf = (m, skill) => (SKILL[skill].range ?? Infinity) * (raging(m) && skill === 'cone' ? RAGE.grow : 1);
 
 /** 這一招出完僵直幾秒：那一招自己的 `recover`，沒有就是 SKILL.recover。 */
 export const recoverOf = (skill) => SKILL[skill].recover ?? SKILL.recover;
@@ -481,14 +475,14 @@ const CAST = {
     m.cast = null;
     const hop = c.hop || 1;
     if (raging(m) && hop < RAGE.hops) { begin(m, 'leap', target); m.cast.hop = hop + 1; }
-    return { shape: 'circle', x: c.tx, y: c.ty, z: c.tz, r: radiusOf(m, 'leap'), dmg: S.damage };
+    return { shape: 'circle', x: c.tx, y: c.ty, z: c.tz, r: S.radius, dmg: S.damage };
   },
 
   cone(m) {
     const c = m.cast, S = SKILL.cone;
     if (c.t < S.windup) return null;
     m.cast = null;
-    return { shape: 'cone', x: m.x, y: m.y, z: m.z, dirX: c.dirX, dirZ: c.dirZ, r: radiusOf(m, 'cone'), half: halfOf(m), dmg: S.damage };
+    return { shape: 'cone', x: m.x, y: m.y, z: m.z, dirX: c.dirX, dirZ: c.dirZ, r: S.radius, half: halfOf(m), dmg: S.damage };
   },
 
   /* 倒數的時候站著；之後 air 秒沿直線飛向落點、高度是一條最高 hop 的拋物線（疊在起點與
@@ -869,7 +863,7 @@ export function bossStep(m, dt, target, world, rng = random, calm = false) {
   // 衝刺（combat.js 的 LUNGE）打完才挑下一招，兩件事不會疊在一起。
   if (!calm && !m.cast && m.castT <= 0 && !busy(m) && !(m.stun > 0) && !m.lunge) {
     const gap = Math.hypot(target.x - m.x, target.z - m.z);
-    const can = list.filter((s) => gap <= rangeOf(m, s) && (!READY[s] || READY[s](m)));
+    const can = list.filter((s) => gap <= (SKILL[s].range ?? Infinity) && (!READY[s] || READY[s](m)));
     const skill = can.length ? choose(m, list, can, rng) : null;
     if (skill) {
       m.castT = k.every;

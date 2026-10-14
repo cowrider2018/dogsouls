@@ -182,7 +182,7 @@ import {
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
   SOUL, dropSoul, soulStep, grabs, bankSouls, DAZE, daze, dazeStep, knockHero,
 } from '../public/src/combat.js';
-import { SKILL, RAGE, TRACK, skillsOf, radiusOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill, planOf, IDLE, REPEAT, windDown } from '../public/src/skills.js';
+import { SKILL, RAGE, TRACK, skillsOf, halfOf, UP_AIR, UP_RISE, REAP, WHIRL_LEN, makeWorld, bossStep, wavesStep, shotsStep, gustsStep, gustHits, gustRise, GUST, shotHits, shotBlocked, strikeHits, laneLength, recoverOf, summonCount, pickSkill, planOf, IDLE, REPEAT, windDown } from '../public/src/skills.js';
 import { steer } from '../public/src/walk.js';
 import { DUST, dustOf, dustFade, QUAKE, quakeBands, quakeFade, quakeTop, PLOW, plowPieces, plowClump } from '../public/src/dust.js';
 import { Motion, CHAIN_TURN, bloodOf, sizeOf, mirror, riseLift, MOVES as KNIGHT_MOVES } from '../public/src/monster.js';
@@ -3340,10 +3340,8 @@ console.log('37. 兩條命');
 console.log('38. 第二條命的跳砸與扇形');
 {
   const second = (x, z) => { const m = makeMonster({ kind: 'boss', x, z, yaw: 0 }); m.life = 2; m.castT = 0; return m; };
-  ok(RAGE.grow === 1.5 && RAGE.hops === 2, '第二條命：扇形的半徑 1.5 倍、跳砸連跳兩下');
-  ok(near(radiusOf(second(0, 0), 'leap'), SKILL.leap.radius) && near(radiusOf(second(0, 0), 'cone'), 1.5 * SKILL.cone.radius)
-    && near(radiusOf(makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 }), 'cone'), SKILL.cone.radius), '跳砸的半徑跟第一條命一樣；第一條命的扇形照原本的半徑');
-  // 扇形：夠得到的距離跟著長度變長。
+  ok(RAGE.hops === 2, '第二條命：跳砸連跳兩下');
+  // 扇形：半徑跟第一條命一樣，夠得到的距離也一樣。
   const picks = (d) => {
     const got = new Set();
     for (const r of [0, 0.34, 0.67, 0.99]) {
@@ -3353,18 +3351,19 @@ console.log('38. 第二條命的跳砸與扇形');
     }
     return [...got].sort().join();
   };
-  ok(picks(5.4) === 'cone,leap,orb' && picks(5.6) === 'leap,orb', `扇形 ${(1.5 * SKILL.cone.range).toFixed(2)} 公尺以內才放（5.4：${picks(5.4)}；5.6：${picks(5.6)}）`);
-  // 扇形打下去的那一片照放大的半徑，傷害不變。
+  const [inR, outR] = [SKILL.cone.range - 0.1, SKILL.cone.range + 0.1];
+  ok(picks(inR) === 'cone,leap,orb' && picks(outR) === 'leap,orb', `扇形 ${SKILL.cone.range.toFixed(2)} 公尺以內才放（${inR.toFixed(2)}：${picks(inR)}；${outR.toFixed(2)}：${picks(outR)}）`);
+  // 扇形打下去的那一片照第一條命的半徑，傷害不變。
   {
     const b = second(0, 0), q = body(0, 2);
     let st = null;
     for (let i = 0; i < 200 && !st; i++) st = bossStep(b, DT, q, makeWorld(), () => 0.99);
-    const sw = { ...st, from: 0, to: st.r }, R = 1.5 * SKILL.cone.radius;
+    const sw = { ...st, from: 0, to: st.r }, R = SKILL.cone.radius;
     ok(st.shape === 'cone' && near(st.r, R) && st.dmg === SKILL.cone.damage
       && strikeHits(sw, body(0, R + PHYS.radius - 0.01)) && !strikeHits(sw, body(0, R + PHYS.radius + 0.01)),
       `扇形長 ${R.toFixed(2)} 公尺、扣 ${st.dmg}`);
-    // 角度：105°。身體張開的角度算進去，所以量在遠處（4 公尺，身體只佔 ±4.3°）。
-    const ang = (deg) => body(Math.sin(deg * Math.PI / 180) * 4, Math.cos(deg * Math.PI / 180) * 4);
+    // 角度：105°。身體張開的角度算進去，所以量在半徑以內盡量遠的地方（3.3 公尺，身體只佔 ±5.2°）。
+    const ang = (deg) => body(Math.sin(deg * Math.PI / 180) * 3.3, Math.cos(deg * Math.PI / 180) * 3.3);
     ok(near(st.half * 2, 105 * Math.PI / 180) && near(halfOf(makeMonster({ kind: 'boss', x: 0, z: 0, yaw: 0 })) * 2, Math.PI / 3)
       && strikeHits(sw, ang(52)) && strikeHits(sw, ang(-52)) && !strikeHits(sw, ang(58)),
       '扇形張開 105°（偏 52° 中、58° 不中）；第一條命還是 60°');
