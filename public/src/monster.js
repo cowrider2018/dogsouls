@@ -125,13 +125,14 @@
 
    頭跟著主角現在的位置左右轉（LOOK，最多 LOOK.max）只給真的會追著主角的招：瞪視一直轉向主角，
    跳砸起跳之前一直瞄著主角（skills.js 的 cast.track；身體只轉 TRACK.body 那麼多，其餘是頭轉的，
-   而且上下也跟——頭正對著主角）。扇形地震鎖定的是倒數開始那一刻的方向，主角之後怎麼跑都不會變——
+   而且上下也跟——頭正對著主角）；國王的連衝（combat.js 的 chains）從蓄力起、每一下的蓄力與衝都一樣
+   左右上下跟著主角（身體照 LUNGE.turn 慢慢轉過去，頭先到），僵直才放掉。扇形地震鎖定的是倒數開始那一刻的方向，主角之後怎麼跑都不會變——
    頭要是跟著主角轉，看起來就像招也跟著轉，玩家會照著頭躲錯地方。所以扇形的頭盯著鎖定的方向不動。
    ------------------------------------------------------------------ */
 
 import * as THREE from '../vendor/three.module.js';
 import { Critter, depthOnly, samePlace } from './critter.js';
-import { LUNGE, STILL, RALLY, DAZE, kindOf } from './combat.js';
+import { LUNGE, STILL, RALLY, DAZE, kindOf, chains, again } from './combat.js';
 import { SKILL, RAGE, UP_AIR, REAP, recoverOf } from './skills.js';
 import { PHYS } from './walk.js';
 import { Mover, MOVES as HERO } from './moves.js';
@@ -642,7 +643,7 @@ export class Motion {
    * 所以寫在自己的一份上。
    */
   _lookAt(dt, stage, m, player, move) {
-    const track = !!stage && !!m.cast?.track;
+    const track = !!stage && (!!m.cast?.track || (chains(m) && (stage === 'windup' || stage === 'dash')));
     const k = 1 - Math.exp(-dt / LOOK.tau);
     this._look += ((LOOK.stages[stage] || (track ? 1 : 0)) - this._look) * k;
     this._tilt += ((track ? 1 : 0) - this._tilt) * k;
@@ -718,7 +719,9 @@ export class Motion {
     if (!L) return [null, 0];
     if (L.t < LUNGE.windup) return ['windup', L.t];
     const s = L.t - LUNGE.windup;
-    return s < LUNGE.time ? ['dash', s] : ['recover', s - LUNGE.time];
+    if (s < LUNGE.time) return ['dash', s];
+    // 衝完沒咬到、還要再衝（國王）：這一幀已經是下一下的蓄力，不播僵直。
+    return again(m) ? ['windup', 0] : ['recover', s - LUNGE.time];
   }
 
   /**

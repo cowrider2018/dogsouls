@@ -27,9 +27,10 @@
    站著發呆（蓄力）0.25 秒，然後朝那時鎖定的方向衝一下（速度 16、0.25 秒內
    減到 0），衝完僵直 0.75 秒才回去追。只有衝的那 0.25 秒裡碰到玩家，玩家
    才被咬到、扣血（小怪 1、騎士 2、殭屍王 3、國王 2，見 KINDS 的 `bite` 與下面的「玩家的血」）。
-   國王（KINDS 的 `lunges`）一次衝兩下：衝完第一下不僵直，重新蓄力 0.25 秒、朝玩家那時
-   的位置再衝一下，第二下衝完才僵直。兩下之間不到 LIFE.guard，所以第一下咬到的話第二下
-   不再扣血——第二下是給躲過第一下的人的。
+   國王（KINDS 的 `lunges`）一次最多衝三下：這一下沒咬到就不僵直，接著重新蓄力 0.25 秒、
+   再衝一下；任何一下咬到、或第三下也沒咬到，衝完才僵直。牠的衝刺不鎖方向（LUNGE.turn）：
+   身體（也就是衝的方向）一直朝玩家轉，蓄力的時候轉得慢、衝的時候轉得快，所以衝過頭之後
+   是一路轉回來、不是一幀轉過去。
 
    國王身邊有三面盾（KINDS 的 `shields`）：挨打的時候先用掉一面，那一下整個不算——
    不扣血、不擊退、不累積破防、衝刺也不取消（parry）。挨打（不管擋沒擋）之後
@@ -37,7 +38,7 @@
 
    攻擊中（attacking：放招、或衝刺的蓄力加衝，不含之後的僵直）被打會怎樣看類別
    （KINDS 的 `steady`）：小怪一打就取消；殭屍王與國王不會被打斷——跟放招的倒數一樣
-   打不退、傷害減半（armored）。國王兩下之間的重新蓄力也算在裡面，兩下連著打不斷。
+   打不退、傷害減半（armored）。國王每兩下之間的重新蓄力也算在裡面，三下連著打不斷。
    畫面上攻擊中墨線變紅，跟 armored 出自同一個 attacking，所以不可打斷與紅色永遠是同一段。
 
    幽靈（KINDS 的 `fly`）不受重力、會飛：y 跟 x、z 是同一回事。追人是朝玩家
@@ -195,7 +196,7 @@ export const FIELD = { arena: ARENA, cols: COLS, doors: {} };
  *           在空中原地轉一圈；reapGround：下劈、在地上原地轉一圈、上挑。三下連著），每次各一半。
  *           衝刺咬人照常。
  *   king  國王（垂耳狗，幽靈那一件毛、半透明，畫成 1.4 倍高）。血 40、腳程 3.8，走路、
- *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺衝兩下才僵直（見 LUNGE）。`shields`：身邊幾面盾，
+ *           受重力。`lives` 兩條命（跟殭屍王一樣，見 RALLY），第二條命從 `rage` 裡挑招（多了瞪視，召喚改成一直召，skills.js）。`lunges`：一次衝刺最多衝幾下——沒咬到就接下一下，咬到或衝滿才僵直；衝的時候一直朝玩家轉（見 LUNGE）。`shields`：身邊幾面盾，
  *           每 `shieldEvery` 秒沒挨打補一面（見 parry）。`steady`：衝刺跟殭屍王一樣不會被打斷。每 `every`
  *           秒從 `skills` 裡挑一招（skills.js）。
  *
@@ -216,7 +217,7 @@ export const KINDS = {
   ghost: { name: '幽靈', hp: 4, speed: 3.4, breakAt: BREAK_AT, bite: 1, fly: true },
   knight: { name: '騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, skills: ['whirl', 'cleave'], open: ['cleave', 'whirl'], every: 3 },
   wraith: { name: '幽靈騎士', hp: 10, speed: 3.6, breakAt: BREAK_AT, bite: 2, soul: true, fly: true, skills: ['reapAir', 'reapGround'], every: 4 },
-  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 2, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 3 },
+  king: { name: '國王', hp: 40, lives: 2, speed: 3.8, breakAt: BREAK_AT, bite: 2, lunges: 3, shields: 3, shieldEvery: 8, steady: true, skills: ['hew', 'summon', 'gale'], open: ['hew', 'gale', 'summon'], rage: ['hew', 'summon', 'gale', 'glare'], rageOpen: ['hew', 'gale', 'summon', 'glare'], every: 3 },
 };
 
 /**
@@ -463,10 +464,23 @@ export const STILL = { before: 0.15, after: 0.1 };
  *   recover  衝完之後僵直多久，才回去追人：低頭、STILL.before 秒完全不動、甩頭，再 STILL.after 秒
  *            沒有動作（monster.js）。
  *
+ *   turn     一次衝好幾下的那一類（chains，國王）不鎖方向：身體一直朝玩家轉，衝的方向就是身體的
+ *            朝向。蓄力的時候每秒轉 windup 弳、衝的時候 dash 弳——外觀轉身速率（critter.js 的
+ *            TURN_RATE，28）的 0.3 與 0.8 倍。咬到之後不再轉，照那個方向衝完。
+ *
  * 衝得到的 2.0 比 range 1.8 還長：站著不動的人一定被衝到（牠會衝過頭），
- * 蓄力的時候往旁邊閃開才躲得掉。
+ * 蓄力的時候往旁邊閃開才躲得掉（會轉的那一類躲不掉，只能跳過去，或跑出 2 公尺外）。
  */
-export const LUNGE = { range: 1.8, windup: 0.25, speed: 16, time: 0.25, recover: STILL.before + 0.5 + STILL.after };
+export const LUNGE = {
+  range: 1.8, windup: 0.25, speed: 16, time: 0.25, recover: STILL.before + 0.5 + STILL.after,
+  turn: { windup: 0.3 * 28, dash: 0.8 * 28 },
+};
+
+/** 一次衝好幾下的那一類（KINDS 的 `lunges`，國王）：衝刺不鎖方向（LUNGE.turn），頭一直盯著玩家（monster.js）。 */
+export const chains = (m) => (kindOf(m).lunges || 1) > 1;
+
+/** 這一下衝完要接下一下嗎：會連衝的那一類、這一下沒咬到（bit）、還沒衝滿 `lunges` 下。 */
+export const again = (m) => !!m.lunge && !m.lunge.bit && m.lunge.n < (kindOf(m).lunges || 1);
 
 /** 攻擊的長度：1.5 個狗高。每一段都一樣，差的只有角度。 */
 export const REACH = 1.5 * DOG_H;
@@ -553,7 +567,7 @@ export function placeMonster(m) {
   m.castT = kindOf(m).every || 0;         // 離下一招還有幾秒
   m.plan = null;                          // 挑招的記性（skills.js 的 planOf）：重生從開場招重來
   m.stun = 0;                             // 出招後的僵直還剩幾秒（skills.js）
-  m.lunge = null;                         // 衝刺：{ t, n, dirX, dirZ }，見 LUNGE
+  m.lunge = null;                         // 衝刺：{ t, n, dirX, dirZ, bit }，見 LUNGE
   m.shields = kindOf(m).shields || 0;     // 還剩幾面盾（國王，見 parry）
   m.broke = false;                        // 被破防攻擊推開、還沒落地滑停（落地就回神，見檔頭的「回神」）
   m.reel = false;                         // 正在回神：這一段僵直（m.stun）播衝刺的甩頭
@@ -743,19 +757,20 @@ export function monsterStep(m, dt, target) {
     if (!m.rally) { m.stun = LUNGE.recover; m.reel = true; m.cast = null; m.lunge = null; }
   }
   // 沒有目標：衝出去的那一下播完（還在蓄力的 standDown 已經收掉了），之後站著不動。
-  if (!target && !m.rally && m.lunge && m.lunge.t < LUNGE.windup + LUNGE.time + LUNGE.recover) { lungeStep(m, dt); return; }
+  if (!target && !m.rally && m.lunge && m.lunge.t < LUNGE.windup + LUNGE.time + LUNGE.recover) { lungeStep(m, dt, null); return; }
   // 沒有目標、站起來的時候（RALLY）、放招中、出招後的僵直（skills.js、回神）：站著不動。
   if (!target || m.rally) { m.lunge = null; m.vx = 0; m.vy = 0; m.vz = 0; return; }
   if (m.cast || m.stun > 0) { m.vx = 0; m.vy = 0; m.vz = 0; return; }
-  /* 一次衝好幾下的那一類（國王）：這一下衝完、還沒到 `lunges` 下，不發呆，重新蓄力
-     朝玩家現在的位置再衝。衝完的那一幀（hot）照常算咬，下一幀才換成下一下。 */
+  /* 一次衝好幾下的那一類（國王）：這一下衝完沒咬到、還沒到 `lunges` 下（again），不發呆，
+     這一幀就開始下一下的蓄力（從衝完的朝向接著朝玩家轉）。衝完的那一幀（hot）照常算咬，
+     咬到沒有（bit）要等那一幀的 bites 才知道，所以下一幀才換成下一下。 */
   const L0 = m.lunge;
-  if (L0 && L0.t >= LUNGE.windup + LUNGE.time && L0.n < (kindOf(m).lunges || 1)) { lockLunge(m, target, L0.n + 1); return; }
+  if (L0 && L0.t >= LUNGE.windup + LUNGE.time && again(m)) { lockLunge(m, target, L0.n + 1); lungeStep(m, dt, target); return; }
   /* 衝完、再發呆 recover 秒之後收掉。收掉的這一幀站著不動、不接著衝下一次：
      殭屍王的 bossStep 在 monsterStep 之前，牠要看到一幀「沒在衝」才挑得了招，
      不然貼著人的殭屍王會一次接一次地衝，永遠輪不到放招。 */
   if (m.lunge && m.lunge.t >= LUNGE.windup + LUNGE.time + LUNGE.recover) { m.lunge = null; m.vx = 0; m.vy = 0; m.vz = 0; return; }
-  if (m.lunge) { lungeStep(m, dt); return; }
+  if (m.lunge) { lungeStep(m, dt, target); return; }
   /* 朝玩家的腳追。會飛的連高低一起追（三維的方向），走路的只看水平。 */
   const fly = !!kindOf(m).fly;
   const dx = target.x - m.x, dy = fly ? target.y - m.y : 0, dz = target.z - m.z;
@@ -805,8 +820,14 @@ function airStep(m, dt, cols = m.field.cols) {
 /**
  * 開始一下衝刺（第 n 下）：站住蓄力，方向在這一刻朝玩家的腳鎖定——會飛的連高低一起
  * （三維的方向），走路的只看水平。正好疊在玩家身上的時候朝自己的面向。
+ * 會連衝的那一類（chains）不鎖：從自己現在的面向起算，之後每一幀朝玩家轉（lungeStep）。
  */
 function lockLunge(m, target, n) {
+  if (chains(m)) {
+    m.lunge = { t: 0, n, dirX: m.aimX, dirY: 0, dirZ: m.aimZ };
+    m.vx = 0; m.vy = 0; m.vz = 0;
+    return;
+  }
   const fly = !!kindOf(m).fly;
   const dx = target.x - m.x, dy = fly ? target.y - m.y : 0, dz = target.z - m.z;
   const d = Math.hypot(dx, dy, dz);
@@ -851,9 +872,15 @@ const lungeDist = (s) => LUNGE.speed * (s - (s * s) / (2 * LUNGE.time));
  *
  * `hot`：這一幀有衝（走了一段）。碰撞看的是它，而不是「t 落在哪一段」——衝完
  * 的那一幀 t 已經跨進衝完之後的發呆了，但牠這一幀剛好走到最遠處。
+ *
+ * 會連衝的那一類（chains）在蓄力與衝的時候先朝 `target` 轉一點（LUNGE.turn，照這一幀開始時在哪一段），
+ * 再沿轉過的方向走；咬到之後（bit）、衝完之後、沒有目標的時候不轉。
  */
-function lungeStep(m, dt) {
+function lungeStep(m, dt, target) {
   const L = m.lunge;
+  if (target && chains(m) && !L.bit && L.t < LUNGE.windup + LUNGE.time) {
+    turnLunge(L, m, target, (L.t < LUNGE.windup ? LUNGE.turn.windup : LUNGE.turn.dash) * dt);
+  }
   const s0 = Math.min(LUNGE.time, Math.max(0, L.t - LUNGE.windup));
   L.t += dt;
   const s1 = Math.min(LUNGE.time, Math.max(0, L.t - LUNGE.windup));
@@ -868,6 +895,17 @@ function lungeStep(m, dt) {
     if (dy) m.y = flyY(m, m.y + dy * step);
     walkTo(m, m.x + L.dirX * step, m.z + L.dirZ * step);
   }
+}
+
+/** 衝刺的方向（水平）朝 target 轉，最多轉 step 弳。target 正好在牠身上的時候不轉。 */
+function turnLunge(L, m, target, step) {
+  const dx = target.x - m.x, dz = target.z - m.z;
+  if (Math.hypot(dx, dz) < 1e-6) return;
+  const at = Math.atan2(L.dirX, L.dirZ);
+  let d = Math.atan2(dx, dz) - at;
+  d -= 2 * Math.PI * Math.round(d / (2 * Math.PI));
+  const a = at + Math.max(-step, Math.min(step, d));
+  L.dirX = Math.sin(a); L.dirZ = Math.cos(a);
 }
 
 /** 這一幀正在衝。只有這段時間碰到玩家才算——蓄力與衝完之後的發呆都不算。 */
@@ -922,8 +960,14 @@ function shove(m, dx, dz) {
 /**
  * 怪物這一幀打到玩家了嗎：正在衝刺（lunging）、身體碰到了。其他時候碰到都
  * 沒事——不衝的怪物只是一個會擋路的東西。
+ *
+ * 咬到了就記在那一下上（m.lunge.bit）：會連衝的那一類（國王）咬到就不接下一下、衝完直接僵直（again）。
  */
-export const bites = (p, m) => !m.air && lunging(m) && touching(p, m);
+export function bites(p, m) {
+  if (m.air || !lunging(m) || !touching(p, m)) return false;
+  m.lunge.bit = true;
+  return true;
+}
 
 /**
  * 擊退一隻怪物：水平往遠離 (fromX, fromZ) 的方向、垂直往上。速度是

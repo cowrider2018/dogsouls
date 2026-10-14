@@ -102,9 +102,11 @@
                     靜置姿勢）：冠環的底是圓角矩形，下緣低過頭頂（坐在頭上、不是浮著），頭頂那一截
                     整個包在冠環內面裡；垂下來的耳朵在冠環底下；王冠跟著頭骨轉、墨線跟著墨色換。
                     國王咬的是騎士那一把劍，只有劍萼與劍柄（還有柄頭）是金色的。
-    28. 國王        血 40、腳程 3.8、咬 2、走路受重力。一次衝兩下：第一下衝完不僵直，重新蓄力
-                    0.25 秒、朝那時的玩家再衝，第二下衝完才僵直；站著不動的只被第一下扣血（guard），
-                    躲過第一下的被第二下咬到；蓄力被打就整套取消。三面盾：挨打先用掉一面、那一下
+    28. 國王        血 40、腳程 3.8、咬 2、走路受重力。一次最多衝三下：沒咬到就不僵直，重新蓄力
+                    0.25 秒再衝；任何一下咬到、或第三下也沒咬到，衝完才僵直；站著不動的被第一下咬到
+                    就僵直，跳過第一下的被第二下咬到，三下都跳過的衝滿三下。衝的方向一直朝玩家轉：
+                    蓄力每秒 0.3×28、衝的時候 0.8×28 弳（外觀轉身 TURN_RATE 的倍數），整套朝向每一幀
+                    都不跳；頭在蓄力與衝的時候左右上下跟著玩家，僵直才放掉。蓄力被打不取消。三面盾：挨打先用掉一面、那一下
                     整個不算（不扣血、不擊退、不累積破防、衝刺不斷）；挨打（擋沒擋都算）之後 8 秒
                     沒再挨打補一面、補到滿；破防突進碰到有盾的國王：被擋掉、不定住、直接跳離。
     29. 直線劈砍    國王每 3 秒放一招，劈砍不限距離；挑的那一刻鎖定方向；倒數 0.5 秒站著不打；
@@ -175,7 +177,7 @@ import {
   MODES, DEFAULT_MODE, LUNGE, STILL, RALLY, spared, rallied, lunging, ARENA, SPAWN, DOG_H, REACH, SWING, REST, KNOCK, KNOCK_SCALE, FAN, WINDOW, KINDS, DAMAGE, hurt, placeMonster,
   BREAK_AT, BREAK_WINDOW, broken,
   FLY, BREAK_ATK, breaking, breakTarget, startBreak, breakContact, latch, contact, parry, spinStep, separate, armored, attacking,
-  makeMonster as freshMonster, monsterStep, touching, bites, knock, inSlash, inFan, inRing, slashTip, fanFrame,
+  makeMonster as freshMonster, monsterStep, touching, bites, chains, again, knock, inSlash, inFan, inRing, slashTip, fanFrame,
   makeCombo, comboStep, invulnerable, cueing, FIELD, LIFE, resetLife, lifeStep, harm, refill, gainHeart, regen,
   SOUL, dropSoul, soulStep, grabs, bankSouls, DAZE, daze, dazeStep, knockHero,
 } from '../public/src/combat.js';
@@ -192,7 +194,7 @@ import { OFFER, makeOffer, offerStep, offerDone, nearOffer, blinkOf, throwSoul, 
 import { iconOf, ICONS, SOUL_SHAPE, bodySpan } from '../public/src/pad.js';
 import { readFileSync } from 'node:fs';
 import * as THREE from '../public/vendor/three.module.js';
-import { loadZoo } from '../public/src/critter.js';
+import { loadZoo, TURN_RATE } from '../public/src/critter.js';
 import { makeMonsterCritter, helmOf, ATTACK_INK } from '../public/src/monster.js';
 import { Helm, HELM, EAR_COLOR } from '../public/src/helm.js';
 import { litOf } from '../public/src/palette.js';
@@ -2302,54 +2304,96 @@ console.log('28. 國王');
   ok(K.hp === 40 && K.speed === 3.8 && K.bite === 2 && !K.fly && K.steady && !K.soul,
     '國王：血 40、腳程 3.8、咬 2、走路受重力、衝刺跟殭屍王一樣打不斷、不掉靈魂');
   const king = () => makeMonster({ kind: 'king', x: 0, z: 0, yaw: 0 });
-  const hero = (x, z) => ({ ...body(x, z), hp: 10, max: 10, guard: 0 });
+  const hero = (x, z, y = 0) => ({ ...body(x, z, y), hp: 10, max: 10, guard: 0 });
+  /** 跳在牠頭頂上：水平疊得上也咬不到（走路的那一類只看水平追、只看水平衝）。 */
+  const UP = PHYS.height + 0.2;
+  const yawOf = (m) => Math.atan2(m.aimX, m.aimZ);
+  const wrap = (a) => a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
 
-  /* 跑一次衝刺：每一幀 monsterStep、guard 倒數、被咬到就扣血。move(t, m) 可以在衝的途中
-     搬動玩家。回報每一下開始衝的那一刻（第幾下、方向）、整套收掉的時間。 */
+  ok(chains(king()) && !chains(makeMonster({ kind: 'minion', x: 0, z: 0, yaw: 0 })) && K.lunges === 3,
+    '國王一次最多衝三下、衝刺不鎖方向；小怪照舊鎖方向');
+  ok(near(LUNGE.turn.windup, 0.3 * TURN_RATE) && near(LUNGE.turn.dash, 0.8 * TURN_RATE),
+    `轉向：蓄力 ${LUNGE.turn.windup.toFixed(1)}、衝 ${LUNGE.turn.dash.toFixed(1)} 弳每秒——外觀轉身（${TURN_RATE}）的 0.3 與 0.8 倍`);
+
+  /* 跑一次衝刺：每一幀 monsterStep、guard 倒數、被咬到就扣血，動作（Motion）照 fight.js 的順序在咬之後播。
+     move(t, m) 可以在途中搬動玩家。回報每一下開始衝的那一刻（第幾下、方向）、整套收掉的時間、
+     朝向一幀最多轉多少、播過的動作段（第幾下的哪一段）、每一下蓄力最後一幀頭跟著玩家多少。 */
   const lunge = (p, move = () => {}) => {
-    const m = king(), dashes = [];
-    let prev = false, done = null;
-    for (let t = 0; t < 3; t += DT) {
+    const m = king(), mo = new Motion(), dashes = [], stages = [], heads = [];
+    let prev = false, done = null, turn = 0, yaw = null;
+    for (let t = 0; t < 4; t += DT) {
       move(t, m, p);
       monsterStep(m, DT, p);
       lifeStep(p, DT);
       if (bites(p, m)) harm(p, K.bite);
+      const [stage] = mo._stage(m);
+      mo.step(DT, m, p);
+      if (m.lunge) {
+        if (yaw !== null) turn = Math.max(turn, Math.abs(wrap(yawOf(m) - yaw)));
+        yaw = yawOf(m);
+        if (stages.at(-1) !== stage) stages.push(stage);
+        if (stage === 'windup' && m.lunge.t + DT >= LUNGE.windup) heads[m.lunge.n - 1] = Math.min(mo._look, mo._tilt);
+      }
       const hot = lunging(m);
-      if (hot && !prev) dashes.push({ t, n: m.lunge.n, dirX: m.lunge.dirX, dirZ: m.lunge.dirZ });
+      if (hot && !prev) dashes.push({ t, n: m.lunge.n, dirX: m.lunge.dirX, dirZ: m.lunge.dirZ, x: m.x, z: m.z });
       prev = hot;
       if (dashes.length && !m.lunge) { done = t; break; }
     }
-    return { dashes, done };
+    return { dashes, done, turn, stages, heads, m };
   };
+  const T = LUNGE.windup + LUNGE.time;
 
   {
     const p = hero(0, 1.5);
     const { dashes, done } = lunge(p);
-    const T = LUNGE.windup + LUNGE.time;
-    ok(dashes.length === 2 && dashes[0].n === 1 && dashes[1].n === 2, `一次衝兩下（第 ${dashes.map((d) => d.n).join('、')} 下）`);
+    ok(dashes.length === 1 && dashes[0].n === 1, `站著不動：第一下就咬到，不接下一下（衝了 ${dashes.length} 下）`);
+    ok(near(done - dashes[0].t, LUNGE.time + LUNGE.recover, DT * 1.5) && p.hp === 10 - K.bite,
+      `咬到的那一下衝完就僵直、僵直完收掉；扣 ${K.bite}（剩 ${p.hp}）`);
+  }
+  {
+    /* 三下都跳過：一直站在牠頭頂上。 */
+    const p = hero(0, 1.5, UP);
+    const { dashes, done, turn, stages, heads } = lunge(p);
+    ok(dashes.length === 3 && dashes.every((d, i) => d.n === i + 1), `三下都沒咬到：衝滿三下（第 ${dashes.map((d) => d.n).join('、')} 下）`);
     // 換下一下的那一幀、蓄力落在格點上，各差一幀。
-    ok(near(dashes[1].t - dashes[0].t, T, DT * 2.5), `第二下在第一下開始衝之後 ${(dashes[1].t - dashes[0].t).toFixed(2)} 秒開始衝：衝完直接重新蓄力 ${LUNGE.windup} 秒`);
-    ok(near(done - dashes[1].t, LUNGE.time + LUNGE.recover, DT * 1.5), '第二下衝完才僵直、僵直完收掉');
-    ok(dashes[0].dirZ > 0.99 && dashes[1].dirZ < -0.99, '第二下朝玩家那時的位置重新瞄（衝過頭之後轉回來）');
-    ok(p.hp === 10 - K.bite, `站著不動：第一下咬到扣 ${K.bite}，第二下在 guard 裡不扣（剩 ${p.hp}）`);
+    ok(dashes.length === 3 && near(dashes[1].t - dashes[0].t, T, DT * 2.5) && near(dashes[2].t - dashes[1].t, T, DT * 2.5),
+      `每一下在上一下開始衝之後 ${T} 秒開始衝：衝完直接重新蓄力 ${LUNGE.windup} 秒`);
+    ok(near(done - dashes[2].t, LUNGE.time + LUNGE.recover, DT * 1.5) && p.hp === 10, '第三下衝完才僵直、僵直完收掉；沒扣血');
+    ok(turn <= LUNGE.turn.dash * DT + 1e-9, `整套朝向每一幀最多轉 ${turn.toFixed(3)} 弳（衝的轉速一幀 ${(LUNGE.turn.dash * DT).toFixed(3)}）：不跳`);
+    ok(stages.join() === 'windup,dash,windup,dash,windup,dash,recover', `動作一段接一段、中間不播僵直（${stages.join('→')}）`);
+    ok(heads.length === 3 && heads.every((h) => h > 0.85), `每一下蓄力完頭都左右上下跟著玩家（${heads.map((h) => h.toFixed(2)).join('、')}）`);
+    const toward = (d) => (d.dirX * (p.x - d.x) + d.dirZ * (p.z - d.z)) / Math.hypot(p.x - d.x, p.z - d.z);
+    ok(dashes.slice(1).every((d) => toward(d) > 0), `衝過頭之後轉回來：後兩下衝出去的時候都朝著玩家那一側（${dashes.map((d) => toward(d).toFixed(2)).join('、')}）`);
+  }
+  for (const k of [2, 3]) {
+    /* 前 k − 1 下跳過，第 k 下站在地上。 */
+    const p = hero(0, 1.5, UP);
+    const { dashes } = lunge(p, (t, m, q) => { if (m.lunge && m.lunge.n >= k) q.y = 0; });
+    ok(dashes.length === k && p.hp === 10 - K.bite, `躲過前 ${k - 1} 下：第 ${k} 下咬到就僵直（衝了 ${dashes.length} 下，扣 ${K.bite}、剩 ${p.hp}）`);
   }
   {
-    /* 第一下開始衝的那一刻往旁邊跳開，第二下蓄力之前站回原處。 */
-    const p = hero(0, 1.5);
-    const { dashes } = lunge(p, (t, m, q) => {
-      if (m.lunge && m.lunge.n === 1 && m.lunge.t >= LUNGE.windup) q.x = 2;
-      if (m.lunge && m.lunge.n === 2) q.x = 0;
-    });
-    ok(dashes.length === 2 && p.hp === 10 - K.bite, `躲過第一下：第二下咬到，扣 ${K.bite}（剩 ${p.hp}）`);
-  }
-  {
+    /* 轉速：蓄力剛開始，玩家換到牠正後方（180°，蓄力那 0.25 秒轉不到）。 */
     const m = king(), p = hero(0, 1.5);
+    while (!m.lunge) monsterStep(m, DT, p);
+    p.z = -1.5;
+    const wind = [], dash = [];
+    while (m.lunge.t < T - 1e-9) {
+      const y0 = yawOf(m), inWind = m.lunge.t < LUNGE.windup;
+      monsterStep(m, DT, p);
+      (inWind ? wind : dash).push(Math.abs(wrap(yawOf(m) - y0)));
+    }
+    ok(wind.every((a) => near(a, LUNGE.turn.windup * DT, 1e-9)), `蓄力的時候朝玩家轉，一幀 ${(LUNGE.turn.windup * DT).toFixed(3)} 弳`);
+    ok(near(dash[0], LUNGE.turn.dash * DT, 1e-9) && dash.every((a) => a <= LUNGE.turn.dash * DT + 1e-9),
+      `衝的時候轉得快，一幀最多 ${(LUNGE.turn.dash * DT).toFixed(3)} 弳；衝的方向就是身體的朝向`);
+  }
+  {
+    const m = king(), p = hero(0, 1.5, UP);
     for (let i = 0; i < 40 && !(m.lunge && m.lunge.n === 2); i++) monsterStep(m, DT, p);
     m.shields = 0;
     const L = m.lunge;
     knock(m, 0, 3, 0, -1);
     hurt(m, DAMAGE.rise);
-    ok(m.lunge === L && !m.air && m.hp === K.hp - Math.ceil(DAMAGE.rise / 2),
+    ok(L && L.n === 2 && m.lunge === L && !m.air && m.hp === K.hp - Math.ceil(DAMAGE.rise / 2),
       '第二下蓄力中被打（沒盾）：不取消、不擊退、傷害減半');
   }
 
