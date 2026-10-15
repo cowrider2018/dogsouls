@@ -69,6 +69,7 @@ import { dustOf, dustFade, DUST_LOOK, PUSH_TIME, QUAKE, quakeBands, quakeFade, P
 import { MUTE } from './sound.js';
 import { EyeGlow, Spirit, dazeView } from './glare.js';
 import { random } from './chance.js';
+import { grab, put, pose, setPose } from './snap.js';
 
 /** 怪物的狀態提示：描線變色（攻擊中紅、打不到金）與地上的技能預告（紅區、球的落點）。只有開發的 `?tell`，
  *  boot.js 驗過才寫 data-tell；平常一樣都不畫。主角的金色描線與「現在按」的提示圈不歸它管。 */
@@ -747,6 +748,67 @@ export class Fight {
   disarm() {
     Object.assign(this.combo, makeCombo());
     this._face = null;
+  }
+
+  /* ── 錄影的存檔點（snap.js、mode-flow.js 的 calm）──────────────────────
+     只在平靜的時候存：場上沒有怪物、沒有在飛的、沒有還看得到的特效，留下來的只有清完的那幾場的屍體。
+     所以存的是：連段、出招的動作、流體場的帳（哪一格借給誰、多久沒注入）、氣流與斬痕的鐘、主角上一幀的
+     高度（落地揚塵照它認）、獻靈魂的帳，與每一具屍體（借哪一份外觀、狀態、倒成什麼樣子）。 */
+
+  /** 平靜：存得了檔。 */
+  get calm() {
+    const w = this.world;
+    return !this.foes.length && !this._emerging.length && !this.souls.length && !this._thrown.length && !this._revival
+      && this.combo.phase === 'idle' && !this._puffs.length && !this._plows.length && !this._quakes.length
+      && !this._stomps.length && !this._rumbles.length && !this._qis.length && !this._shakes.length
+      && !w.shots.length && !w.waves.length && !w.gusts.length && !w.rings.length && !w.spawns.length
+      && !this._blood.drops.length && !this._blood.splats.length && !this._fire.drops.length
+      && !this._scars.live.length && !this._gusts.views.length && !this._heats.views.length
+      && (!this.fluid || !this.fluid.lent) && this.settled && !this._king?.at;
+  }
+
+  /** 存一份（平靜的時候）。`player` 是主角（落地揚塵記著牠上一幀的高度）。 */
+  save(player) {
+    const slotOf = (f) => ({ kind: f.m.kind, i: this._pool.get(f.m.kind).findIndex((s) => s.critter === f.critter) });
+    return {
+      own: grab(this, ['scene', 'zoo', 'sound', '_renderer', '_cold', 'blade', 'mover', 'hearts', 'foes', '_corpses', '_emerging', '_pool', 'world', '_fire',
+        '_marks', '_fx', '_qis', '_spare', '_scars', '_grab', '_gusts', '_heats', '_blood', 'fluid', '_sheets', '_puffs', '_plows',
+        '_feet', '_quakes', '_stomps', '_quiet', '_rumbles', '_reach', '_shakes', '_spirit', '_view', 'souls', '_soulLook',
+        '_soulViews', '_king', '_thrown', '_revival', 'combo', '_inkPx']),
+      combo: { phase: this.combo.phase, t: this.combo.t, tip: this.combo.tip ? grab(this.combo.tip) : null },
+      fluid: this.fluid ? grab(this.fluid, ['renderer']) : null,
+      // 氣流、熱浪、斬痕各自的時鐘（扭曲的雜訊、斬痕的淡出照它走）：平靜的時候都收著，只有鐘一直在走。
+      clocks: [this._gusts.time, this._heats.time, this._scars.now],
+      feet: this._feet.has(player) ? grab(this._feet.get(player)) : null,
+      corpses: this._corpses.map((f) => ({
+        ...slotOf(f), field: f.m.field?.arena?.id ?? null,
+        m: grab(f.m, ['field']), motion: grab(f.motion), corpse: grab(f.corpse), banked: !!f.banked,
+        critter: grab(f.critter), pose: pose(f.critter.root),
+      })),
+    };
+  }
+
+  /**
+   * 放回去（重演的那一頁，剛 rewind 完）。`fieldOf(id)` 照房間給場地（屍體站在哪一張圖上）。
+   * 回傳對不上的那幾個位置（空的就是都放好了）。
+   */
+  load(s, player, fieldOf) {
+    const bad = [...put(this, s.own).map((p) => `fight${p}`)];
+    Object.assign(this.combo, makeCombo(), { phase: s.combo.phase, t: s.combo.t });
+    if (s.combo.tip) { this.combo.tip = {}; bad.push(...put(this.combo.tip, s.combo.tip)); } else this.combo.tip = null;
+    if (s.fluid) bad.push(...put(this.fluid, s.fluid).map((p) => `fluid${p}`));
+    [this._gusts.time, this._heats.time, this._scars.now] = s.clocks;
+    if (s.feet) { const o = {}; bad.push(...put(o, s.feet)); this._feet.set(player, o); } else this._feet.delete(player);
+    for (const f of this._corpses) Fight._hide(f);
+    this._corpses = s.corpses.map((c) => {
+      const slot = this._slot(c.kind, c.i);
+      const m = {}, motion = new Motion(), corpse = {};
+      bad.push(...put(m, c.m), ...put(motion, c.motion), ...put(corpse, c.corpse), ...put(slot.critter, c.critter));
+      m.field = c.field ? fieldOf(c.field) : FIELD;
+      if (!setPose(slot.critter.root, c.pose)) bad.push(`corpse ${c.kind}#${c.i} pose`);
+      return { m, motion, rising: null, ...slot, corpse, banked: c.banked };
+    });
+    return bad;
   }
 
   /** 破防攻擊裡：突進與跳離是拋物線、迴旋的位置由 spinStep 擺，模式不要操控玩家。 */

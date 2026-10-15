@@ -72,5 +72,12 @@ export function createLight({ scene, renderer, camera, ruins = null, cols = [], 
       if (owner) owner.render(draw);
       else draw();
     },
+    /** 錄影的存檔點（snap.js）：每一支自己的狀態（沒有 save 的是 null）。 */
+    save() { return live.map((l) => (l.save ? l.save() : null)); },
+    /** 放回去。回傳要等的那幾件事（有的要先拿東西）全部好了的那一刻。 */
+    load(list) {
+      if (list.length !== live.length) throw new Error('光影的存檔對不上');
+      return Promise.all(live.map((l, i) => (l.load ? l.load(list[i]) : null)));
+    },
   };
 }

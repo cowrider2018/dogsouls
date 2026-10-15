@@ -70,6 +70,11 @@ export function blankTape(meta) {
     covers: [],
     /** 正在打的那一場是從哪一幀開始的（k → 幀）。 */
     open: {},
+    /**
+     * 存檔點（snap.js、mode-flow.js 的 calm）：{ at, calls, data, keep }。at 是存的那一刻之後的第一幀，
+     * calls 是那時候 calls 寫到哪；重演的時候從離勾的那一場最近的一份接著走，不必從頭推。
+     */
+    snaps: [],
     /** 整場結束（國王坐好、尾巴也錄完）。 */
     over: false,
   };
@@ -216,11 +221,41 @@ export class Deck {
     this._covered = on;
   }
 
+  /* ── 存檔點 ───────────────────────────────────────────────────── */
+
+  /**
+   * 錄：存一份（這一幀結束之後、下一幀開始之前的世界）。留哪幾份：每一場開打（enter）的時候最近的兩份
+   * 釘住（最近那一份可能落在開打前的暖身裡，用不到，就用前一份），其他的只留最新的兩份——帶子不會越存越大。
+   */
+  snap(data) {
+    if (this.mode !== 'record' || !this.rolling) return;
+    const s = this.tape.snaps;
+    s.push({ at: this.i + 1, calls: this.tape.calls.length, data, keep: false });
+    const loose = s.filter((x) => !x.keep);
+    if (loose.length > 2) s.splice(s.indexOf(loose[0]), 1);
+  }
+
+  /**
+   * 放：跳到存檔點 `snap` 那一刻（下一次 begin 就是它的那一幀）。各條紀錄讀到那裡；回傳那時候的畫面大小
+   * （views 最後一筆在它之前的，沒有是 null——就是一開始那個）。
+   */
+  seek(snap) {
+    const t = this.tape, at = snap.at, i = (list, f) => { let k = 0; while (k < list.length && f(list[k]) < at) k++; return k; };
+    this.i = at - 1;
+    this._at = {
+      calls: snap.calls, cams: i(t.cams, (x) => x[0]), taps: i(t.taps, (x) => x), pads: i(t.pads, (x) => x[0]),
+      views: i(t.views, (x) => x[0]), sums: i(t.sums, (x) => x[0]),
+    };
+    return this._at.views ? t.views[this._at.views - 1][1] : null;
+  }
+
   /* ── 片段（只有錄的時候記）──────────────────────────────────── */
 
-  /** 走進第 k 場：從這一幀開始（倒下重打的話換成這一次）。 */
+  /** 走進第 k 場：從這一幀開始（倒下重打的話換成這一次）。最近的兩份存檔點留著（snap）。 */
   enter(k) {
-    if (this.mode === 'record' && this.rolling) this.tape.open[k] = this.i;
+    if (this.mode !== 'record' || !this.rolling) return;
+    this.tape.open[k] = this.i;
+    for (const x of this.tape.snaps.slice(-2)) x.keep = true;
   }
 
   /** 第 k 場的怪物全死、屍體全落地：這一段到這一幀，再多錄 tail 秒。 */

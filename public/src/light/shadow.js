@@ -247,6 +247,10 @@ export function setup(ctx) {
       at = id; was = s;
       shoot();
     },
+    /* 錄影的存檔點（snap.js）：不必存——拍的是哪一間、哪幾樣看得到，放回去之後下一幀重框重拍一次，
+       拍出來跟原本那一張一模一樣。 */
+    save() { return null; },
+    load() { at = undefined; was = -1; },
   };
 }
 

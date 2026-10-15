@@ -116,5 +116,24 @@ export function setup(ctx) {
       const a = from.tint, b = target.tint;
       FUR_TINT.value.set(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u);
     },
+    /** 錄影的存檔點（snap.js）：漸變走到哪，與已經寫出去的色階、霧色、毛色。 */
+    save() {
+      const id = [...sets].find(([, s]) => s === target)?.[0] ?? null;
+      return {
+        block, target: id, t, from: { tones: [...from.tones], fog: from.fog.toArray(), tint: [...from.tint] },
+        band: [...band], fog: fog ? fog.color.toArray() : null, tint: FUR_TINT.value.toArray(),
+      };
+    },
+    load(s) {
+      block = s.block;
+      target = s.target === null ? null : sets.get(s.target);
+      t = s.t;
+      from.tones.set(s.from.tones);
+      from.fog.fromArray(s.from.fog);
+      from.tint = [...s.from.tint];
+      band.set(s.band);
+      if (fog && s.fog) fog.color.fromArray(s.fog);
+      FUR_TINT.value.fromArray(s.tint);
+    },
   };
 }

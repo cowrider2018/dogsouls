@@ -202,5 +202,13 @@ export function setup(ctx) {
       fade.needsUpdate = true;
       clip.needsUpdate = true;
     },
+    /* 錄影的存檔點（snap.js）：怪物的大小拿了沒有。放回去的時候拿過的話現在就去拿，等它拿到（回傳的那一個）
+       才接著走——不然那幾幀的影子是預設的大小。 */
+    save() { return { asked }; },
+    load(s) {
+      if (!s.asked || asked) return null;
+      asked = true;
+      return import('../monster.js').then((mod) => { sizeOf = mod.sizeOf; });
+    },
   };
 }

@@ -36,6 +36,8 @@ const WARM = 0.5;
 const SHOT_COST = 6;
 
 const post = (msg) => parent.postMessage(msg, location.origin);
+/** 用不用存檔點（mode-flow.js 的 restore）：還在試，網址給 `?snap=1` 才用；上一層說 `nosnap` 的那一次不用（放不回去，從頭再來）。 */
+const SNAP_ON = (() => { const q = new URLSearchParams(location.search); return q.get('snap') === '1' && !q.has('nosnap'); })();
 const nap = () => new Promise((r) => setTimeout(r, 0));
 
 /**
@@ -82,6 +84,7 @@ export async function serve(game) {
   try {
     await replay(game, tape, new Set(pick), FPS.includes(fps) ? fps : FPS[FPS.length - 1], ears);
   } catch (e) {
+    console.error(e);
     post({ type: 'error', message: String(e?.message || e) });
   }
 }
@@ -174,20 +177,35 @@ async function replay(game, tape, pick, fps, ears) {
   apply();
 
   game.rewind(meta);
+  /* 存檔點（tape.js 的 snaps、mode-flow.js 的 restore）：第一場要轉的暖身開始之前、離它最近的那一份放回去，
+     從那一幀接著走，前面不推。放不回去（有對不上的）或之後指紋對不上，就請上一層從頭再開一次、不用存檔點
+     （'again'）——這一頁的世界已經被動過，不能就地改回從頭推。 */
+  let i0 = 0, snapped = false;
+  const snap = SNAP_ON && scenes.length ? (tape.snaps || []).filter((s) => s.at <= scenes[0].from).pop() : null;
+  if (snap) {
+    let r;
+    try { r = game.restore(snap.data); } catch (e) { r = { bad: [String(e?.message || e)] }; }
+    if (r.bad.length) { post({ type: 'again', why: r.bad.slice(0, 4).join('；') }); return; }
+    await r.ready;
+    view = game.deck.seek(snap) || meta.view;
+    apply();
+    i0 = snap.at;
+    snapped = true;
+  }
   let film = null;
   // 最後一場要轉的錄完就停：之後的不必再快轉。
   const N = scenes.length ? scenes[scenes.length - 1].last + 1 : 0;
   const shots = scenes.reduce((n, sc) => n + mask.subarray(sc.start, sc.last + 1).reduce((m, v) => m + 1 - v, 0), 0);
-  const total = N + shots * SHOT_COST;
+  const total = N - i0 + shots * SHOT_COST;
   let done = 0, told = 0;
   /** 時間花在哪（毫秒）：快轉的幀、畫的幀（世界＋GL）、拍（疊圖層）、等編碼器、混音裝箱；各幾幀。 */
-  const cost = { fast: 0, draw: 0, shoot: 0, encode: 0, mix: 0, fastN: 0, drawN: 0, wall: performance.now() };
+  const cost = { fast: 0, draw: 0, shoot: 0, encode: 0, mix: 0, fastN: 0, drawN: 0, from: i0, wall: performance.now() };
   const clockIn = () => performance.now();
 
   let k = 0;                    // 下一段（或正在錄的那一段）
   let cut = null;               // 正在錄的這一段：{ sc, reel, mix, t, next }
 
-  for (let i = 0; i < N; i++) {
+  for (let i = i0; i < N; i++) {
     const sc = scenes[k];
     // 暖身開始（片段開始前 WARM 秒）：畫面換成這一場的大小。
     if (sc && i === sc.from) {
@@ -209,6 +227,7 @@ async function replay(game, tape, pick, fps, ears) {
     const draw = shoot || (!!sc && !hidden && i >= sc.from && i < sc.start);
     let t0 = clockIn();
     game.step(real, draw);
+    if (snapped && game.deck.drift >= 0) { post({ type: 'again', why: `第 ${game.deck.drift} 幀的指紋對不上` }); return; }
     const t1 = clockIn();
     if (draw) { cost.draw += t1 - t0; cost.drawN++; } else { cost.fast += t1 - t0; cost.fastN++; }
     done++;

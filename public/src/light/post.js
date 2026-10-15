@@ -316,6 +316,18 @@ export function setup(ctx) {
       }
     },
 
+    /** 錄影的存檔點（snap.js）：暗角跟到哪、心跳在哪一拍，與圓心（跑到相機後面那幾幀留著的上一個）。 */
+    save() {
+      return { tight, low, phase, pulse: state.pulse, scale: state.scale, center: comp.uniforms.uCenter.value.toArray(), vig: comp.uniforms.uVig.value.toArray() };
+    },
+    load(s) {
+      ({ tight, low, phase } = s);
+      state.pulse = s.pulse;
+      state.scale = s.scale;
+      comp.uniforms.uCenter.value.fromArray(s.center);
+      comp.uniforms.uVig.value.fromArray(s.vig);
+    },
+
     render(draw) {
       fit();
       renderer.setRenderTarget(rt);

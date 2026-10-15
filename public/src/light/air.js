@@ -352,5 +352,26 @@ export function setup(ctx) {
       renderer.getDrawingBufferSize(size);
       U_H.value = size.y / 2;
     },
+    /** 錄影的存檔點（snap.js）：霧走到哪、每一組光柱淡到哪，與已經寫出去的霧。 */
+    save() {
+      const k = {};
+      for (const id in sets) k[id] = sets[id].k;
+      return { cur: { ...cur }, from: { ...from }, to: { ...to }, t, block, k, fogC: U_FOG_C.value.toArray(), fog: U_FOG.value.toArray() };
+    },
+    load(s) {
+      Object.assign(cur, s.cur);
+      Object.assign(from, s.from);
+      Object.assign(to, s.to);
+      ({ t, block } = s);
+      for (const id in sets) {
+        const S = sets[id];
+        S.k = s.k[id] ?? 0;
+        S.uK.value = S.k * SHAFT_K;
+        S.uD.value = S.k * 0.8;
+        S.mesh.visible = S.dots.visible = S.k > 0;
+      }
+      U_FOG_C.value.fromArray(s.fogC);
+      U_FOG.value.fromArray(s.fog);
+    },
   };
 }

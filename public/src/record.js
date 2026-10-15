@@ -228,15 +228,24 @@ export function showReel({ tape, stages, release }) {
     let lock = null;
     try { lock = await navigator.wakeLock?.request('screen'); } catch { /* 不給就算了 */ }
 
-    const q = new URLSearchParams(location.search);
-    q.delete('record');
-    q.set('replay', '1');
-    q.set('seed', String(tape.meta.bootSeed));
-    const frame = document.createElement('iframe');
-    frame.className = 'replay';
-    frame.style.width = `${tape.meta.view.w}px`;
-    frame.style.height = `${tape.meta.view.h}px`;
-    frame.src = `${location.pathname}?${q}`;
+    /* 重演的那一頁。存檔點放不回去（replay.js 說 'again'）的話整頁丟掉、從頭推再開一頁（nosnap），
+       只轉還沒下載的那幾場。 */
+    const saved = new Set();
+    let frame = null;
+    const open = (nosnap) => {
+      const q = new URLSearchParams(location.search);
+      q.delete('record');
+      q.set('replay', '1');
+      q.set('seed', String(tape.meta.bootSeed));
+      if (nosnap) q.set('nosnap', '1');
+      frame?.remove();
+      frame = document.createElement('iframe');
+      frame.className = 'replay';
+      frame.style.width = `${tape.meta.view.w}px`;
+      frame.style.height = `${tape.meta.view.h}px`;
+      frame.src = `${location.pathname}?${q}`;
+      document.body.append(frame);
+    };
 
     const end = (text) => {
       say.textContent = text;
@@ -247,10 +256,13 @@ export function showReel({ tape, stages, release }) {
       lock?.release().catch(() => {});
     };
     const listen = (e) => {
-      if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
+      if (e.origin !== location.origin || e.source !== frame?.contentWindow) return;
       const m = e.data;
       if (m.type === 'ready') {
-        frame.contentWindow.postMessage({ type: 'tape', tape, pick, fps }, location.origin);
+        frame.contentWindow.postMessage({ type: 'tape', tape, pick: pick.filter((k) => !saved.has(k)), fps }, location.origin);
+      } else if (m.type === 'again') {
+        console.info('存檔點放不回去，從頭推', m.why);
+        open(true);
       } else if (m.type === 'progress') {
         const pct = 100 * m.done / m.total;
         bar.style.width = `${pct.toFixed(1)}%`;
@@ -258,6 +270,7 @@ export function showReel({ tape, stages, release }) {
         if (m.scene !== null) mark(m.scene, m.mixing ? '裝箱' : '轉檔中', 'now');
       } else if (m.type === 'file') {
         download(m.blob, `dogsouls-${m.k + 1}-${m.name}.mp4`);
+        saved.add(m.k);
         mark(m.k, '已下載', 'saved');
       } else if (m.type === 'done') {
         bar.style.width = '100%';
@@ -268,6 +281,6 @@ export function showReel({ tape, stages, release }) {
       }
     };
     addEventListener('message', listen);
-    document.body.append(frame);
+    open(false);
   });
 }

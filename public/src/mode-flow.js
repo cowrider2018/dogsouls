@@ -95,8 +95,10 @@ import { Signpost } from './signpost.js';
 import { BossBar } from './bossbar.js';
 import { roamMap } from './roam.js';
 import { Lobby, aimBackdrop } from './lobby.js';
-import { BOOT_SEED, reseed } from './chance.js';
+import { BOOT_SEED, reseed, chanceState, setChanceState } from './chance.js';
 import { Deck, blankTape, END_TAIL } from './tape.js';
+import { grab, put, differ, pose, setPose } from './snap.js';
+import { makeWorld } from './skills.js';
 
 /** 完整遊戲（boot.js 的 game）：完整流程去掉面板、提示字與開發用的鍵。 */
 const GAME = document.body.dataset.mode === 'game';
@@ -141,6 +143,13 @@ STAGES.forEach((s, k) => {
 });
 /** 怪物站在哪一張圖（combat.js 的 FIELD 那一種）：那一張的黑牆、整片遺跡的碰撞、現在的門、准許待的地方。 */
 const fieldOf = (block) => ({ arena: ruins.arenas.find((a) => a.id === block), cols: COLS, doors, roam: ROAMS.get(block) });
+/** 上一次換陣容站的是哪一張圖（錄影的存檔點照它把 fight 的場地放回去）。 */
+let fieldBlock = 'wallwalk';
+/** 換一批怪物上場，站在 `block` 那一張圖上（Fight.lineup）。 */
+function lineup(spawns, block) {
+  fieldBlock = block;
+  fight.lineup(spawns, fieldOf(block));
+}
 
 /* ── 動物 ────────────────────────────────────────────────────────── */
 const zoo = await loadZoo({ look: 'dog-prick/yellow', height: 1.0 });
@@ -282,7 +291,7 @@ function startFrom(k) {
   seen = new Set(STAGES.slice(0, k).map((s) => s.room));
   deaths = 0;
   resetLife(player);
-  fight.lineup([], fieldOf('wallwalk'));
+  lineup([], 'wallwalk');
   dropBoss();
   fight.reset();                          // 地上沒撿的靈魂一起清掉
   folk.clear();
@@ -323,7 +332,7 @@ function appear(k, rise) {
   spawnIn = 0;
   appeared.add(k);
   const foes = foesOf(k, rise);
-  fight.lineup(foes, fieldOf(STAGES[k].room.split(':')[0]));
+  lineup(foes, STAGES[k].room.split(':')[0]);
   if (rise) hud.flash(`${foes.length > 1 ? '怪物' : KINDS[foes[0].kind].name}出現了`);
 }
 
@@ -382,7 +391,7 @@ function rest() {
   const k = run.next;
   run.active = false;
   spawnIn = 0;
-  fight.lineup([], fieldOf(player.block));
+  lineup([], player.block);
   dropBoss();
   place(k === 0 ? { ...ruins.arrivals[START] } : restAt(k, ruins));
   applyDoors();
@@ -502,6 +511,65 @@ function finish() {
   }));
 }
 
+/* ── 錄影的存檔點（snap.js、tape.js 的 snaps）───────────────────────
+   錄的時候，平靜（calm）每 SNAP_EVERY 秒把世界抓一份記在帶子上；轉檔的時候重演那一頁 rewind 之後
+   放回離勾的那一場最近的一份（restore），從那一幀接著走——前面不必一幀一幀推。
+   平靜：沒在打、沒有劇情、沒在被送走、沒有倒下，場上沒有怪物、沒有在飛的、沒有還看得到的特效
+   （Fight.calm）。這時候世界剩下的就是主角、鏡頭、路線、亂數、動物的姿勢、光影、手把、路標，
+   與清完的那幾場的屍體——抓得完。抓不完的那些（還在打、特效還在）就等下一次平靜。
+   還在試：網址給 `?snap=1` 才存、才用。 */
+const SNAP_ON = new URLSearchParams(location.search).get('snap') === '1';
+/** 平靜的時候幾秒存一份。 */
+const SNAP_EVERY = 1;
+let snapT = 0;
+
+function calm() {
+  return !lobby && !stopped && !run.active && spawnIn === 0 && closing === null && ending === null
+    && !story.on && transit.t < 0 && !death.busy && !folk.list.length && fight.calm;
+}
+
+/** 抓一份（這一幀結束之後的世界）。 */
+function save() {
+  return {
+    rng: chanceState(), clock, battle, run: { ...run }, opened: [...opened], appeared: [...appeared], seen: [...seen],
+    deaths, byAltar, fieldBlock,
+    player: grab(player), cam: grab(cam), camera: [...camera.position.toArray(), ...camera.quaternion.toArray()],
+    story: grab(story), transit: grab(transit), death: grab(death, ['zoo', 'ghosts', 'ghost']),
+    fight: fight.save(player), mover: grab(fight.mover, ['moves', 'moveOf']),
+    zoo: grab(zoo.active, ['data', 'model', 'skins', 'shape', '_hatBones']), pose: pose(zoo.active.root),
+    light: light.save(), pad: grab(pad), signpost: grab(signpost), bossBar: grab(bossBar),
+  };
+}
+
+/**
+ * 放回去（重演的那一頁，rewind 之後）。回傳 { bad, ready }：bad 是對不上的那幾個位置（有的話這一份不能用，
+ * 從頭推）；ready 是光影要先拿的東西拿到了的那一刻。
+ */
+function restore(s) {
+  setChanceState(s.rng);
+  clock = s.clock; battle = s.battle; run = { ...s.run };
+  opened = new Set(s.opened); appeared = new Set(s.appeared); seen = new Set(s.seen);
+  deaths = s.deaths; byAltar = s.byAltar; fieldBlock = s.fieldBlock;
+  spawnIn = 0; closing = null; ending = null; bossAt = null;
+  const bad = [
+    ...put(player, s.player), ...put(cam, s.cam), ...put(story, s.story), ...put(transit, s.transit),
+    ...put(death, s.death), ...put(fight.mover, s.mover), ...put(zoo.active, s.zoo),
+    ...put(pad, s.pad), ...put(signpost, s.signpost), ...put(bossBar, s.bossBar),
+  ];
+  camera.position.fromArray(s.camera, 0);
+  camera.quaternion.fromArray(s.camera, 3);
+  fight.world = makeWorld(fieldOf(fieldBlock));
+  bad.push(...fight.load(s.fight, player, fieldOf));
+  if (!setPose(zoo.active.root, s.pose)) bad.push('zoo pose');
+  const ready = light.load(s.light);
+  applyDoors();
+  // 放好之後再抓一次，跟存的那一份逐項比：寫不回去的地方在這裡現形。
+  const again = save();
+  const off = differ({ ...again, light: null }, { ...s, light: null });
+  if (off) bad.push(`differ ${off}`);
+  return { bad, ready };
+}
+
 /* ── 主迴圈 ──────────────────────────────────────────────────── */
 let last = performance.now();
 /** 世界的時鐘（毫秒）：跟著慢動作走、書頁蓋住的時候停住。火光、旗子這些照它動。 */
@@ -545,7 +613,18 @@ function step(real, draw = true) {
   play(real, draw);
   if (deck) {
     deck.end();
-    if (TAPE === 'record') { settle(); watchThrone(real); }
+    if (TAPE === 'record') {
+      settle();
+      watchThrone(real);
+      // 存檔點：平靜的時候每 SNAP_EVERY 秒一份（ms 記著抓一份花多久，量對遊戲的負擔）。
+      snapT += real;
+      if (SNAP_ON && snapT >= SNAP_EVERY && calm()) {
+        snapT = 0;
+        const t0 = performance.now();
+        deck.snap(save());
+        deck.tape.snaps[deck.tape.snaps.length - 1].ms = performance.now() - t0;
+      }
+    }
   }
 }
 
@@ -756,7 +835,7 @@ document.getElementById('boot').remove();
 if (TAPE === 'replay') {
   // 重演的那一頁沒有開始畫面、不跟著螢幕刷新走：等帶子來了，由 replay.js 一幀一幀推。
   import('./replay.js').then((m) => m.serve({
-    step, rewind, deck, story, pad, renderer, sound, music, stages: STAGES.map((st) => st.name),
+    step, rewind, restore, deck, story, pad, renderer, sound, music, stages: STAGES.map((st) => st.name),
   }));
 } else {
   if (GAME) {
