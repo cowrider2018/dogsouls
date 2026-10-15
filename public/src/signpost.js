@@ -59,9 +59,10 @@ export class Signpost {
 
   /**
    * 這一幀：`posts` 是主角這個房間的路標（route.js 的 signposts），`doors` 每一扇門開不開
-   * （stage.js 的 doors），`player` 是主角（腳在 x, y, z），`calm` 是不在打。
+   * （stage.js 的 doors），`player` 是主角（腳在 x, y, z），`calm` 是不在打。`paint` 是假的：
+   * 淡入淡出照走，只是不畫（轉檔的重演快轉；下一次畫的時候整張從頭畫）。
    */
-  show(posts, doors, player, camera, dt, calm = true) {
+  show(posts, doors, player, camera, dt, calm = true, paint = true) {
     const { x, y, z } = player;
     const want = new Set();
     for (const sp of posts) {
@@ -76,7 +77,7 @@ export class Signpost {
       o.a = Math.max(0, Math.min(1, o.a + (want.has(p) ? dt : -dt) / FADE));
       if (o.a === 0 && !want.has(p)) this._posts.delete(p);
     }
-    this._draw(player, camera);
+    if (paint) this._draw(player, camera);
   }
 
   /** 全部馬上收掉（書頁蓋住的時候）：蓋住的這段時間不畫，掀開之後再淡進來。 */

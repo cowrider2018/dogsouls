@@ -15,9 +15,10 @@
      · `setup(ctx)`  建場景物件，回傳 { update?(f), render?(draw) }。
                    ctx = { scene, renderer, camera, ruins (沒有遺跡的那一頁是
                          null), cols, arenas }
-                   f   = { dt, now, player, block, foes, crowd }（foes 是怪物狀態，
+                   f   = { dt, now, player, block, foes, crowd, draw }（foes 是怪物狀態，
                          各有 x y z；crowd 是不是怪物的那幾隻（人民、國王），
-                         各有 x y z aimX aimZ size；沒有就是空陣列）
+                         各有 x y z aimX aimZ size；沒有就是空陣列。draw 是假的：
+                         這一幀不畫（轉檔的重演快轉），只畫不記的可以不做；沒給是要畫）
                    render(draw)：要接管最後那一筆畫面（後製）的才給；draw()
                          就是原本的 renderer.render(scene, camera)。只能有一支。
 
@@ -62,7 +63,7 @@ export function createLight({ scene, renderer, camera, ruins = null, cols = [], 
   const draw = () => renderer.render(scene, camera);
   const owner = live.find((l) => l.render);
   return {
-    /** @param {{dt: number, now: number, player: object, block?: string, foes?: object[], crowd?: object[]}} f */
+    /** @param {{dt: number, now: number, player: object, block?: string, foes?: object[], crowd?: object[], draw?: boolean}} f */
     update(f) {
       const g = { block: null, foes: [], crowd: [], ...f };
       for (const l of live) if (l.update) l.update(g);

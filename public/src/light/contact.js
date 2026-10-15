@@ -181,13 +181,16 @@ export function setup(ctx) {
 
   return {
     update(f) {
-      let n = 0;
-      if (f.player && place(n, f.player, 1)) n++;
       const foes = f.foes;
       if (foes.length && !asked) {
         asked = true;
         import('../monster.js').then((mod) => { sizeOf = mod.sizeOf; });
       }
+      // 這一幀不畫（轉檔的重演快轉）：不必擺。每一幀照當下的位置從頭擺，要畫的那一幀擺的就是對的。
+      // 上面那一下照樣問，牠們的大小才會在要畫之前就拿到。
+      if (f.draw === false) return;
+      let n = 0;
+      if (f.player && place(n, f.player, 1)) n++;
       for (let j = 0; j < foes.length && n < POOL; j++) {
         const m = foes[j];
         if (place(n, m, (sizeOf && sizeOf(m.kind)) || 1)) n++;

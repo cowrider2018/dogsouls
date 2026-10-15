@@ -528,7 +528,9 @@ function frame(now) {
 
 /**
  * 一幀：真實時間過了 `real` 秒。世界走一步、畫一張。`draw` 是假的話世界照走、只是不畫
- * （light.render 那一下，一幀裡最貴的）——其餘的照樣跑，因為它們也會動到世界的狀態與亂數。
+ * （轉檔的重演快轉的時候）：不畫 GL（light.render，一幀裡最貴的），也不畫搖桿、路標這幾張 2D 畫布、
+ * 不擺腳下的影子——它們每一幀照當下的狀態從頭畫，下一張要畫的時候就是對的。其餘的照樣跑，
+ * 因為它們也會動到世界的狀態與亂數；只畫不記的才省，淡入淡出、動畫這種一幀一幀累積的照樣走。
  */
 function step(real, draw = true) {
   cost.begin();
@@ -642,7 +644,7 @@ function play(real, draw) {
   }
   // 路標只在不打、也不在演劇情（慢動作、書頁）的時候出現：開打的那一刻淡出去，漫畫走了才淡進來。
   seen.add(roomOf(player.block, player.y));
-  signpost.show(signposts(passable, roomOf(player.block, player.y), seen), doors, player, camera, real, !run.active && !story.on);
+  signpost.show(signposts(passable, roomOf(player.block, player.y), seen), doors, player, camera, real, !run.active && !story.on, draw);
 
   fight.draw(dt, camera, player);
   trackBoss();
@@ -652,7 +654,7 @@ function play(real, draw) {
   const king = fight.king && fight.king.body();
   light.update({
     dt, now: clock, player, block: player.block, foes: fight.foes.map((f) => f.m),
-    crowd: king ? [...folk.here(player.block), king] : folk.here(player.block),
+    crowd: king ? [...folk.here(player.block), king] : folk.here(player.block), draw,
   });
   cost.split();
   /* 轉檔的重演：每畫一張之前愛心的貼圖重新傳上 GPU、three 記的 GL 狀態全部重來（hearts.js 的 refresh），
@@ -666,7 +668,7 @@ function play(real, draw) {
   // 跳躍鍵的圖案：長按會交靈魂的時候（在國王身邊、還沒交滿、操作沒收起來）是托著靈魂的手。
   // 這一幀交滿了的話這裡已經不在國王身邊（nearAltar 重問），圖案當場換回來。
   pad.icon = iconOf({ give: fight.nearAltar(player) && !still, striking: fight.striking });
-  pad.draw();
+  if (draw) pad.draw();
 
   fpsAcc += real; fpsN++; hudAcc += real;
   let line = null;
