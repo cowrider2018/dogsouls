@@ -14,8 +14,6 @@
    抽了就會把世界後面的籤全部錯開一格。
    ------------------------------------------------------------------ */
 
-import { mulberry32 } from './rng.js';
-
 /** 隨便一顆 32 位元的種子。 */
 export const freshSeed = () => globalThis.crypto.getRandomValues(new Uint32Array(1))[0];
 
@@ -25,13 +23,25 @@ export const BOOT_SEED = (() => {
   return q !== null && /^\d+$/.test(q) ? Number(q) >>> 0 : freshSeed();
 })();
 
-let draw = mulberry32(BOOT_SEED);
+/* rng.js 的 mulberry32 照抄一份，只是狀態放在外面：錄影的存檔點（snap.js）要記下抽到哪、重演的時候
+   接著抽。抽出來的數跟 mulberry32(種子) 一模一樣。 */
+let s = BOOT_SEED >>> 0;
 
 /** 0（含）～1（不含）的一個數，跟 Math.random 一樣用。 */
-export const random = () => draw();
+export function random() {
+  s = (s + 0x6d2b79f5) >>> 0;
+  let t = s;
+  t = Math.imul(t ^ (t >>> 15), 1 | t);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
 
 /** 從這一顆種子重新抽起（沒給就隨便挑一顆）。回傳用的那一顆。 */
 export function reseed(seed = freshSeed()) {
-  draw = mulberry32(seed);
-  return seed >>> 0;
+  s = seed >>> 0;
+  return s;
 }
+
+/** 抽到哪了（存檔點記下、重演的時候放回去接著抽）。 */
+export const chanceState = () => s;
+export function setChanceState(v) { s = v >>> 0; }
