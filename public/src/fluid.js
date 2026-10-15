@@ -294,7 +294,15 @@ export class Fluid {
   /** 醒著嗎：最後一次注入之後還沒過 sleep 秒。 */
   get awake() { return this._now - this._lastSplat < FLUID.sleep || this._splats.length > 0; }
 
-  /** 往前推一幀。在 renderer.render 之前叫。 */
+  /** 有沒有哪一格借出去了。 */
+  get lent() { return this._tiles.some((t) => t.owner !== null); }
+
+  /**
+   * 往前推一幀。在 renderer.render 之前叫。
+   * 醒著、可是一格都沒借出去的時候也不推：沒人借的格子不會出現在畫面上（貼著它的那一片只畫借著的
+   * 那一格），再借出去的時候先清成 0（acquire），格子之間又不相通——推不推，畫面上一個像素都不差。
+   * 煙散了、格子還了之後到 sleep 秒之前那一截，就不必白跑。
+   */
   step(dt) {
     this._now += dt;
     this.passes = 0;
@@ -304,7 +312,7 @@ export class Fluid {
     r.autoClear = false;
     for (const tile of this._dirty) this._clear(tile);
     this._dirty.clear();
-    if (this.awake) this._simulate(Math.min(dt, 1 / 30));
+    if (this.awake && this.lent) this._simulate(Math.min(dt, 1 / 30));
     r.setRenderTarget(prev);
     r.autoClear = autoClear;
   }
