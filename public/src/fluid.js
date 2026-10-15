@@ -259,9 +259,15 @@ export class Fluid {
     return best;
   }
 
-  /** 還一格。已經被別人收走的話什麼都不做。 */
+  /**
+   * 還一格。已經被別人收走的話什麼都不做。還回來的那一格下一幀清成 0：沒人借的格子不留殘煙——
+   * 隔壁那一格取樣的時候在邊上沾不到它，而且一格都沒借出去的時候整張圖就是 0，跟剛建好的一樣
+   * （錄影的存檔點靠這一點：存的時候不必把整張圖從 GPU 讀回來）。
+   */
   release(tile, owner) {
-    if (this._tiles[tile].owner === owner) this._tiles[tile].owner = null;
+    if (this._tiles[tile].owner !== owner) return;
+    this._tiles[tile].owner = null;
+    this._dirty.add(tile);
   }
 
   /** 這一格還是不是 owner 的（借得太久、被收走了就不是）。 */
